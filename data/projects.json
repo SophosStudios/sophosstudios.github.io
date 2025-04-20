@@ -2,31 +2,31 @@
   {
     "name": "Minecraft | Sophos Studios | eco.sk",
     "description": "Virtual economy system with daily rewards and balance tracking. (Skript is required)",
-    "link": "./page/minermc/economy",
+    "link": "./page/economy/economy.html",
     "gif": "https://cdn-icons-png.freepik.com/512/8274/8274512.png"
   },
   {
     "name": "Minecraft | Sophos Studios | moderation.sk",
     "description": "This will completely give you moderation skills in minecraft with SKRIPT (Skript is required)",
-    "link": "./page/moderation/mod",
+    "link": "./page/mod/mod.html",
     "gif": "https://cdn-icons-png.freepik.com/512/8274/8274512.png"
   },
   {
     "name": "Discord | Voice Channel Logger",
     "description": "Discord bot that logs voice state updates with duration tracking. (Discord.js v14)",
-    "link": "./page/voice-logger/bot",
+    "link": "./page/vc-logger/vc-logger.html",
     "gif": "./content/locked_vc.png"
   },
   {
     "name": "Roblox | Flashlight Script",
     "description": "Roblox first-person horror flashlight script for immersive gameplay.",
-    "link": "./page/roblox-flashlight/flashlight",
+    "link": "./page/flashlight/flashlight.html",
     "gif": "./content/cold_flashlight.png"
   },
   {
     "name":"Roblox | Script Counter",
     "description":"Counts the number of scripts in a Roblox game, including local scripts.",
-    "link":"./page/plugin-counter/plugin",
+    "link":"./page/plugin/plugin.html",
     "gif":"https://tr.rbxcdn.com/180DAY-ef1bb8fd79dbb43455cec7c458a2fe5f/420/420/Decal/Webp/noFilter"
   }
 ]
