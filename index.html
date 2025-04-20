@@ -2,27 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sophos Studios Portfolio</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sophos Portfolio</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <button id="theme-toggle">Toggle Theme</button>
+  <button id="theme-toggle">🌓</button>
 
   <div class="terminal">
-    <p>Welcome to Sophos Studios!</p>
-    <p>I'm <strong>Sophos</strong>, a passionate developer building cool things on the web.</p>
-    <p>Type <code>'help'</code> or press a button below to get started.</p>
+    <p>Welcome to <strong>Sophos Studios</strong>!</p>
+    <p>A web dev platform styled like a terminal. Type <code>help</code> or click a button.</p>
   </div>
 
-  <button id="add-project-btn">➕ Add Project</button>
+  <div id="auth">
+    <input id="username" placeholder="Username" />
+    <input id="password" type="password" placeholder="Password" />
+    <button id="signin">Sign In</button>
+    <button id="signup">Sign Up</button>
+  </div>
 
+  <div id="dashboard" class="hidden">
+    <button id="add-project-btn">➕ New Project</button>
+    <div id="projects"></div>
+  </div>
+
+  <!-- Modal -->
   <div id="project-modal" class="modal hidden">
     <div class="modal-content">
-      <h2>Create New Project</h2>
-      <input type="text" id="project-title" placeholder="Title" />
+      <h2 id="modal-title">New Project</h2>
+      <input id="project-title" placeholder="Title" />
       <textarea id="project-desc" placeholder="Description"></textarea>
-      <textarea id="project-code" placeholder="Code (optional)"></textarea>
+      <textarea id="project-code" placeholder="Code"></textarea>
       <div class="modal-actions">
         <button id="save-project">Save</button>
         <button id="cancel-project">Cancel</button>
@@ -30,9 +40,8 @@
     </div>
   </div>
 
-  <div id="projects"></div>
-
   <script src="theme.js"></script>
+  <script src="auth.js"></script>
   <script src="database.js"></script>
   <script src="main.js"></script>
 </body>
