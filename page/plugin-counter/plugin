@@ -51,8 +51,8 @@
     </pre>    
     </div>
       <div class="code-block">
-<pre>
-  <code id="copy-code">
+      <pre>
+      <code id="copy-code">
     --[[ THIS SCRIPT IS SERVER SIDED ]]--
     local ScriptCounter = require(game.ReplicatedStorage:WaitForChild("ScriptCounter"))
 
@@ -94,8 +94,8 @@
     return {
         ["ScriptCounter"] = ScriptCounter.Source
     }
-</code>
-</pre>
+          </code>
+        </pre>
       </div>
     </section>
 
