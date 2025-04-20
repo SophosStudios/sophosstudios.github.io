@@ -3,30 +3,37 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sophos Studios</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>Sophos Studios Portfolio</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="terminal-intro" id="terminal">
-    <pre id="terminal-text"></pre>
+  <button id="theme-toggle">Toggle Theme</button>
+
+  <div class="terminal">
+    <p>Welcome to Sophos Studios!</p>
+    <p>I'm <strong>Sophos</strong>, a passionate developer building cool things on the web.</p>
+    <p>Type <code>'help'</code> or press a button below to get started.</p>
   </div>
 
-  <div class="container" id="main-content" style="display:none;">
-    <header>
-      <div class="header-top">
-        <h1>👨‍💻 Sophos Studios</h1>
-        <button id="theme-toggle">🌙</button>
+  <button id="add-project-btn">➕ Add Project</button>
+
+  <div id="project-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Create New Project</h2>
+      <input type="text" id="project-title" placeholder="Title" />
+      <textarea id="project-desc" placeholder="Description"></textarea>
+      <textarea id="project-code" placeholder="Code (optional)"></textarea>
+      <div class="modal-actions">
+        <button id="save-project">Save</button>
+        <button id="cancel-project">Cancel</button>
       </div>
-      <input type="text" id="search" placeholder="Search projects..." />
-    </header>
-
-    <main id="projects"></main>
-
-    <footer>
-      <p>Made with 💻 by Sophos</p>
-    </footer>
+    </div>
   </div>
 
-  <script src="script.js"></script>
+  <div id="projects"></div>
+
+  <script src="theme.js"></script>
+  <script src="database.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>

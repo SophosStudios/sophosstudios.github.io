@@ -1,89 +1,58 @@
-:root {
-  --bg-color: #0e1117;
-  --text-color: #c9d1d9;
-  --card-bg: #161b22;
-  --accent: #58a6ff;
-  --button-bg: #238636;
-}
-
-.light {
-  --bg-color: #f5f5f5;
-  --text-color: #111;
-  --card-bg: #ffffff;
-  --accent: #007acc;
-  --button-bg: #007700;
-}
-
 body {
+  font-family: monospace;
+  background-color: #111;
+  color: #eee;
   margin: 0;
-  font-family: "Fira Code", monospace;
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  transition: 0.3s;
-}
-
-.container {
-  max-width: 800px;
-  margin: auto;
   padding: 2rem;
+  transition: background-color 0.3s, color 0.3s;
 }
-
-.header-top {
+body.light {
+  background-color: #fff;
+  color: #111;
+}
+button {
+  margin: 10px;
+  padding: 10px 20px;
+  background: #333;
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+}
+body.light button {
+  background: #ddd;
+  color: #111;
+}
+.terminal {
+  border: 2px solid #444;
+  padding: 20px;
+  margin-bottom: 2rem;
+}
+.modal {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal.hidden {
+  display: none;
+}
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 10px;
+  width: 300px;
+}
+.modal-actions {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  margin-top: 1rem;
 }
-
-#theme-toggle {
-  background: none;
-  border: 2px solid var(--text-color);
-  border-radius: 4px;
-  padding: 0.4rem 0.6rem;
-  color: var(--text-color);
-  cursor: pointer;
-}
-
-#search {
+textarea, input {
   width: 100%;
+  margin: 0.5rem 0;
   padding: 0.5rem;
-  border: none;
-  background: var(--card-bg);
-  color: var(--text-color);
-  border-radius: 5px;
-  margin-top: 1rem;
-}
-
-.project {
-  background: var(--card-bg);
-  margin-top: 1rem;
-  padding: 1rem;
-  border-left: 5px solid var(--accent);
-  border-radius: 5px;
-  transition: all 0.2s ease;
-}
-
-.project:hover {
-  transform: scale(1.01);
-  border-color: var(--text-color);
-}
-
-.project button {
-  background: var(--button-bg);
-  border: none;
-  padding: 0.5rem 1rem;
-  color: white;
-  margin-top: 0.5rem;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-/* Terminal Intro */
-.terminal-intro {
-  font-family: monospace;
-  background: black;
-  color: #00ff7f;
-  padding: 3rem;
-  height: 100vh;
-  white-space: pre-wrap;
-  font-size: 1.1rem;
 }
