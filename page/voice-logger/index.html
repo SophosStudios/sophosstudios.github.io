@@ -3,46 +3,45 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MinerMC - Sophos Studios</title>
+  <title>Voice Logger - Sophos Studios</title>
   <link rel="stylesheet" href="../../styles.css" />
 </head>
 <body>
   <div class="container">
     <header class="header-top">
-      <h1>🛠️ MinerMC Wiki</h1>
+      <h1>🎙️ Voice Channel Logger</h1>
       <button id="theme-toggle">🌙</button>
     </header>
 
     <nav>
-      <a href="../../" style="color: var(--accent); text-decoration: none;">← Back to Home</a>
+      <a href="../../index.html" style="color: var(--accent); text-decoration: none;">← Back to Home</a>
     </nav>
 
     <section style="margin-top: 2rem;">
-      <h2>📜 Project Overview</h2>
-      <p>MinerMC is a Minecraft server powered by community-driven features like virtual currency, role systems, and advanced automation tools.</p>
+      <h2>🧠 Project Info</h2>
+      <p>This Discord bot logs voice channel join/leave events and tracks user duration. Useful for community engagement and admin tools.</p>
     </section>
 
     <section>
-      <h2>💡 Sample Code Snippet</h2>
+      <h2>🧪 Sample Code</h2>
       <div class="code-block">
 <pre>
   <code id="copy-code">
-    # Minecraft Skript example
-    command /daily:
-      trigger:
-        if {daily::%player%} is not set:
-            give player 10 diamonds
-            set {daily::%player%} to now
-            send "&aYou received your daily reward!"
-        else:
-            send "&cYou've already claimed your daily reward."
-          </code>
-        </pre>
+      client.on('voiceStateUpdate', (oldState, newState) => {
+      const user = newState.member.user;
+      if (!oldState.channel && newState.channel) {
+        console.log(`${user.tag} joined ${newState.channel.name}`);
+      } else if (oldState.channel && !newState.channel) {
+        console.log(`${user.tag} left ${oldState.channel.name}`);
+      }
+    });
+</code>
+</pre>
       </div>
     </section>
 
     <footer style="margin-top: 3rem;">
-      <p>🧠 Documentation by Sophos Studios</p>
+      <p>🛠️ Built with Discord.js by Sophos</p>
     </footer>
   </div>
 

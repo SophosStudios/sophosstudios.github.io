@@ -1,28 +1,100 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="bg-gray-900 text-white">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sophos Studios</title>
-  <link rel="stylesheet" href="./styles.css"/>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="min-h-screen flex flex-col">
 
-  <div class="container" id="main-content">
-    <header>
-      <div class="header-top">
-        <h1>👨‍💻 Sophos Studios</h1>
-        <button id="theme-toggle">🌙</button>
+  <!-- 🌐 Navbar -->
+  <nav class="bg-gray-800 shadow-md w-full">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <h1 class="text-xl font-bold">👨‍💻 Sophos Studios</h1>
+      <div class="relative">
+        <button id="dropdownBtn" class="hover:bg-gray-700 px-4 py-2 rounded transition">Menu ▼</button>
+        <ul id="dropdownMenu" class="hidden absolute right-0 mt-2 bg-gray-800 border border-gray-700 rounded shadow-lg">
+          <li><a href="#" class="block px-4 py-2 hover:bg-gray-700">Projects</a></li>
+          <li><a href="#" class="block px-4 py-2 hover:bg-gray-700">Updates</a></li>
+          <li><a href="#" class="block px-4 py-2 hover:bg-gray-700">About</a></li>
+        </ul>
       </div>
-      <input type="text" id="search" placeholder="Search projects..." />
-    </header>
+    </div>
+  </nav>
 
-    <main id="projects"></main>
+  <!-- 📦 Main Content -->
+  <div class="container max-w-7xl mx-auto flex-1 px-4 py-8" id="main-content">
+    <div class="flex flex-col md:flex-row gap-8">
 
-    <footer>
-      <p>Made with 💻 by Sophos</p>
-    </footer>
+      <!-- 🧑 Side Profile -->
+      <aside class="w-full md:w-1/4 bg-gray-800 p-6 rounded-full shadow-lg text-center">
+        <!-- 👤 Profile Picture with pink glow -->
+        <div class="relative w-32 h-32 mx-auto mb-4">
+          <div class="absolute inset-0 rounded-full blur-xl bg-pink-500 opacity-60 z-0"></div>
+          <img src="./content/team/sophos.png" alt="Sophos" class="rounded-full border-4 border-gray-700 relative z-10" />
+        </div>
+      
+        <!-- 👨 Name -->
+        <h2 class="text-xl font-bold mb-1">Sophos</h2>
+      
+        <!-- ✉️ Email -->
+        <p class="text-sm text-pink-300 mb-4">
+          <a href="mailto:admin@sophosstudios.org" class="hover:underline">admin@sophosstudios.org</a>
+        </p>
+      
+        <!-- 🧠 About Me -->
+        <div class="text-sm text-gray-300">
+          <p>
+            Hey there! I'm Sophos — a developer passionate about creating immersive experiences across Roblox, Discord bots, and custom web platforms. I enjoy building creative tools that help others innovate!
+          </p>
+        </div>
+      </aside>
+      
+
+      <!-- 🔍 Project Viewer -->
+      <main class="flex-1">
+        <header class="mb-4">
+          <div class="flex justify-between items-center">
+            <h2 class="text-2xl font-semibold">Projects</h2>
+            <button id="theme-toggle" class="bg-gray-700 px-3 py-1 rounded">🌙</button>
+          </div>
+          <input type="text" id="search" placeholder="Search projects..." class="mt-4 w-full px-4 py-2 rounded bg-gray-700 text-white placeholder-gray-400" />
+        </header>
+
+        <section id="projects" class="space-y-4"></section>
+      </main>
+
+    </div>
   </div>
+
+  <!-- 🔗 Socials Footer -->
+  <footer class="bg-gray-800 text-center py-6 mt-12">
+    <p class="text-sm mb-2">Made with 💻 by Sophos</p>
+    <div class="flex justify-center gap-6">
+      <a href="#" class="hover:text-blue-400">Twitter</a>
+      <a href="#" class="hover:text-blue-400">GitHub</a>
+      <a href="#" class="hover:text-blue-400">LinkedIn</a>
+      <a href="#" class="hover:text-blue-400">Discord</a>
+    </div>
+  </footer>
+
+  <script>
+    // Dropdown logic
+    const dropdownBtn = document.getElementById("dropdownBtn");
+    const dropdownMenu = document.getElementById("dropdownMenu");
+
+    dropdownBtn.addEventListener("click", () => {
+      dropdownMenu.classList.toggle("hidden");
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!dropdownBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+        dropdownMenu.classList.add("hidden");
+      }
+    });
+  </script>
 
   <script src="./script.js"></script>
   <script src="../../data/favicon.js"></script>
