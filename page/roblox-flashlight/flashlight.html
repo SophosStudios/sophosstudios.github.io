@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Flashlight Script - Sophos Studios</title>
+  <link rel="stylesheet" href="../../styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="header-top">
+      <h1>🔦 Flashlight Script</h1>
+      <button id="theme-toggle">🌙</button>
+    </header>
+
+    <nav>
+      <a href="../../index.html" style="color: var(--accent); text-decoration: none;">← Back to Home</a>
+    </nav>
+
+    <section style="margin-top: 2rem;">
+      <h2>🧱 Overview</h2>
+      <p>This script adds an immersive first-person flashlight mechanic for Roblox horror games. Players toggle it using the RMB key, and it stays locked to the player's head.</p>
+    </section>
+
+    <section>
+      <h2>💡 Script Example</h2>
+      <div class="code-block">
+<pre><code id="copy-code">
+    --[[ 📁 | Flashlight Information ]]--
+    local flashlight = script.Parent;
+    local handle = script.Parent.Handle;
+    local light = script.Parent.Handle.SpotLight;
+
+    local devName = "Sophos (@RedScripting)"
+    
+    local jobs = {light = false;};
+    --[[ ⚡ | Job Worker ]]--
+    function jobs:ToggleJob(min: number?, max: number?)
+        if jobs.light == false then
+            jobs.light = true
+            game:GetService("TweenService"):Create(light, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.In), { Range = max }):Play()
+        else
+            jobs.light = false
+            game:GetService("TweenService"):Create(light, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), { Range = min }):Play()
+        end
+    end
+    
+    --[[ ⛔ | Job Executor ]]--
+    flashlight.Activated:Connect(function()
+        jobs:ToggleJob(0, 24)
+    end)
+    
+    warn("This asset was created by", devName)
+
+    </code>
+        </pre>
+    </section>
+
+    <footer style="margin-top: 3rem;">
+      <p>💡 Created by Sophos Studios</p>
+    </footer>
+  </div>
+
+  <script>
+    const toggle = document.getElementById("theme-toggle");
+    const userTheme = localStorage.getItem("theme");
+
+    if (userTheme === "light") {
+      document.body.classList.add("light");
+      toggle.textContent = "🌞";
+    }
+
+    toggle.addEventListener("click", () => {
+      document.body.classList.toggle("light");
+      const isLight = document.body.classList.contains("light");
+      localStorage.setItem("theme", isLight ? "light" : "dark");
+      toggle.textContent = isLight ? "🌞" : "🌙";
+    });
+  </script>
+  <script src="../../data/copy.js"></script>
+  <script src="../../data/favicon.js"></script>
+</body>
+</html>

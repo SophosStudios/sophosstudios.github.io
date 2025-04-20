@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Script Logger - Sophos Studios</title>
+  <link rel="stylesheet" href="../../styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="header-top">
+      <h1>Roblox Script Logger 📁</h1>
+      <button id="theme-toggle">🌙</button>
+    </header>
+
+    <nav>
+      <a href="../../index.html" style="color: var(--accent); text-decoration: none;">← Back to Home</a>
+    </nav>
+
+    <section style="margin-top: 2rem;">
+      <h2>🧠 Project Info</h2>
+      <p>These scripts will essentailly give you the knowledge of how many scripts are in your game without you having to download another plugin on roblox.</p>
+    </section>
+
+    <section>
+      <h2>🧪 Sample Code</h2>
+      <div class="code-block">
+       <pre>
+        <code id="copy-code">
+            --[[ THIS IS A MODULE SCRIPT ]]--
+            local ScriptCounter = {}
+
+            ScriptCounter.Source = {
+                ["Total"] = 0,
+                ["Category"] = {
+                    ["Workspace"] = 0,
+                    ["Lighting"] = 0,
+                    ["ReplicatedFirst"] = 0,
+                    ["ReplicatedStorage"] = 0,
+                    ["ServerScriptService"] = 0,
+                    ["ServerStorage"] = 0,
+                    ["StarterGui"] = 0,
+                    ["StarterPack"] = 0,
+                    ["StarterPlayer"] = 0,
+                    ["Teams"] = 0,
+                },
+            }
+            
+            return ScriptCounter            
+        </code>
+    </pre>    
+    </div>
+      <div class="code-block">
+<pre>
+  <code id="copy-code">
+    --[[ THIS SCRIPT IS SERVER SIDED ]]--
+    local ScriptCounter = require(game.ReplicatedStorage:WaitForChild("ScriptCounter"))
+
+    local function countScriptsIn(instance)
+        local count = 0
+        for _, item in pairs(instance:GetDescendants()) do
+            if item:IsA("Script") or item:IsA("LocalScript") or item:IsA("ModuleScript") then
+                count += 1
+            end
+        end
+        return count
+    end
+    
+    local total = 0
+    for categoryName, _ in pairs(ScriptCounter.Source.Category) do
+        local service = game:FindFirstChild(categoryName)
+        if service then
+            local count = countScriptsIn(service)
+            ScriptCounter.Source.Category[categoryName] = count
+            total += count
+        end
+    end
+    
+    ScriptCounter.Source.Total = total
+    
+    -- 🖨️ Formatted Output
+    print("=========== Script Count Summary ===========")
+    warn(string.format("%-20s | %s", "Category", "Script Count"))
+    print("--------------------------------------------")
+    
+    for name, count in pairs(ScriptCounter.Source.Category) do
+        warn(string.format("%-20s | %d", name, count))
+    end
+    
+    print("--------------------------------------------")
+    warn(string.format("%-20s | %d", "Total Scripts", ScriptCounter.Source.Total))
+    print("============================================")
+    
+    return {
+        ["ScriptCounter"] = ScriptCounter.Source
+    }
+</code>
+</pre>
+      </div>
+    </section>
+
+    <footer style="margin-top: 3rem;">
+      <p>🛠️ Built with Discord.js by Sophos</p>
+    </footer>
+  </div>
+
+  <script>
+    const toggle = document.getElementById("theme-toggle");
+    const userTheme = localStorage.getItem("theme");
+
+    if (userTheme === "light") {
+      document.body.classList.add("light");
+      toggle.textContent = "🌞";
+    }
+
+    toggle.addEventListener("click", () => {
+      document.body.classList.toggle("light");
+      const isLight = document.body.classList.contains("light");
+      localStorage.setItem("theme", isLight ? "light" : "dark");
+      toggle.textContent = isLight ? "🌞" : "🌙";
+    });
+  </script>
+  <script src="../../data/copy.js"></script>
+  <script src="../../data/favicon.js"></script>
+</body>
+</html>
