@@ -21,12 +21,18 @@
     "name": "Roblox | Flashlight Script",
     "description": "Roblox first-person horror flashlight script for immersive gameplay.",
     "link": "./page/flashlight",
-    "gif": "./content/cold_flashlight.png"
+    "gif": "https://tr.rbxcdn.com/180DAY-ef1bb8fd79dbb43455cec7c458a2fe5f/420/420/Decal/Webp/noFilter"
   },
   {
     "name":"Roblox | Script Counter",
     "description":"Counts the number of scripts in a Roblox game, including local scripts.",
     "link":"./page/plugin",
     "gif":"https://tr.rbxcdn.com/180DAY-ef1bb8fd79dbb43455cec7c458a2fe5f/420/420/Decal/Webp/noFilter"
+  },
+  {
+    "name":"Roblox | Rainbow Part",
+    "description":"This will make a target part rainbow.",
+    "link":"./page/rainbow-part",
+    "gif": "https://tr.rbxcdn.com/180DAY-ef1bb8fd79dbb43455cec7c458a2fe5f/420/420/Decal/Webp/noFilter"
   }
 ]

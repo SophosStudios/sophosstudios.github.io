@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Rainbow Part - Sophos Studios</title>
+  <link rel="stylesheet" href="../../styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="header-top">
+      <h1>Roblox Rainbow Part Script 📁</h1>
+      <button id="theme-toggle">🌙</button>
+    </header>
+
+    <nav>
+      <a href="../../index.html" style="color: var(--accent); text-decoration: none;">← Back to Home</a>
+    </nav>
+
+    <section style="margin-top: 2rem;">
+      <h2>🧠 Project Info</h2>
+      <p>These script(s) will essentially make it so that you will have a rainbow part/parts.</p>
+    </section>
+
+    <section>
+      <h2>🧪 Sample Code</h2>
+      <div class="code-block">
+        <pre>
+          <code id="copy-code">
+            --[[ ThIS IS A SERVER SCRIPT ]]--
+            local config = {
+              targetPart = Workspace.Part;
+              targetTimer = 5;
+            }
+
+            function config:FireRainbowPart()
+              local colorCycle = %config.targetTimer/config.targetTimer;
+              config.targetPart.Color3 = Color3.fromHSV(colorCycle, 1, 1);
+            end
+
+            while task.wait(0.1) do
+              config:FireRainbowPart()
+            end
+</code>
+</pre>
+  <h2> OR </h2>
+<pre>
+  <code id="copy-code">
+      --[[ ThIS IS A SERVER SCRIPT ]]--
+      local config = {
+        targetService = gane.workspace;
+        targetTimer = 5;
+      }
+
+      function config:FireRainbowPart()
+        for _, part in pairs(config.targetService:GetChildren()) do
+          if part:IsA("Part") then
+            local colorCycle = %config.targetTimer/config.targetTimer;
+            part.Color3 = Color3.fromHSV(colorCycle, 1, 1);
+          end
+        end
+      end
+
+      while task.wait(0.1) do
+        config:FireRainbowPart()
+      end
+    </code>
+  </pre>
+      </div>
+    </section>
+    <section style="margin-top: 2rem;">
+      <h2>📥 Download</h2>
+      <p>Click the button below to download the script.</p>
+      <a href="../../data/rainbow-part.lua" download class="button">File coming soon</a>
+    <footer style="margin-top: 3rem;">
+      <p>🛠️ Built with Discord.js by Sophos</p>
+    </footer>
+  </div>
+
+  <script>
+    const toggle = document.getElementById("theme-toggle");
+    const userTheme = localStorage.getItem("theme");
+
+    if (userTheme === "light") {
+      document.body.classList.add("light");
+      toggle.textContent = "🌞";
+    }
+
+    toggle.addEventListener("click", () => {
+      document.body.classList.toggle("light");
+      const isLight = document.body.classList.contains("light");
+      localStorage.setItem("theme", isLight ? "light" : "dark");
+      toggle.textContent = isLight ? "🌞" : "🌙";
+    });
+  </script>
+  <script src="../../data/copy.js"></script>
+  <script src="../../data/favicon.js"></script>
+</body>
+</html>
