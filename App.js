@@ -1735,7 +1735,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <div class="flex items-center space-x-4 mt-4 border-t pt-4 border-gray-300">
                                         <!-- Reactions Section -->
                                         <div class="flex items-center space-x-2">
-                                            ${['👍', '❤️', '😂', '🔥'].map(emoji => `
+                                            ${['�', '❤️', '😂', '🔥'].map(emoji => `
                                                 <button class="text-xl p-1 rounded-full hover:bg-gray-200 transition duration-200" data-post-id="${post.id}" data-emoji="${emoji}">
                                                     ${emoji} <span class="text-sm text-gray-600">${post.reactions[emoji] || 0}</span>
                                                 </button>
