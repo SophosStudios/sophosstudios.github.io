@@ -6,7 +6,7 @@
 // Import Firebase functions
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField, addDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js"; // Added addDoc here
 
 // Import configuration from config.js
 import CONFIG from './config.js'; // Make sure config.js is in the same directory
@@ -2320,7 +2320,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             contentArea.querySelectorAll('[data-delete-team-member-id]').forEach(button => {
                 button.addEventListener('click', async (e) => {
-                    const teamMemberId = e.target.dataset.deleteTeamMemberId;
+                    const teamMemberId = e.target.dataset.teamMemberId;
                     const username = e.target.dataset.username;
                     showMessageModal(`Are you sure you want to remove "${username}" from the team?`, 'confirm', async () => {
                         try {
