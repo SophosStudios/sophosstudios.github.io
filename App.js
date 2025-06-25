@@ -399,6 +399,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
+     * Sets a user's banned status.
+     * @param {string} userId - The ID of the user to ban/unban.
+     * @param {boolean} isBanned - True to ban, false to unban.
+     * @returns {Promise<boolean>} - True on success.
+     */
+    async function setUserBanStatusFirestore(userId, isBanned) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Not authorized to ban/unban users.");
+        }
+        if (userId === currentUser.uid) {
+            showMessageModal("You cannot ban or unban your own account.", 'info');
+            return false;
+        }
+
+        showLoadingSpinner();
+        try {
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
+            await updateDoc(userDocRef, { isBanned: isBanned });
+            return true;
+        } catch (error) {
+            console.error("Error setting user ban status in Firestore:", error.message);
+            throw new Error("Failed to update user ban status: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+
+    /**
      * Deletes a user's data from Firestore by an admin/founder.
      * Note: This does NOT delete the user from Firebase Authentication.
      * For full deletion, server-side code (e.g., using Firebase Admin SDK) is required.
@@ -515,7 +544,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Adds/updates a reaction to a post.
      * Any authenticated user can react.
      * @param {string} postId - The ID of the post.
-     * @param {string} emoji - The emoji character (e.g., '�', '❤️').
+     * @param {string} emoji - The emoji character (e.g., '?', '❤️').
      * @returns {Promise<void>}
      */
     async function addReactionToPost(postId, emoji) {
@@ -656,6 +685,91 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Fetches all team members from Firestore.
+     * @returns {Promise<Array<object>>} - List of all team members.
+     */
+    async function fetchTeamMembersFirestore() {
+        showLoadingSpinner();
+        try {
+            const teamCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/team`);
+            const q = query(teamCollectionRef);
+
+            const querySnapshot = await new Promise((resolve, reject) => {
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    unsubscribe();
+                    resolve(snapshot);
+                }, (error) => {
+                    reject(error);
+                });
+            });
+
+            const teamMembersData = [];
+            querySnapshot.forEach((doc) => {
+                teamMembersData.push({ id: doc.id, ...doc.data() });
+            });
+            return teamMembersData;
+        } catch (error) {
+            console.error("Error fetching team members:", error.message);
+            throw new Error("Failed to fetch team members: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Adds a new team member to Firestore.
+     * Only callable by admins and founders.
+     * @param {string} username - The username of the team member.
+     * @param {string} role - The role of the team member.
+     * @returns {Promise<void>}
+     */
+    async function addTeamMemberFirestore(username, role) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can add team members.");
+        }
+        showLoadingSpinner();
+        try {
+            const teamCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/team`);
+            await addDoc(teamCollectionRef, {
+                username: username,
+                role: role,
+                addedBy: currentUser.uid,
+                addedByUsername: userData.username || currentUser.displayName || currentUser.email,
+                timestamp: serverTimestamp()
+            });
+            showMessageModal('Team member added successfully!');
+        } catch (error) {
+            console.error("Error adding team member:", error.message);
+            throw new Error("Failed to add team member: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Deletes a team member from Firestore.
+     * Only callable by admins and founders.
+     * @param {string} teamMemberId - The ID of the team member to delete.
+     * @returns {Promise<void>}
+     */
+    async function deleteTeamMemberFirestore(teamMemberId) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can delete team members.");
+        }
+        showLoadingSpinner();
+        try {
+            const teamMemberDocRef = doc(db, `/artifacts/${APP_ID}/public/data/team`, teamMemberId);
+            await deleteDoc(teamMemberDocRef);
+            showMessageModal('Team member deleted successfully!');
+        } catch (error) {
+            console.error("Error deleting team member:", error.message);
+            throw new Error("Failed to delete team member: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
 
     // --- UI Rendering Functions ---
 
@@ -713,39 +827,155 @@ document.addEventListener('DOMContentLoaded', async () => {
             container.appendChild(btn);
         };
 
-        if (currentUser && userData) {
-            // Logged in user - Desktop Links
-            createAndAppendButton(navLinks, 'nav-forum', 'Forum', 'forum');
-            if (userData.role === 'admin' || userData.role === 'founder') {
-                createAndAppendButton(navLinks, 'nav-admin', 'Admin Panel', 'admin');
+        // Navigation Categories for Desktop
+        const categories = [
+            {
+                name: 'Community',
+                items: [
+                    { id: 'nav-forum', text: 'Forum', page: 'forum' },
+                    { id: 'nav-team', text: 'Meet the Team', page: 'team' } // New category item
+                ],
+                authRequired: true
+            },
+            {
+                name: 'Administration',
+                items: [
+                    { id: 'nav-admin', text: 'Admin Panel', page: 'admin' }
+                ],
+                authRequired: true,
+                roles: ['admin', 'founder']
+            },
+            {
+                name: 'Account',
+                items: [], // Populated below based on auth state
+                authRequired: false
             }
-            // Removed specific 'Founder Panel' button as requested, Founders use Admin Panel now.
+        ];
 
+        // Populate Account category based on auth state
+        const accountCategory = categories.find(cat => cat.name === 'Account');
+        if (currentUser && userData) {
             const profileIconSrc = userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`;
             const profileIconHtml = `
                 <img src="${profileIconSrc}" alt="Profile" class="w-8 h-8 rounded-full object-cover border-2 border-gray-400"
                      onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}'">`;
 
-            createAndAppendButton(navLinks, 'nav-profile', userData.username || currentUser.email, 'profile', profileIconHtml);
-            createAndAppendButton(navLinks, 'nav-sign-out', 'Sign Out', 'logout');
-
-
-            // Logged in user - Mobile Drawer Links
-            createAndAppendButton(sideDrawerMenu, 'mobile-nav-forum', 'Forum', 'forum', '', true);
-            if (userData.role === 'admin' || userData.role === 'founder') {
-                createAndAppendButton(sideDrawerMenu, 'mobile-nav-admin', 'Admin Panel', 'admin', '', true);
-            }
-            // Removed specific 'Founder Panel' button for mobile, Founders use Admin Panel now.
-            createAndAppendButton(sideDrawerMenu, 'mobile-nav-profile', 'Profile', 'profile', '', true);
-            createAndAppendButton(sideDrawerMenu, 'mobile-nav-sign-out', 'Sign Out', 'logout', '', true);
-
+            accountCategory.items.push(
+                { id: 'nav-profile', text: userData.username || currentUser.email, page: 'profile', icon: profileIconHtml },
+                { id: 'nav-sign-out', text: 'Sign Out', page: 'logout' }
+            );
         } else {
-            // Not logged in - Desktop Links
-            createAndAppendButton(navLinks, 'nav-auth', 'Sign In / Up', 'auth');
-
-            // Not logged in - Mobile Drawer Links
-            createAndAppendButton(sideDrawerMenu, 'mobile-nav-auth', 'Sign In / Up', 'auth', '', true);
+            accountCategory.items.push(
+                { id: 'nav-auth', text: 'Sign In / Up', page: 'auth' }
+            );
         }
+
+        // Render Desktop Navigation
+        categories.forEach(category => {
+            if (category.authRequired && !currentUser) return; // Skip if auth required and user not logged in
+            if (category.roles && (!currentUser || !category.roles.includes(userData.role))) return; // Skip if roles required and user doesn't have them
+
+            // Create dropdown for categories with multiple items or if explicitly set up
+            if (category.items.length > 1) {
+                const dropdownContainer = document.createElement('div');
+                dropdownContainer.className = 'relative group';
+                dropdownContainer.innerHTML = `
+                    <button class="px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 flex items-center space-x-2">
+                        <span>${category.name}</span>
+                        <i class="fas fa-chevron-down text-xs ml-1"></i>
+                    </button>
+                    <div class="absolute hidden group-hover:block bg-gray-700 text-white rounded-lg shadow-lg py-2 w-40 z-10 top-full mt-2 left-0 transition-all duration-300 ease-in-out origin-top scale-y-0 group-hover:scale-y-100">
+                        ${category.items.map(item => `
+                            <button id="${item.id}" class="block w-full text-left px-4 py-2 hover:bg-gray-600 transition duration-200">
+                                ${item.icon || ''}<span>${item.text}</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+                navLinks.appendChild(dropdownContainer);
+
+                // Attach event listeners for dropdown items
+                dropdownContainer.querySelectorAll('button[id]').forEach(btn => {
+                    const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
+                    if (page) {
+                        btn.addEventListener('click', () => {
+                            navigateTo(page);
+                        });
+                    }
+                });
+
+            } else if (category.items.length === 1) {
+                // If only one item in category, just add it as a regular button
+                const item = category.items[0];
+                createAndAppendButton(navLinks, item.id, item.text, item.page, item.icon);
+            }
+        });
+
+
+        // Render Mobile Drawer Navigation
+        // Ensure static home/about buttons are already in HTML and have their listeners.
+        // We will append dynamic categories below them.
+
+        // Mobile dropdown toggle function
+        const createMobileDropdown = (categoryName, items) => {
+            const dropdownWrapper = document.createElement('div');
+            dropdownWrapper.className = 'w-full';
+            dropdownWrapper.innerHTML = `
+                <button class="mobile-dropdown-toggle block w-full text-left px-4 py-3 text-lg font-semibold bg-gray-700 hover:bg-gray-600 transition duration-200 flex justify-between items-center rounded-md">
+                    <span>${categoryName}</span>
+                    <i class="fas fa-chevron-down text-sm transition-transform transform"></i>
+                </button>
+                <div class="mobile-dropdown-content hidden bg-gray-700 py-1 rounded-b-lg overflow-hidden transition-all duration-300 ease-in-out" style="max-height: 0px;">
+                    ${items.map(item => `
+                        <button id="${item.id}" class="block w-full text-left px-6 py-2 text-md hover:bg-gray-600 text-white transition duration-200">
+                            ${item.icon || ''}<span>${item.text}</span>
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+            sideDrawerMenu.appendChild(dropdownWrapper);
+
+            const toggleButton = dropdownWrapper.querySelector('.mobile-dropdown-toggle');
+            const dropdownContent = dropdownWrapper.querySelector('.mobile-dropdown-content');
+            const dropdownIcon = dropdownWrapper.querySelector('.fa-chevron-down');
+
+            toggleButton.addEventListener('click', () => {
+                const isOpen = dropdownContent.classList.contains('open');
+                if (isOpen) {
+                    dropdownContent.style.maxHeight = '0px';
+                    dropdownContent.classList.remove('open');
+                    dropdownIcon.classList.remove('rotate-180');
+                } else {
+                    // Close all other open dropdowns first for cleaner UX
+                    sideDrawerMenu.querySelectorAll('.mobile-dropdown-content.open').forEach(openContent => {
+                        openContent.style.maxHeight = '0px';
+                        openContent.classList.remove('open');
+                        openContent.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
+                    });
+                    
+                    dropdownContent.style.maxHeight = dropdownContent.scrollHeight + 'px';
+                    dropdownContent.classList.add('open');
+                    dropdownIcon.classList.add('rotate-180');
+                }
+            });
+
+            dropdownContent.querySelectorAll('button[id]').forEach(btn => {
+                const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
+                if (page) {
+                    btn.addEventListener('click', () => {
+                        navigateTo(page);
+                        closeSideDrawer(); // Close drawer after navigating
+                    });
+                }
+            });
+        };
+
+        categories.forEach(category => {
+            if (category.authRequired && !currentUser) return;
+            if (category.roles && (!currentUser || !category.roles.includes(userData.role))) return;
+
+            createMobileDropdown(category.name, category.items);
+        });
     }
 
     /**
@@ -1110,9 +1340,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Admin Panel</h2>
                     <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts, and create forum posts.</p>
                     <div class="mb-6 text-center space-x-4">
-                        <button id="create-post-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                            Create New Post
-                        </button>
                         <button id="view-forum-admin-btn" class="py-2 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Manage Posts (Forum)
                         </button>
@@ -1187,19 +1414,33 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </select>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button
-                                class="text-red-600 hover:text-red-900 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                                ${isDisabled}
-                                data-delete-user-id="${user.id}" data-username="${user.username}"
-                            >
-                                Delete
-                            </button>
+                            <div class="relative inline-block text-left">
+                                <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-indigo-500" id="options-menu-${user.id}" aria-haspopup="true" aria-expanded="true">
+                                    Take Action
+                                    <svg class="-mr-1 ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                                <div class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 focus:outline-none hidden" role="menu" aria-orientation="vertical" aria-labelledby="options-menu-${user.id}" data-action-menu-for="${user.id}">
+                                    <div class="py-1" role="none">
+                                        <button class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 ${isDisabled}" role="menuitem" data-action="ban" data-user-id="${user.id}" data-username="${user.username}" ${user.isBanned ? 'hidden' : ''}>
+                                            Ban Account
+                                        </button>
+                                        <button class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 ${isDisabled}" role="menuitem" data-action="unban" data-user-id="${user.id}" data-username="${user.username}" ${!user.isBanned ? 'hidden' : ''}>
+                                            Unban Account
+                                        </button>
+                                        <button class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 text-red-600 ${isDisabled}" role="menuitem" data-action="delete" data-user-id="${user.id}" data-username="${user.username}">
+                                            Delete Account
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                 `;
             }).join('');
 
-            // Add event listeners for role change and delete buttons
+            // Add event listeners for role change and "Take Action" buttons
             usersTableBody.querySelectorAll('[data-role-select-id]').forEach(selectElement => {
                 selectElement.addEventListener('change', async (e) => {
                     const userId = e.target.dataset.roleSelectId;
@@ -1220,11 +1461,63 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
 
-            usersTableBody.querySelectorAll('[data-delete-user-id]').forEach(button => {
+            usersTableBody.querySelectorAll('[id^="options-menu-"]').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const userId = e.currentTarget.id.replace('options-menu-', '');
+                    const menu = document.querySelector(`[data-action-menu-for="${userId}"]`);
+                    if (menu) {
+                        menu.classList.toggle('hidden');
+                    }
+                    // Close other menus if open
+                    document.querySelectorAll('.origin-top-right').forEach(otherMenu => {
+                        if (otherMenu !== menu) {
+                            otherMenu.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+
+            usersTableBody.querySelectorAll('[data-action="ban"]').forEach(button => {
                 button.addEventListener('click', async (e) => {
-                    const userId = e.target.dataset.deleteUserId;
+                    const userId = e.target.dataset.userId;
                     const username = e.target.dataset.username;
-                    showMessageModal(`Are you sure you want to delete user "${username}"? This action cannot be undone and will only remove their data from Firestore.`, 'confirm', async () => {
+                    showMessageModal(`Are you sure you want to BAN user "${username}"? They will no longer be able to log in.`, 'confirm', async () => {
+                        try {
+                            const success = await setUserBanStatusFirestore(userId, true);
+                            if (success) {
+                                showMessageModal(`User "${username}" has been banned.`);
+                                renderAdminPanelPage(); // Re-render to update UI
+                            }
+                        } catch (error) {
+                            showMessageModal(error.message, 'error');
+                        }
+                    });
+                });
+            });
+
+            usersTableBody.querySelectorAll('[data-action="unban"]').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const userId = e.target.dataset.userId;
+                    const username = e.target.dataset.username;
+                    showMessageModal(`Are you sure you want to UNBAN user "${username}"? They will regain login access.`, 'confirm', async () => {
+                        try {
+                            const success = await setUserBanStatusFirestore(userId, false);
+                            if (success) {
+                                showMessageModal(`User "${username}" has been unbanned.`);
+                                renderAdminPanelPage(); // Re-render to update UI
+                            }
+                        } catch (error) {
+                            showMessageModal(error.message, 'error');
+                        }
+                    });
+                });
+            });
+
+            usersTableBody.querySelectorAll('[data-action="delete"]').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const userId = e.target.dataset.userId;
+                    const username = e.target.dataset.username;
+                    showMessageModal(`Are you sure you want to DELETE user "${username}"? This action cannot be undone and will only remove their data from Firestore.`, 'confirm', async () => {
                         try {
                             const success = await deleteUserFirestore(userId);
                             if (success) { // Only show success if the operation actually proceeded
@@ -1238,60 +1531,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
         }
-        document.getElementById('create-post-btn').addEventListener('click', () => navigateTo('create-post'));
+        // Removed create-post-btn from here, as it's now on the forum page
         document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins/Founders can manage from forum view
     }
 
     /**
      * Renders the Create Post page for admins/founders.
+     * This page is now removed and creation happens directly on forum.
      */
-    function renderCreatePostPage() {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
-            contentArea.innerHTML = `
-                <div class="flex flex-col items-center justify-center p-4">
-                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                        <p class="text-lg text-gray-700">You do not have administrative privileges to create posts.</p>
-                    </div>
-                </div>
-            `;
-            return;
-        }
-
-        contentArea.innerHTML = `
-            <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Create New Post</h2>
-                    <form id="create-post-form" class="space-y-6">
-                        <div>
-                            <label for="post-title" class="block text-gray-700 text-sm font-semibold mb-2">Post Title</label>
-                            <input type="text" id="post-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter post title" required>
-                        </div>
-                        <div>
-                            <label for="post-content" class="block text-gray-700 text-sm font-semibold mb-2">Post Content</label>
-                            <textarea id="post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Write your post content here..." required></textarea>
-                        </div>
-                        <button type="submit" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                            Publish Post
-                        </button>
-                    </form>
-                </div>
-            </div>
-        `;
-
-        document.getElementById('create-post-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const title = document.getElementById('post-title').value;
-            const content = document.getElementById('post-content').value;
-
-            try {
-                await createPostFirestore(title, content);
-                navigateTo('forum'); // Redirect to forum after posting
-            } catch (error) {
-                showMessageModal(error.message, 'error');
-            }
-        });
-    }
+    // function renderCreatePostPage() { /* ... removed ... */ }
 
     /**
      * Renders the Edit Post page for admins/founders.
@@ -1398,6 +1646,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Forum & Announcements</h2>
+                    ${userData.role === 'admin' || userData.role === 'founder' ? `
+                        <div class="mb-6 text-center">
+                            <button id="create-post-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                                Create New Post
+                            </button>
+                        </div>
+                    ` : ''}
+
                     ${posts.length === 0 ? `
                         <p class="text-center text-gray-600">No posts yet. Check back later!</p>
                     ` : `
@@ -1459,6 +1715,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
         `;
 
+        // Add event listeners for new "Create New Post" button on forum page
+        const createPostBtn = document.getElementById('create-post-btn');
+        if (createPostBtn) {
+            createPostBtn.addEventListener('click', () => {
+                // Instead of navigating to a separate page, show a modal for post creation
+                showCreatePostModal();
+            });
+        }
+
+
         // Add event listeners for reactions
         contentArea.querySelectorAll('[data-emoji]').forEach(button => {
             button.addEventListener('click', async (e) => {
@@ -1505,6 +1771,160 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    /**
+     * Shows a modal for creating a new post.
+     */
+    function showCreatePostModal() {
+        const modal = document.createElement('div');
+        modal.id = 'create-post-modal';
+        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+        modal.innerHTML = `
+            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 border border-gray-200">
+                <h2 class="text-2xl font-extrabold text-center text-gray-800 mb-6">Create New Post</h2>
+                <form id="create-post-modal-form" class="space-y-4">
+                    <div>
+                        <label for="modal-post-title" class="block text-gray-700 text-sm font-semibold mb-2">Title</label>
+                        <input type="text" id="modal-post-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter post title" required>
+                    </div>
+                    <div>
+                        <label for="modal-post-content" class="block text-gray-700 text-sm font-semibold mb-2">Content</label>
+                        <textarea id="modal-post-content" rows="7" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Write your post content here..." required></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-4 mt-6">
+                        <button type="button" id="cancel-create-post-modal" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Cancel
+                        </button>
+                        <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Publish
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        currentModal = modal;
+
+        document.getElementById('cancel-create-post-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+        });
+
+        document.getElementById('create-post-modal-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('modal-post-title').value;
+            const content = document.getElementById('modal-post-content').value;
+
+            try {
+                await createPostFirestore(title, content);
+                currentModal.remove();
+                currentModal = null;
+                renderForumPage(); // Re-render forum to show new post
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+    }
+
+    /**
+     * Renders the "Meet the Team" page.
+     */
+    async function renderTeamPage() {
+        showLoadingSpinner();
+        let teamMembers = [];
+        try {
+            teamMembers = await fetchTeamMembersFirestore();
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+        } finally {
+            hideLoadingSpinner();
+        }
+
+        const isAdminOrFounder = currentUser && (userData.role === 'admin' || userData.role === 'founder');
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Meet the Team</h2>
+                    
+                    ${isAdminOrFounder ? `
+                        <div class="mb-8 p-6 bg-gray-100 rounded-lg shadow-inner">
+                            <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Add New Team Member</h3>
+                            <form id="add-team-member-form" class="space-y-4">
+                                <div>
+                                    <label for="team-username" class="block text-gray-700 text-sm font-semibold mb-2">Username</label>
+                                    <input type="text" id="team-username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter team member's username" required>
+                                </div>
+                                <div>
+                                    <label for="team-role" class="block text-gray-700 text-sm font-semibold mb-2">Role</label>
+                                    <select id="team-role" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none" required>
+                                        <option value="">Select Role</option>
+                                        <option value="member">Member</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="founder">Founder</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                                    Add Team Member
+                                </button>
+                            </form>
+                        </div>
+                    ` : ''}
+
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Current Team</h3>
+                    ${teamMembers.length === 0 ? `
+                        <p class="text-center text-gray-600">No team members listed yet.</p>
+                    ` : `
+                        <div class="space-y-4">
+                            ${teamMembers.map(member => `
+                                <div class="flex items-center justify-between bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200">
+                                    <div class="flex items-center space-x-4">
+                                        <p class="text-lg font-semibold text-gray-900">${member.username}</p>
+                                        <span class="text-sm text-gray-600 px-3 py-1 rounded-full bg-gray-200">${member.role}</span>
+                                    </div>
+                                    ${isAdminOrFounder ? `
+                                        <button class="text-red-600 hover:text-red-800 font-semibold text-sm" data-delete-team-member-id="${member.id}" data-username="${member.username}">
+                                            Delete
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+
+        if (isAdminOrFounder) {
+            document.getElementById('add-team-member-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = document.getElementById('team-username').value;
+                const role = document.getElementById('team-role').value;
+                try {
+                    await addTeamMemberFirestore(username, role);
+                    renderTeamPage(); // Re-render to show updated list
+                } catch (error) {
+                    showMessageModal(error.message, 'error');
+                }
+            });
+
+            contentArea.querySelectorAll('[data-delete-team-member-id]').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const teamMemberId = e.target.dataset.deleteTeamMemberId;
+                    const username = e.target.dataset.username;
+                    showMessageModal(`Are you sure you want to remove "${username}" from the team?`, 'confirm', async () => {
+                        try {
+                            await deleteTeamMemberFirestore(teamMemberId);
+                            renderTeamPage(); // Re-render to show updated list
+                        } catch (error) {
+                            showMessageModal(error.message, 'error');
+                        }
+                    });
+                });
+            });
+        }
+    }
+
+
     // --- Navigation and Initialization ---
 
     /**
@@ -1515,17 +1935,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (overlayBackdrop) overlayBackdrop.classList.remove('visible');
         if (mobileMenuIconOpen) mobileMenuIconOpen.classList.remove('hidden');
         if (mobileMenuIconClose) mobileMenuIconClose.classList.add('hidden');
+        // Reset mobile dropdowns when closing the main drawer
+        sideDrawerMenu.querySelectorAll('.mobile-dropdown-content.open').forEach(openContent => {
+            openContent.style.maxHeight = '0px';
+            openContent.classList.remove('open');
+            openContent.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
+        });
     }
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout').
-     * @param {string} [postId=null] - Optional: postId for edit-post route.
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team').
+     * @param {string} [id=null] - Optional: postId for edit-post route, or any other ID.
      */
-    async function navigateTo(page, postId = null) {
+    async function navigateTo(page, id = null) {
         // Store the current page in a data attribute on the content area for tracking
         contentArea.dataset.currentPage = page;
-        contentArea.dataset.currentPostId = postId; // Store postId if applicable
+        contentArea.dataset.currentId = id; // Store generic ID if applicable
 
         if (page === 'logout') {
             showLoadingSpinner();
@@ -1561,19 +1987,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'admin':
                 renderAdminPanelPage();
                 break;
-            case 'create-post': // New case
-                renderCreatePostPage();
-                break;
-            case 'edit-post': // New case for editing
-                if (postId) {
-                    renderEditPostPage(postId);
+            // Removed 'create-post' as a direct navigation target, now part of forum page actions
+            case 'edit-post': // For editing existing posts
+                if (id) {
+                    renderEditPostPage(id);
                 } else {
                     showMessageModal("Invalid post ID for editing.", 'error');
                     navigateTo('forum');
                 }
                 break;
-            case 'forum': // New case
+            case 'forum': // Forum page now includes create post functionality
                 renderForumPage();
+                break;
+            case 'team': // New Team page
+                renderTeamPage();
                 break;
             default:
                 renderHomePage();
@@ -1644,12 +2071,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderNavbar(); // Update navbar with user info
                 // Determine which page to render based on current state or previous navigation
                 let pageToRender = contentArea.dataset.currentPage || 'home';
-                let postIdToRender = contentArea.dataset.currentPostId || null;
+                let currentId = contentArea.dataset.currentId || null;
 
                 if (pageToRender === 'auth' || pageToRender === 'logout') {
                     pageToRender = 'home'; // Always redirect to home if coming from auth/logout
                 }
-                navigateTo(pageToRender, postIdToRender); // Navigate to the appropriate page
+                navigateTo(pageToRender, currentId); // Navigate to the appropriate page
 
             } catch (error) {
                 console.error("Error setting up user data after auth state change:", error);
@@ -1666,7 +2093,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateBodyBackground(); // Reset to default background
             renderNavbar(); // Update navbar to logged out state
             // Only redirect if current page is not home or about, or if it was a protected page
-            if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about') {
+            if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about' && contentArea.dataset.currentPage !== 'team') {
                  navigateTo('home'); // Redirect to home if logged out from a protected page
             }
         }
