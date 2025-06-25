@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentUser = null; // Firebase Auth user object
     let userData = null; // Firestore user document data (role, background, etc.)
     let usersList = []; // List of all users for admin panel
+    let roomsList = []; // List of all rooms for admin panel and rooms page
     let currentModal = null; // To manage active message modal
 
     // --- Utility Functions ---
@@ -770,6 +771,98 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Creates a new room in Firestore.
+     * Only callable by admins and founders.
+     * @param {string} title - The title of the room.
+     * @param {string} description - The description of the room.
+     * @returns {Promise<void>}
+     */
+    async function createRoomFirestore(title, description) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can create rooms.");
+        }
+        showLoadingSpinner();
+        try {
+            const roomsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms`);
+            await addDoc(roomsCollectionRef, { // Use addDoc for auto-generated ID
+                title: title,
+                description: description,
+                creatorId: currentUser.uid,
+                creatorUsername: userData.username || currentUser.displayName || currentUser.email,
+                timestamp: serverTimestamp(),
+            });
+            showMessageModal('Room created successfully!');
+        } catch (error) {
+            console.error("Error creating room:", error.message);
+            throw new Error("Failed to create room: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Deletes a room from Firestore.
+     * Only callable by admins and founders.
+     * @param {string} roomId - The ID of the room to delete.
+     * @returns {Promise<void>}
+     */
+    async function deleteRoomFirestore(roomId) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Not authorized to delete rooms.");
+        }
+        showLoadingSpinner();
+        try {
+            const roomDocRef = doc(db, `/artifacts/${APP_ID}/public/data/rooms`, roomId);
+            await deleteDoc(roomDocRef);
+            showMessageModal('Room deleted successfully!');
+        } catch (error) {
+            console.error("Error deleting room:", error.message);
+            throw new Error("Failed to delete room: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Fetches all rooms from Firestore.
+     * @returns {Promise<Array<object>>} - List of all rooms.
+     */
+    async function fetchAllRoomsFirestore() {
+        showLoadingSpinner();
+        try {
+            const roomsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms`);
+            const q = query(roomsCollectionRef, orderBy('timestamp', 'desc')); // Order by newest first
+
+            const querySnapshot = await new Promise((resolve, reject) => {
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    unsubscribe();
+                    resolve(snapshot);
+                }, (error) => {
+                    reject(error);
+                });
+            });
+
+            const roomsData = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                roomsData.push({
+                    id: doc.id,
+                    title: data.title,
+                    description: data.description,
+                    creatorUsername: data.creatorUsername,
+                    timestamp: data.timestamp ? (typeof data.timestamp === 'string' ? new Date(data.timestamp).toLocaleString() : data.timestamp.toDate().toLocaleString()) : 'N/A',
+                });
+            });
+            return roomsData;
+        } catch (error) {
+            console.error("Error fetching rooms:", error.message);
+            throw new Error("Failed to fetch rooms: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
 
     // --- UI Rendering Functions ---
 
@@ -833,7 +926,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 name: 'Community',
                 items: [
                     { id: 'nav-forum', text: 'Forum', page: 'forum' },
-                    { id: 'nav-team', text: 'Meet the Team', page: 'team' } // New category item
+                    { id: 'nav-rooms', text: 'Rooms', page: 'rooms' }, // Added Rooms here
+                    { id: 'nav-team', text: 'Meet the Team', page: 'team' }
                 ],
                 authRequired: true
             },
@@ -1358,9 +1452,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         try {
             usersList = await fetchAllUsersFirestore();
+            roomsList = await fetchAllRoomsFirestore(); // Fetch rooms for display
         } catch (error) {
             showMessageModal(error.message, 'error');
             usersList = []; // Clear list if fetch fails
+            roomsList = [];
         }
 
 
@@ -1368,10 +1464,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Admin Panel</h2>
-                    <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts, and create forum posts.</p>
-                    <div class="mb-6 text-center space-x-4">
+                    <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts, forum posts, and communication rooms.</p>
+                    
+                    <div class="mb-8 text-center space-x-4">
                         <button id="view-forum-admin-btn" class="py-2 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Manage Posts (Forum)
+                        </button>
+                        <button id="manage-rooms-admin-btn" class="py-2 px-6 rounded-full bg-teal-600 text-white font-bold text-lg hover:bg-teal-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Manage Rooms
                         </button>
                     </div>
 
@@ -1379,7 +1479,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ${usersList.length === 0 ? `
                         <p class="text-center text-gray-600">No users found.</p>
                     ` : `
-                        <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200">
+                        <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200 mb-8">
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-100">
                                     <tr>
@@ -1406,20 +1506,55 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </table>
                         </div>
                     `}
+                    
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Manage Rooms</h3>
+                    <div class="mb-6 text-center">
+                        <button id="create-room-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Create New Room
+                        </button>
+                    </div>
+                    ${roomsList.length === 0 ? `
+                        <p class="text-center text-gray-600">No rooms created yet.</p>
+                    ` : `
+                        <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Title
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Description
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Creator
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Created On
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200" id="rooms-table-body">
+                                    <!-- Rooms will be populated here by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    `}
                 </div>
             </div>
         `;
 
+        // Populate Users Table
         if (usersList.length > 0) {
             const usersTableBody = document.getElementById('users-table-body');
-            // Ensure the content is reset before mapping new users to avoid duplication on re-render
             usersTableBody.innerHTML = usersList.map(user => {
                 const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
-                // Disable controls for the current user to prevent self-demotion/deletion via UI
                 const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; 
-                // Only founders can assign the 'founder' role
                 const canAssignFounder = userData.role === 'founder';
-                const showFounderOption = canAssignFounder || user.role === 'founder'; // Show founder option if current user is founder or if target user is already a founder
+                const showFounderOption = canAssignFounder || user.role === 'founder';
 
                 return `
                     <tr data-user-id="${user.id}" class="hover:bg-gray-50">
@@ -1455,7 +1590,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 `;
             }).join('');
 
-            // Add event listeners for role change and "Take Action" buttons
             usersTableBody.querySelectorAll('[data-role-select-id]').forEach(selectElement => {
                 selectElement.addEventListener('change', async (e) => {
                     const userId = e.target.dataset.roleSelectId;
@@ -1463,14 +1597,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     showMessageModal(`Are you sure you want to change this user's role to "${newRole}"?`, 'confirm', async () => {
                         try {
                             const success = await updateUserRoleFirestore(userId, newRole);
-                            if (success) { // Only show success if the operation actually proceeded (not blocked by self-check)
+                            if (success) {
                                 showMessageModal(`User role updated to "${newRole}" successfully!`);
-                                renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                                renderAdminPanelPage();
                             }
                         }
                         catch (error) {
                             showMessageModal(error.message, 'error');
-                            renderAdminPanelPage(); // Re-render to revert dropdown if failed
+                            renderAdminPanelPage();
                         }
                     });
                 });
@@ -1486,8 +1620,54 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
         }
-        // Removed create-post-btn from here, as it's now on the forum page
-        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins/Founders can manage from forum view
+
+        // Populate Rooms Table
+        if (roomsList.length > 0) {
+            const roomsTableBody = document.getElementById('rooms-table-body');
+            roomsTableBody.innerHTML = roomsList.map(room => `
+                <tr data-room-id="${room.id}" class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        ${room.title}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${room.description}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${room.creatorUsername}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${room.timestamp}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                            class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-red-600 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-red-500"
+                            data-delete-room-id="${room.id}" data-room-title="${room.title}"
+                        >
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            roomsTableBody.querySelectorAll('[data-delete-room-id]').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const roomId = e.target.dataset.deleteRoomId;
+                    const roomTitle = e.target.dataset.roomTitle;
+                    showMessageModal(`Are you sure you want to delete room "${roomTitle}"? This action cannot be undone.`, 'confirm', async () => {
+                        try {
+                            await deleteRoomFirestore(roomId);
+                            renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                        } catch (error) {
+                            showMessageModal(error.message, 'error');
+                        }
+                    });
+                });
+            });
+        }
+
+        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum'));
+        document.getElementById('manage-rooms-admin-btn').addEventListener('click', () => renderAdminPanelPage()); // Already on this page, but useful if we add tabs
+        document.getElementById('create-room-btn').addEventListener('click', () => showCreateRoomModal());
     }
 
     /**
@@ -1600,6 +1780,63 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Shows a modal for creating a new room.
+     */
+    function showCreateRoomModal() {
+        if (currentModal) {
+            currentModal.remove();
+        }
+
+        const modal = document.createElement('div');
+        modal.id = 'create-room-modal';
+        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+        modal.innerHTML = `
+            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 border border-gray-200">
+                <h2 class="text-2xl font-extrabold text-center text-gray-800 mb-6">Create New Room</h2>
+                <form id="create-room-modal-form" class="space-y-4">
+                    <div>
+                        <label for="room-title" class="block text-gray-700 text-sm font-semibold mb-2">Room Title</label>
+                        <input type="text" id="room-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter room title" required>
+                    </div>
+                    <div>
+                        <label for="room-description" class="block text-gray-700 text-sm font-semibold mb-2">Description</label>
+                        <textarea id="room-description" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Describe the purpose of this room..."></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-4 mt-6">
+                        <button type="button" id="cancel-create-room-modal" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Cancel
+                        </button>
+                        <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Create Room
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        currentModal = modal;
+
+        document.getElementById('cancel-create-room-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+        });
+
+        document.getElementById('create-room-modal-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('room-title').value;
+            const description = document.getElementById('room-description').value;
+
+            try {
+                await createRoomFirestore(title, description);
+                currentModal.remove();
+                currentModal = null;
+                renderAdminPanelPage(); // Re-render admin panel to show new room
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+    }
 
     /**
      * Renders the Create Post page for admins/founders.
@@ -1735,7 +1972,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <div class="flex items-center space-x-4 mt-4 border-t pt-4 border-gray-300">
                                         <!-- Reactions Section -->
                                         <div class="flex items-center space-x-2">
-                                            ${['�', '❤️', '😂', '🔥'].map(emoji => `
+                                            ${['👍', '❤️', '😂', '🔥'].map(emoji => `
                                                 <button class="text-xl p-1 rounded-full hover:bg-gray-200 transition duration-200" data-post-id="${post.id}" data-emoji="${emoji}">
                                                     ${emoji} <span class="text-sm text-gray-600">${post.reactions[emoji] || 0}</span>
                                                 </button>
@@ -2011,7 +2248,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team').
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team', 'rooms').
      * @param {string} [id=null] - Optional: postId for edit-post route, or any other ID.
      */
     async function navigateTo(page, id = null) {
@@ -2075,6 +2312,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
             case 'team': // New Team page
                 renderTeamPage();
+                break;
+            case 'rooms': // Navigate to the new rooms.html file
+                window.location.href = 'rooms.html';
                 break;
             default:
                 renderHomePage();
@@ -2167,7 +2407,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateBodyBackground(); // Reset to default background
             renderNavbar(); // Update navbar to logged out state
             // Only redirect if current page is not home or about, or if it was a protected page
-            if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about' && contentArea.dataset.currentPage !== 'team') {
+            if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about' && contentArea.dataset.currentPage !== 'team' && contentArea.dataset.currentPage !== 'rooms') {
                  navigateTo('home'); // Redirect to home if logged out from a protected page
             }
         }
