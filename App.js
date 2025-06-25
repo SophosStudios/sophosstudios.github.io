@@ -978,7 +978,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 name: 'Community',
                 items: [
                     { id: 'nav-forum', text: 'Forum', page: 'forum' },
-                    { id: 'nav-rooms', text: 'Rooms', page: 'rooms.html' }, // Points to rooms.html
+                    { id: 'nav-rooms', text: 'Rooms', page: 'rooms', passId: false }, // Modified: page: 'rooms'
                     { id: 'nav-team', text: 'Meet the Team', page: 'team' }
                 ],
                 authRequired: true
@@ -1091,20 +1091,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Attach event listeners for dropdown items
             dropdownContent.querySelectorAll('button[id]').forEach(btn => {
-                const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
-                if (page) {
+                const navItem = categories.flatMap(cat => cat.items).find(item => item.id === btn.id);
+                if (navItem) {
                     btn.addEventListener('click', () => {
-                        if (page === 'logout') {
+                        if (navItem.page === 'logout') {
                             signOut(auth).then(() => {
                                 showMessageModal('You have been signed out.');
                                 window.location.href = 'index.html'; // Full reload to clear state
                             }).catch(error => {
                                 showMessageModal("Failed to sign out: " + error.message, 'error');
                             });
-                        } else if (page.endsWith('.html')) {
-                            window.location.href = page; // Navigate to external HTML file
+                        } else if (navItem.page === 'rooms' && navItem.passId === false) { // Special case for generic rooms link
+                            // Do nothing or navigate to rooms list. For now, navigateTo('admin') as rooms are managed there.
+                            navigateTo('admin'); // Assuming 'Rooms' link from nav goes to admin panel to list rooms
+                        } else if (navItem.page.endsWith('.html')) {
+                            window.location.href = navItem.page; // Navigate to external HTML file
                         } else {
-                            navigateTo(page); // Navigate within this index.html
+                            navigateTo(navItem.page); // Navigate within this index.html
                         }
                         closeAllDesktopDropdowns({target: document.body}); // Simulate click on body to close dropdown
                     });
@@ -1166,20 +1169,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
 
             dropdownContent.querySelectorAll('button[id]').forEach(btn => {
-                const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
-                if (page) {
+                const navItem = categories.flatMap(cat => cat.items).find(item => item.id === btn.id);
+                if (navItem) {
                     btn.addEventListener('click', () => {
-                        if (page === 'logout') {
+                        if (navItem.page === 'logout') {
                             signOut(auth).then(() => {
                                 showMessageModal('You have been signed out.');
                                 window.location.href = 'index.html'; // Full reload on logout
                             }).catch(error => {
                                 showMessageModal("Failed to sign out: " + error.message, 'error');
                             });
-                        } else if (page.endsWith('.html')) { // Direct navigation to an HTML file
-                            window.location.href = page;
+                        } else if (navItem.page === 'rooms' && navItem.passId === false) { // Special case for generic rooms link
+                            navigateTo('admin'); // Assuming 'Rooms' link from nav goes to admin panel to list rooms
+                        } else if (navItem.page.endsWith('.html')) { // Direct navigation to an HTML file
+                            window.location.href = navItem.page;
                         } else { // In-page navigation
-                            navigateTo(page);
+                            navigateTo(navItem.page);
                         }
                         closeSideDrawer(); // Close drawer after navigating
                     });
@@ -1740,6 +1745,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                         >
                             Delete
                         </button>
+                        <button
+                            class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-blue-500 ml-2"
+                            data-join-room-id="${room.id}" data-room-title="${room.title}"
+                        >
+                            Join Chat
+                        </button>
                     </td>
                 </tr>
             `).join('');
@@ -1756,6 +1767,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                             showMessageModal(error.message, 'error');
                         }
                     });
+                });
+            });
+
+            // Event listener for "Join Chat" buttons
+            roomsTableBody.querySelectorAll('[data-join-room-id]').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const roomId = e.target.dataset.joinRoomId;
+                    const roomTitle = e.target.dataset.roomTitle;
+                    // Navigate to rooms.html and pass the room ID and title as URL parameters
+                    window.location.href = `rooms.html?id=${roomId}&title=${encodeURIComponent(roomTitle)}`;
                 });
             });
         }
@@ -2390,11 +2411,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             return; // Exit navigateTo
         }
 
-        // Redirect to full HTML pages if needed
-        if (page.endsWith('.html')) {
-            window.location.href = page;
+        // Redirect to full HTML pages if needed, passing ID if rooms page is targetted
+        if (page === 'rooms') { // Handle rooms.html with ID
+            let url = 'rooms.html';
+            if (id) {
+                // If ID is an object (e.g., {id: '...', title: '...'}), destructure it
+                if (typeof id === 'object' && id !== null) {
+                    url += `?id=${id.id}&title=${encodeURIComponent(id.title || '')}`;
+                } else { // Assume it's just the ID string
+                    url += `?id=${id}`;
+                }
+            }
+            window.location.href = url;
             return;
         }
+
 
         // For in-page navigation (fragments)
         switch (page) {
