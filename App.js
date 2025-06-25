@@ -515,7 +515,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Adds/updates a reaction to a post.
      * Any authenticated user can react.
      * @param {string} postId - The ID of the post.
-     * @param {string} emoji - The emoji character (e.g., '�', '❤️').
+     * @param {string} emoji - The emoji character (e.g., '👍', '❤️').
      * @returns {Promise<void>}
      */
     async function addReactionToPost(postId, emoji) {
@@ -663,24 +663,38 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Renders the Navbar links based on authentication status.
      */
     function renderNavbar() {
-        // Clear both desktop and mobile nav containers first
-        navLinks.innerHTML = '';
-        sideDrawerMenu.innerHTML = `
-            <button id="mobile-drawer-home" class="block w-full text-left px-4 py-3 hover:bg-gray-700 text-white transition duration-200 text-lg font-semibold">Home</button>
-            <button id="mobile-drawer-about" class="block w-full text-left px-4 py-3 hover:bg-gray-700 text-white transition duration-200 text-lg font-semibold">About</button>
-        `; // Re-add static buttons
-
-        // Re-attach event listeners for static buttons
-        document.getElementById('mobile-drawer-home').addEventListener('click', () => navigateTo('home'));
-        document.getElementById('mobile-drawer-about').addEventListener('click', () => navigateTo('about'));
-
+        // Clear desktop nav links
+        if (navLinks) {
+            navLinks.innerHTML = '';
+        } else {
+            console.warn("Element with ID 'nav-links' not found. Desktop navigation may not render correctly.");
+        }
+        
+        // Clear only dynamically added items from side drawer (keeping static Home/About)
+        // Find the index of the first dynamic button (or the length if none)
+        let firstDynamicIndex = 2; // Assuming mobile-drawer-home and mobile-drawer-about are always first 2 static elements
+        if (sideDrawerMenu) {
+            while (sideDrawerMenu.children.length > firstDynamicIndex) {
+                sideDrawerMenu.removeChild(sideDrawerMenu.lastChild);
+            }
+        } else {
+            console.warn("Element with ID 'side-drawer-menu' not found. Mobile navigation may not render correctly.");
+        }
 
         // Update website title from config.js
         document.querySelector('title').textContent = CONFIG.websiteTitle;
-        document.getElementById('nav-home').textContent = CONFIG.websiteTitle; // Update home button text
+        // The navHomeButton is a static element for the main title, already in index.html
+        if (navHomeButton) {
+            navHomeButton.textContent = CONFIG.websiteTitle;
+        } else {
+            console.warn("Element with ID 'nav-home' not found. Main title may not be functional.");
+        }
+
 
         // Helper to create a button for a given menu (desktop or mobile)
         const createAndAppendButton = (container, id, text, page, iconHtml = '', isMobile = false) => {
+            if (!container) return; // Defensive check
+
             const btn = document.createElement('button');
             btn.id = id;
             btn.className = `
@@ -701,18 +715,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         if (currentUser && userData) {
-            // Logged in user
+            // Logged in user - Desktop Links
             createAndAppendButton(navLinks, 'nav-forum', 'Forum', 'forum');
-            createAndAppendButton(sideDrawerMenu, 'mobile-nav-forum', 'Forum', 'forum', '', true);
-
             if (userData.role === 'admin' || userData.role === 'founder') {
                 createAndAppendButton(navLinks, 'nav-admin', 'Admin Panel', 'admin');
-                createAndAppendButton(sideDrawerMenu, 'mobile-nav-admin', 'Admin Panel', 'admin', '', true);
             }
-            // New: Founder Panel button (only for founders)
-            if (userData.role === 'founder') {
-                createAndAppendButton(navLinks, 'nav-founder', 'Founder Panel', 'admin'); // Founder uses admin panel for now
-                createAndAppendButton(sideDrawerMenu, 'mobile-nav-founder', 'Founder Panel', 'admin', '', true);
+            if (userData.role === 'founder') { // New: Founder Panel for desktop
+                createAndAppendButton(navLinks, 'nav-founder', 'Founder Panel', 'admin');
             }
 
             const profileIconSrc = userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`;
@@ -721,13 +730,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                      onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}'">`;
 
             createAndAppendButton(navLinks, 'nav-profile', userData.username || currentUser.email, 'profile', profileIconHtml);
-            createAndAppendButton(sideDrawerMenu, 'mobile-nav-profile', 'Profile', 'profile', '', true);
-
             createAndAppendButton(navLinks, 'nav-sign-out', 'Sign Out', 'logout');
+
+
+            // Logged in user - Mobile Drawer Links
+            createAndAppendButton(sideDrawerMenu, 'mobile-nav-forum', 'Forum', 'forum', '', true);
+            if (userData.role === 'admin' || userData.role === 'founder') {
+                createAndAppendButton(sideDrawerMenu, 'mobile-nav-admin', 'Admin Panel', 'admin', '', true);
+            }
+            if (userData.role === 'founder') { // New: Founder Panel for mobile
+                createAndAppendButton(sideDrawerMenu, 'mobile-nav-founder', 'Founder Panel', 'admin', '', true);
+            }
+            createAndAppendButton(sideDrawerMenu, 'mobile-nav-profile', 'Profile', 'profile', '', true);
             createAndAppendButton(sideDrawerMenu, 'mobile-nav-sign-out', 'Sign Out', 'logout', '', true);
+
         } else {
-            // Not logged in
+            // Not logged in - Desktop Links
             createAndAppendButton(navLinks, 'nav-auth', 'Sign In / Up', 'auth');
+
+            // Not logged in - Mobile Drawer Links
             createAndAppendButton(sideDrawerMenu, 'mobile-nav-auth', 'Sign In / Up', 'auth', '', true);
         }
     }
@@ -1467,10 +1488,10 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Closes the side drawer menu.
      */
     function closeSideDrawer() {
-        sideDrawerMenu.classList.remove('open');
-        overlayBackdrop.classList.remove('visible');
-        mobileMenuIconOpen.classList.remove('hidden');
-        mobileMenuIconClose.classList.add('hidden');
+        if (sideDrawerMenu) sideDrawerMenu.classList.remove('open');
+        if (overlayBackdrop) overlayBackdrop.classList.remove('visible');
+        if (mobileMenuIconOpen) mobileMenuIconOpen.classList.remove('hidden');
+        if (mobileMenuIconClose) mobileMenuIconClose.classList.add('hidden');
     }
 
     /**
@@ -1538,21 +1559,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Mobile menu toggle (for side drawer)
-    mobileMenuToggle.addEventListener('click', () => {
-        const isOpen = sideDrawerMenu.classList.contains('open');
-        if (isOpen) {
-            closeSideDrawer();
-        } else {
-            sideDrawerMenu.classList.add('open');
-            overlayBackdrop.classList.add('visible');
-            mobileMenuIconOpen.classList.add('hidden');
-            mobileMenuIconClose.classList.remove('hidden');
-        }
-    });
+    if (mobileMenuToggle) { // Defensive check
+        mobileMenuToggle.addEventListener('click', () => {
+            // Check if sideDrawerMenu exists before trying to access its classList
+            const isOpen = sideDrawerMenu && sideDrawerMenu.classList.contains('open');
+            if (isOpen) {
+                closeSideDrawer();
+            } else {
+                if (sideDrawerMenu) sideDrawerMenu.classList.add('open');
+                if (overlayBackdrop) overlayBackdrop.classList.add('visible');
+                if (mobileMenuIconOpen) mobileMenuIconOpen.classList.add('hidden');
+                if (mobileMenuIconClose) mobileMenuIconClose.classList.remove('hidden');
+            }
+        });
+    } else {
+        console.warn("Element with ID 'mobile-menu-toggle' not found. Mobile menu functionality may be broken.");
+    }
+
 
     // Close side drawer when clicking on the overlay backdrop
-    overlayBackdrop.addEventListener('click', closeSideDrawer);
-
+    if (overlayBackdrop) { // Defensive check
+        overlayBackdrop.addEventListener('click', closeSideDrawer);
+    } else {
+        console.warn("Element with ID 'overlay-backdrop' not found. Mobile menu overlay may not close correctly.");
+    }
 
     // Firebase Auth State Listener
     // This is the most critical part for initial load and ongoing authentication state changes
@@ -1634,6 +1664,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Event listeners for static navbar buttons (ensure these are attached AFTER initial DOM render)
     // The home and about buttons in the main navbar are static in index.html, so their event listeners
     // are attached here, but they are *not* added dynamically by renderNavbar
-    navHomeButton.addEventListener('click', () => navigateTo('home'));
-    navAboutButton.addEventListener('click', () => navigateTo('about')); // Assuming navAboutButton exists in desktop nav
+    if (navHomeButton) { // Defensive check
+        navHomeButton.addEventListener('click', () => navigateTo('home'));
+    } else {
+        console.warn("Element with ID 'nav-home' not found. Home button may not be functional.");
+    }
+    if (navAboutButton) { // Defensive check
+        navAboutButton.addEventListener('click', () => navigateTo('about'));
+    } else {
+        console.warn("Element with ID 'nav-about' not found. About button may not be functional.");
+    }
+    // Event listeners for static mobile drawer buttons (also ensure attached once)
+    if (mobileDrawerHomeButton) { // Defensive check
+        mobileDrawerHomeButton.addEventListener('click', () => navigateTo('home'));
+    }
+    if (mobileDrawerAboutButton) { // Defensive check
+        mobileDrawerAboutButton.addEventListener('click', () => navigateTo('about'));
+    }
 });
