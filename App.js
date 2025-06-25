@@ -328,7 +328,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<Array<object>>} - List of all users.
      */
     async function fetchAllUsersFirestore() {
-        if (!currentUser || userData.role !== 'admin') {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             throw new Error("Not authorized to view users list.");
         }
 
@@ -360,17 +360,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Updates a user's role by an admin in Firestore.
+     * Updates a user's role by an admin/founder in Firestore.
      * @param {string} userId - ID of the user to update.
-     * @param {string} newRole - The new role ('member' or 'admin').
+     * @param {string} newRole - The new role ('member', 'admin', or 'founder').
      * @returns {Promise<boolean>} - True on success.
      */
     async function updateUserRoleFirestore(userId, newRole) {
-        if (!currentUser || userData.role !== 'admin') {
+        // Only admins can change roles, but founders can change any role.
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             throw new Error("Not authorized to change roles.");
         }
+        
+        // Prevent admins from setting founder role (only founders can do this)
+        if (newRole === 'founder' && userData.role !== 'founder') {
+            throw new Error("Only a founder can assign the 'founder' role.");
+        }
+
+        // Prevent self-demotion from founder/admin, or self-deletion from any role via the panel.
         if (userId === currentUser.uid) {
-            throw new Error("You cannot change your own role from the admin panel.");
+            showMessageModal("You cannot change your own role or delete your own account from the admin panel. Please manage your own profile in the 'Profile' section.", 'info');
+            return false; // Indicate operation was not performed due to safety check
         }
 
         showLoadingSpinner();
@@ -387,18 +396,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Deletes a user's data from Firestore by an admin.
+     * Deletes a user's data from Firestore by an admin/founder.
      * Note: This does NOT delete the user from Firebase Authentication.
      * For full deletion, server-side code (e.g., using Firebase Admin SDK) is required.
      * @param {string} userId - ID of the user to delete.
      * @returns {Promise<boolean>} - True on success.
      */
     async function deleteUserFirestore(userId) {
-        if (!currentUser || userData.role !== 'admin') {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             throw new Error("Not authorized to delete users.");
         }
         if (userId === currentUser.uid) {
-            throw new Error("You cannot delete your own account from the admin panel.");
+            showMessageModal("You cannot delete your own account from the admin panel.", 'info');
+            return false;
         }
 
         showLoadingSpinner();
@@ -416,14 +426,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Creates a new post in Firestore.
-     * Only callable by admins.
+     * Only callable by admins and founders.
      * @param {string} title - The title of the post.
      * @param {string} content - The content of the post.
      * @returns {Promise<void>}
      */
     async function createPostFirestore(title, content) {
-        if (!currentUser || userData.role !== 'admin') {
-            throw new Error("Only admins can create posts.");
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can create posts.");
         }
         showLoadingSpinner();
         try {
@@ -448,15 +458,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Updates an existing post in Firestore.
-     * Only callable by admins.
+     * Only callable by admins and founders.
      * @param {string} postId - The ID of the post to update.
      * @param {string} title - The new title.
      * @param {string} content - The new content.
      * @returns {Promise<void>}
      */
     async function updatePostFirestore(postId, title, content) {
-        if (!currentUser || userData.role !== 'admin') {
-            throw new Error("Only admins can edit posts.");
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can edit posts.");
         }
         showLoadingSpinner();
         try {
@@ -477,13 +487,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Deletes a post from Firestore.
-     * Only callable by admins.
+     * Only callable by admins and founders.
      * @param {string} postId - The ID of the post to delete.
      * @returns {Promise<void>}
      */
     async function deletePostFirestore(postId) {
-        if (!currentUser || userData.role !== 'admin') {
-            throw new Error("Only admins can delete posts.");
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can delete posts.");
         }
         showLoadingSpinner();
         try {
@@ -660,7 +670,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const createButton = (id, text, page, iconHtml = '') => {
             const btn = document.createElement('button');
             btn.id = id;
-            btn.className = `px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}`;
+            btn.className = `px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : (id.includes('founder') ? 'bg-purple-800 hover:bg-purple-900 shadow-md' : '')))}`;
             btn.innerHTML = `${iconHtml}<span>${text}</span>`;
             btn.addEventListener('click', () => {
                 navigateTo(page);
@@ -677,7 +687,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const createMobileButton = (id, text, page) => {
             const btn = document.createElement('button');
             btn.id = id;
-            btn.className = `block w-full text-left px-4 py-2 hover:bg-gray-700 text-white transition duration-200 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700' : (id.includes('auth') ? 'bg-green-600 hover:bg-green-700' : (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700' : ''))}`;
+            btn.className = `block w-full text-left px-4 py-2 hover:bg-gray-700 text-white transition duration-200 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700' : (id.includes('auth') ? 'bg-green-600 hover:bg-green-700' : (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700' : (id.includes('founder') ? 'bg-purple-800 hover:bg-purple-900' : '')))}`;
             btn.textContent = text;
             btn.addEventListener('click', () => {
                 navigateTo(page);
@@ -696,9 +706,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             navLinks.appendChild(createButton('nav-forum', 'Forum', 'forum')); // Forum for all authenticated users
             mobileMenu.appendChild(createMobileButton('mobile-nav-forum', 'Forum', 'forum'));
 
-            if (userData.role === 'admin') {
+            if (userData.role === 'admin' || userData.role === 'founder') {
                 navLinks.appendChild(createButton('nav-admin', 'Admin Panel', 'admin'));
                 mobileMenu.appendChild(createMobileButton('mobile-nav-admin', 'Admin Panel', 'admin'));
+            }
+            // New: Founder Panel button (only for founders)
+            if (userData.role === 'founder') {
+                navLinks.appendChild(createButton('nav-founder', 'Founder Panel', 'admin')); // Founder uses admin panel for now
+                mobileMenu.appendChild(createMobileButton('mobile-nav-founder', 'Founder Panel', 'admin')); // Founder uses admin panel for now
             }
 
             const profileIconSrc = userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`;
@@ -748,7 +763,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button id="go-to-forum-btn" class="py-3 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Visit Forum
                         </button>
-                        ${userData.role === 'admin' ? `
+                        ${userData.role === 'admin' || userData.role === 'founder' ? `
                         <button id="go-to-admin-btn" class="py-3 px-6 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Admin Panel
                         </button>` : ''}
@@ -767,7 +782,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (currentUser && userData) {
             document.getElementById('go-to-profile-btn').addEventListener('click', () => navigateTo('profile'));
             document.getElementById('go-to-forum-btn').addEventListener('click', () => navigateTo('forum'));
-            if (userData.role === 'admin') {
+            if (userData.role === 'admin' || userData.role === 'founder') {
                 document.getElementById('go-to-admin-btn').addEventListener('click', () => navigateTo('admin'));
             }
         } else {
@@ -1032,7 +1047,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Renders the Admin Panel page.
      */
     async function renderAdminPanelPage() {
-        if (!currentUser || !userData || userData.role !== 'admin') {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -1106,7 +1121,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Ensure the content is reset before mapping new users to avoid duplication on re-render
             usersTableBody.innerHTML = usersList.map(user => {
                 const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
-                const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; // Use currentUser.uid
+                // Disable controls for the current user to prevent self-demotion/deletion via UI
+                const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; 
+                // Only founders can assign the 'founder' role
+                const canAssignFounder = userData.role === 'founder';
+                const showFounderOption = canAssignFounder || user.role === 'founder'; // Show founder option if current user is founder or if target user is already a founder
 
                 return `
                     <tr data-user-id="${user.id}" class="hover:bg-gray-50">
@@ -1127,6 +1146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             >
                                 <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
                                 <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                ${showFounderOption ? `<option value="founder" ${user.role === 'founder' ? 'selected' : ''}>Founder</option>` : ''}
                             </select>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1149,9 +1169,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const newRole = e.target.value;
                     showMessageModal(`Are you sure you want to change this user's role to "${newRole}"?`, 'confirm', async () => {
                         try {
-                            await updateUserRoleFirestore(userId, newRole);
-                            showMessageModal(`User role updated to "${newRole}" successfully!`);
-                            renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                            const success = await updateUserRoleFirestore(userId, newRole);
+                            if (success) { // Only show success if the operation actually proceeded (not blocked by self-check)
+                                showMessageModal(`User role updated to "${newRole}" successfully!`);
+                                renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                            }
                         }
                         catch (error) {
                             showMessageModal(error.message, 'error');
@@ -1167,9 +1189,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const username = e.target.dataset.username;
                     showMessageModal(`Are you sure you want to delete user "${username}"? This action cannot be undone and will only remove their data from Firestore.`, 'confirm', async () => {
                         try {
-                            await deleteUserFirestore(userId);
-                            showMessageModal(`User "${username}" data deleted successfully!`);
-                            renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                            const success = await deleteUserFirestore(userId);
+                            if (success) { // Only show success if the operation actually proceeded
+                                showMessageModal(`User "${username}" data deleted successfully!`);
+                                renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                            }
                         } catch (error) {
                             showMessageModal(error.message, 'error');
                         }
@@ -1178,14 +1202,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         document.getElementById('create-post-btn').addEventListener('click', () => navigateTo('create-post'));
-        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins can manage from forum view
+        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins/Founders can manage from forum view
     }
 
     /**
-     * Renders the Create Post page for admins.
+     * Renders the Create Post page for admins/founders.
      */
     function renderCreatePostPage() {
-        if (!currentUser || userData.role !== 'admin') {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -1233,11 +1257,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Renders the Edit Post page for admins.
+     * Renders the Edit Post page for admins/founders.
      * @param {string} postId - The ID of the post to edit.
      */
     async function renderEditPostPage(postId) {
-        if (!currentUser || userData.role !== 'admin') {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -1360,7 +1384,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         </div>
 
                                         <!-- Admin Actions (Edit/Delete) -->
-                                        ${userData.role === 'admin' ? `
+                                        ${userData.role === 'admin' || userData.role === 'founder' ? `
                                             <div class="ml-auto space-x-2">
                                                 <button class="text-blue-600 hover:text-blue-800 font-semibold" data-post-id="${post.id}" data-action="edit">Edit</button>
                                                 <button class="text-red-600 hover:text-red-800 font-semibold" data-post-id="${post.id}" data-action="delete">Delete</button>
