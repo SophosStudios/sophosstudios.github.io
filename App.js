@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let presenceInterval = null; // Interval for presence updates
     let messagesUnsubscribe = null; // Unsubscribe function for messages listener
     let presenceUnsubscribe = null; // Unsubscribe function for presence listener
+    let isInCall = false; // New state variable: tracks if the current user is in a simulated call
 
     // --- Utility Functions ---
 
@@ -317,10 +318,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log("Default user document created in Firestore.");
                 fetchedUserData = newUserData;
             }
-            // Store user data in localStorage for other pages (like rooms.html, if it existed)
+            // Store user data in localStorage for persistence across refreshes
             localStorage.setItem('currentUserUid', currentUser.uid);
             localStorage.setItem('userData', JSON.stringify(fetchedUserData));
-            // Also store background directly for easier access by other pages or for body updates
             localStorage.setItem('userBackgroundUrl', fetchedUserData.backgroundUrl);
 
             return fetchedUserData;
@@ -928,7 +928,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Sends a new chat message to Firestore.
-     * This function now resides in App.js as rooms are integrated.
      * @param {string} messageText - The content of the message.
      */
     async function sendMessage(messageText) {
@@ -960,8 +959,58 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
+     * Updates the current user's presence status in the current room.
+     * @param {boolean} inCallStatus - True if the user is in a call, false otherwise.
+     */
+    async function updateMyPresence(inCallStatus) {
+        if (!currentUser || !currentRoomId) return;
+
+        try {
+            const presenceRef = doc(db, `/artifacts/${APP_ID}/public/data/rooms/${currentRoomId}/presence`, currentUser.uid);
+            await setDoc(presenceRef, {
+                userId: currentUser.uid,
+                username: userData.username || currentUser.displayName || currentUser.email,
+                profilePicUrl: userData.profilePicUrl || '',
+                lastSeen: serverTimestamp(),
+                inCall: inCallStatus, // New field to indicate call status
+            }, { merge: true });
+        } catch (error) {
+            console.error("Error updating presence:", error);
+        }
+    }
+
+    /**
+     * Initiates a simulated call for the current user.
+     */
+    async function joinCall() {
+        if (!currentUser || !currentRoomId) return;
+        isInCall = true;
+        await updateMyPresence(true);
+        showMessageModal("You have joined the call!", 'info');
+        // Update button states immediately
+        const joinCallBtn = document.getElementById('join-call-btn');
+        const leaveCallBtn = document.getElementById('leave-call-btn');
+        if (joinCallBtn) joinCallBtn.classList.add('hidden');
+        if (leaveCallBtn) leaveCallBtn.classList.remove('hidden');
+    }
+
+    /**
+     * Ends a simulated call for the current user.
+     */
+    async function leaveCall() {
+        if (!currentUser || !currentRoomId) return;
+        isInCall = false;
+        await updateMyPresence(false);
+        showMessageModal("You have left the call.", 'info');
+        // Update button states immediately
+        const joinCallBtn = document.getElementById('join-call-btn');
+        const leaveCallBtn = document.getElementById('leave-call-btn');
+        if (joinCallBtn) joinCallBtn.classList.remove('hidden');
+        if (leaveCallBtn) leaveCallBtn.classList.add('hidden');
+    }
+
+    /**
      * Sets up real-time presence tracking for the current user in the room.
-     * This function now resides in App.js as rooms are integrated.
      */
     async function setupPresence() {
         if (!currentUser || !currentRoomId) return;
@@ -970,31 +1019,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (presenceUnsubscribe) presenceUnsubscribe();
         if (presenceInterval) clearInterval(presenceInterval);
 
-        const presenceRef = doc(db, `/artifacts/${APP_ID}/public/data/rooms/${currentRoomId}/presence`, currentUser.uid);
+        // Initial presence update for the room, reflecting current isInCall status
+        updateMyPresence(isInCall);
 
-        // Update presence immediately and then every few seconds
-        const updateMyPresence = async () => {
-            await setDoc(presenceRef, {
-                userId: currentUser.uid,
-                username: userData.username || currentUser.displayName || currentUser.email,
-                profilePicUrl: userData.profilePicUrl || '',
-                lastSeen: serverTimestamp(),
-            }, { merge: true }); // Use merge to avoid overwriting other fields if added later
-        };
-
-        // Initial update
-        updateMyPresence();
-
-        // Set up interval for periodic updates (e.g., every 5 seconds)
-        presenceInterval = setInterval(updateMyPresence, 5000);
+        // Set up interval for periodic presence updates (e.g., every 5 seconds)
+        presenceInterval = setInterval(() => updateMyPresence(isInCall), 5000);
 
         // Listen for other users' presence
         const presenceCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms/${currentRoomId}/presence`);
-        const q = query(presenceCollectionRef, orderBy('lastSeen', 'desc')); // No time filter here, filter client-side for simplicity
+        const q = query(presenceCollectionRef, orderBy('lastSeen', 'desc'));
 
         presenceUnsubscribe = onSnapshot(q, (snapshot) => {
             const activeUsersListDiv = document.getElementById('active-users-list');
-            if (!activeUsersListDiv) return; // Ensure element exists after contentArea is rendered
+            if (!activeUsersListDiv) return;
 
             activeUsersListDiv.innerHTML = '';
             let activeUsersCount = 0;
@@ -1009,9 +1046,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const userProfilePic = presenceData.profilePicUrl || `https://placehold.co/30x30/F0F0F0/000000?text=${(presenceData.username || 'U').charAt(0).toUpperCase()}`;
 
                     userElement.innerHTML = `
-                        <img src="${userProfilePic}" alt="User Avatar" class="w-8 h-8 rounded-full object-cover border-2 border-green-500" onerror="this.onerror=null; this.src='https://placehold.co/30x30/F0F0F0/000000?text=${(presenceData.username || 'U').charAt(0).toUpperCase()}'">
+                        <img src="${userProfilePic}" alt="User Avatar" class="w-8 h-8 rounded-full object-cover border-2 ${presenceData.inCall ? 'border-green-500' : 'border-gray-300'}">
                         <span class="font-semibold text-gray-800">${presenceData.username}</span>
                         ${presenceData.userId === currentUser.uid ? '<span class="text-xs text-blue-500">(You)</span>' : ''}
+                        ${presenceData.inCall ? '<i class="fas fa-phone text-green-500 ml-2" title="In Call"></i>' : ''}
                     `;
                     activeUsersListDiv.appendChild(userElement);
                 }
@@ -1025,10 +1063,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const activeUsersListDiv = document.getElementById('active-users-list');
             if (activeUsersListDiv) activeUsersListDiv.innerHTML = '<p class="text-red-500 text-center text-sm">Error loading active users.</p>';
         });
-
-        // Clean up presence when user leaves the page or app is closed
-        window.removeEventListener('beforeunload', cleanupRoomListeners); // Remove previous listener to avoid duplicates
-        window.addEventListener('beforeunload', cleanupRoomListeners);
     }
 
     /**
@@ -2625,12 +2659,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         currentRoomId = id;
         currentRoomTitle = title;
+        isInCall = false; // Reset call status when entering a new room
 
         contentArea.innerHTML = `
             <div class="flex flex-col md:flex-row items-start justify-center p-4 w-full h-full min-h-screen gap-4">
                 <!-- Main Chat Area -->
                 <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200" style="height: 80vh; max-height: 700px; display: flex; flex-direction: column;">
                     <h2 id="room-title-chat" class="text-3xl font-extrabold text-center text-gray-800 mb-6">Chat in "${decodeURIComponent(currentRoomTitle)}"</h2>
+
+                    <!-- Call Buttons -->
+                    <div class="flex justify-center mb-4 space-x-4">
+                        <button id="join-call-btn" class="py-2 px-6 rounded-full bg-green-500 text-white font-bold text-lg hover:bg-green-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                            <i class="fas fa-phone mr-2"></i> Join Call
+                        </button>
+                        <button id="leave-call-btn" class="py-2 px-6 rounded-full bg-red-500 text-white font-bold text-lg hover:bg-red-600 transition duration-300 transform hover:scale-105 shadow-lg hidden">
+                            <i class="fas fa-phone-slash mr-2"></i> Leave Call
+                        </button>
+                    </div>
+
                     <div id="chat-messages" class="bg-gray-100 p-4 rounded-lg mb-4 space-y-3" style="flex-grow: 1; overflow-y: auto; scroll-behavior: smooth;">
                         <!-- Chat messages will be loaded here -->
                     </div>
@@ -2660,7 +2706,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Set up listeners for the current room
         loadRoomMessages();
-        setupPresence();
+        setupPresence(); // This will also handle initial button state
 
         // Add event listeners specific to this page
         document.getElementById('chat-form').addEventListener('submit', (e) => {
@@ -2672,6 +2718,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('back-to-rooms-list-btn').addEventListener('click', () => {
             navigateTo('rooms'); // Go back to the list of rooms
         });
+
+        document.getElementById('join-call-btn').addEventListener('click', joinCall);
+        document.getElementById('leave-call-btn').addEventListener('click', leaveCall);
     }
 
 
@@ -2683,6 +2732,11 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     function cleanupRoomListeners() {
         console.log("Cleaning up room listeners...");
+        // If current user was in a call, set inCall to false when leaving the room
+        if (currentUser && currentRoomId && isInCall) {
+            updateMyPresence(false); // Update presence to indicate leaving call
+        }
+
         if (messagesUnsubscribe) {
             messagesUnsubscribe();
             messagesUnsubscribe = null;
@@ -2697,22 +2751,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         currentRoomId = null; // Clear current room state
         currentRoomTitle = '';
-    }
-
-    /**
-     * Closes the side drawer menu.
-     */
-    function closeSideDrawer() {
-        if (sideDrawerMenu) sideDrawerMenu.classList.remove('open');
-        if (overlayBackdrop) overlayBackdrop.classList.remove('visible');
-        if (mobileMenuIconOpen) mobileMenuIconOpen.classList.remove('hidden');
-        if (mobileMenuIconClose) mobileMenuIconClose.classList.add('hidden');
-        // Reset mobile dropdowns when closing the main drawer
-        sideDrawerMenu.querySelectorAll('.mobile-dropdown-content.open').forEach(openContent => {
-            openContent.style.maxHeight = '0px';
-            openContent.classList.remove('open');
-            openContent.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
-        });
+        isInCall = false; // Reset call status for next room entry
     }
 
     /**
@@ -2834,7 +2873,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         showLoadingSpinner();
         try {
             // Store firebaseConfig and APP_ID in localStorage when auth state changes (or on app load)
-            // This is primarily for the *external* rooms.html, but keeping it for consistency.
             localStorage.setItem('firebaseConfig', JSON.stringify(firebaseConfig));
             localStorage.setItem('APP_ID', APP_ID);
             // Check if __initial_auth_token is available from the Canvas environment
@@ -2885,7 +2923,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 } else {
                     pageToRender = currentHash;
-                    // For pages like edit-post, the ID might be directly in the hash or from data-currentId
+                    // For pages like edit-post, the ID might be directly in the hash or from data-currentParam
                     paramToPass = contentArea.dataset.currentParam || null;
                     if (paramToPass && typeof paramToPass === 'string') {
                         try { paramToPass = JSON.parse(paramToPass); } catch (e) { /* not JSON */ }
