@@ -3,7 +3,7 @@
 
 // Import Firebase functions directly into this module
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, signInAnonymously, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -25,6 +25,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const db = getFirestore(app);
     // Use the projectId as the APP_ID for consistent Firestore collection paths and rules
     const APP_ID = firebaseConfig.projectId; 
+
+    // Initialize Auth Provider for Google
+    const googleProvider = new GoogleAuthProvider();
+    googleProvider.addScope('profile'); // Request profile access
+    googleProvider.addScope('email'); // Request email access
+
 
     // DOM Elements
     const contentArea = document.getElementById('content-area');
@@ -150,7 +156,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Authenticates a user (login or signup) with Firebase Auth and stores user data in Firestore.
-     * @param {string} type - 'login' or 'signup'.
+     * Handles Email/Password and Google authentication.
+     * @param {string} type - 'login', 'signup', or 'google'.
      * @param {object} formData - { email, password, username (for signup) }.
      * @returns {Promise<object>} - User data or throws error.
      */
@@ -158,51 +165,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         showLoadingSpinner();
         try {
             let userCredential;
-            if (type === 'signup') {
+            let user;
+
+            if (type === 'google') {
+                userCredential = await signInWithPopup(auth, googleProvider);
+                user = userCredential.user;
+            } else if (type === 'signup') {
                 userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-                const user = userCredential.user;
-
-                // Create user document in Firestore
-                const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
-                await setDoc(userDocRef, {
-                    email: user.email,
-                    username: formData.username,
-                    role: 'member', // Default role for new users
-                    profilePicUrl: `https://placehold.co/100x100/F0F0F0/000000?text=${formData.username.charAt(0).toUpperCase()}`,
-                    backgroundUrl: 'bg-gradient-to-r from-blue-400 to-purple-600' // Default background
-                });
-
-                // Update display name for Firebase Auth user
-                await updateProfile(user, { displayName: formData.username });
-
-                // Fetch the newly created user data from Firestore for consistency
-                const docSnap = await getDoc(userDocRef);
-                return docSnap.exists() ? docSnap.data() : null;
-
+                user = userCredential.user;
             } else { // login
                 userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
-                const user = userCredential.user;
-
-                // Fetch user data from Firestore
-                const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
-                const docSnap = await getDoc(userDocRef);
-
-                if (docSnap.exists()) {
-                    return docSnap.data();
-                } else {
-                    // This case should ideally not happen if signup works, but as a fallback
-                    // create a default entry for existing auth users without firestore data.
-                    await setDoc(userDocRef, {
-                        email: user.email,
-                        username: user.displayName || user.email.split('@')[0],
-                        role: 'member',
-                        profilePicUrl: `https://placehold.co/100x100/F0F0F0/000000?text=${user.displayName ? user.displayName.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}`,
-                        backgroundUrl: 'bg-gradient-to-r from-blue-400 to-purple-600'
-                    });
-                    const newDocSnap = await getDoc(userDocRef);
-                    return newDocSnap.data();
-                }
+                user = userCredential.user;
             }
+
+            // After authentication, ensure user data exists in Firestore
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+            const docSnap = await getDoc(userDocRef);
+
+            let fetchedUserData;
+            if (docSnap.exists()) {
+                fetchedUserData = docSnap.data();
+            } else {
+                // Create user document if it doesn't exist (e.g., new Google user)
+                const usernameToUse = user.displayName || user.email?.split('@')[0] || 'User';
+                const profilePicToUse = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
+
+                await setDoc(userDocRef, {
+                    email: user.email,
+                    username: usernameToUse,
+                    role: 'member', // Default role for new users
+                    profilePicUrl: profilePicToUse,
+                    backgroundUrl: 'bg-gradient-to-r from-blue-400 to-purple-600' // Default background
+                });
+                const newDocSnap = await getDoc(userDocRef);
+                fetchedUserData = newDocSnap.data();
+            }
+            return fetchedUserData;
+
         } catch (error) {
             console.error("Firebase Auth error:", error.message);
             let errorMessage = "An unknown error occurred.";
@@ -212,8 +211,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 errorMessage = 'Invalid email address.';
             } else if (error.code === 'auth/weak-password') {
                 errorMessage = 'Password should be at least 6 characters.';
-            } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-api-key' || error.code === 'auth/unauthorized-domain') {
-                errorMessage = 'Invalid email, password, or Firebase configuration error. Please check console for details.';
+            } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                errorMessage = 'Invalid email or password.';
+            } else if (error.code === 'auth/popup-closed-by-user') {
+                errorMessage = 'Authentication popup closed.';
+            } else if (error.code === 'auth/cancelled-popup-request') {
+                errorMessage = 'Authentication request cancelled.';
+            } else if (error.code === 'auth/unauthorized-domain') {
+                errorMessage = 'Unauthorized domain. Add your website URL to Firebase Authentication Authorized Domains.';
+            } else if (error.code === 'auth/invalid-api-key') {
+                errorMessage = 'Invalid Firebase API Key. Please check your firebaseConfig.';
+            } else if (error.code === 'auth/account-exists-with-different-credential') {
+                errorMessage = 'Account already exists with a different login method. Try signing in with that method.';
             }
             throw new Error(errorMessage); // Re-throw with a user-friendly message
         } finally {
@@ -472,7 +481,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         contentArea.innerHTML = `
             <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
                 <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-green-600 mb-6">
-                    Welcome to MyWebsite!
+                    Welcome to SophosWRLD!
                 </h1>
                 ${currentUser && userData ? `
                     <p class="text-xl text-gray-700 mb-4">
@@ -545,6 +554,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                             Forgot Password?
                         </button>
                     </div>
+                    <div class="mt-6">
+                        <button id="google-auth-btn" class="w-full py-3 rounded-full bg-red-500 text-white font-bold text-lg hover:bg-red-600 transition duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12.24 10.26v3.29h6.14c-.26 1.63-1.4 3.01-3.23 3.91l-.01.01-2.58 2.02c-1.52 1.19-3.4 1.83-5.32 1.83-4.8 0-8.72-3.86-8.72-8.62s3.92-8.62 8.72-8.62c2.81 0 4.67 1.19 5.86 2.36L18.42 5c-.71-.69-2.09-1.83-5.46-1.83-3.69 0-6.73 2.97-6.73 6.64s3.04 6.64 6.73 6.64c2.86 0 4.69-1.22 5.56-2.26l.01-.01-4.73-3.71z" fill="#FFFFFF"></path>
+                            </svg>
+                            <span>Sign in with Google</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -558,6 +575,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const authSubmitBtn = document.getElementById('auth-submit-btn');
         const toggleAuthModeBtn = document.getElementById('toggle-auth-mode');
         const forgotPasswordBtn = document.getElementById('forgot-password-btn');
+        const googleAuthBtn = document.getElementById('google-auth-btn'); // Get the Google button
 
         let isSignUpMode = false;
 
@@ -599,6 +617,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             try {
                 await sendPasswordReset(email);
                 showMessageModal("Password reset email sent! Check your inbox.");
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+
+        // Add event listener for Google button
+        googleAuthBtn.addEventListener('click', async () => {
+            try {
+                await authenticateUser('google');
+                showMessageModal('Signed in with Google successfully!');
             } catch (error) {
                 showMessageModal(error.message, 'error');
             }
@@ -843,7 +871,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                             await updateUserRoleFirestore(userId, newRole);
                             showMessageModal(`User role updated to "${newRole}" successfully!`);
                             renderAdminPanelPage(); // Re-render admin panel to reflect changes
-                        } catch (error) {
+                        }
+                        catch (error) {
                             showMessageModal(error.message, 'error');
                             renderAdminPanelPage(); // Re-render to revert dropdown if failed
                         }
@@ -943,18 +972,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // where a user exists in Auth but not Firestore.
                     console.warn("User exists in Auth but not Firestore. Creating default entry.");
                     const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
-                    const defaultProfilePic = `https://placehold.co/100x100/F0F0F0/000000?text=${(user.displayName || user.email || 'U').charAt(0).toUpperCase()}`;
+                    const defaultProfilePic = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.displayName || user.email || 'U').charAt(0).toUpperCase()}`;
                     const defaultBackground = 'bg-gradient-to-r from-blue-400 to-purple-600';
                     await setDoc(userDocRef, {
                         email: user.email,
-                        username: user.displayName || user.email.split('@')[0],
+                        username: user.displayName || user.email?.split('@')[0],
                         role: 'member',
                         profilePicUrl: defaultProfilePic,
                         backgroundUrl: defaultBackground
                     });
                     userData = {
                         email: user.email,
-                        username: user.displayName || user.email.split('@')[0],
+                        username: user.displayName || user.email?.split('@')[0],
                         role: 'member',
                         profilePicUrl: defaultProfilePic,
                         backgroundUrl: defaultBackground
