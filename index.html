@@ -1,102 +1,106 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-gray-900 text-white">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sophos Studios</title>
-  <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="min-h-screen flex flex-col">
-
-  <!-- 🌐 Navbar -->
-  <nav class="bg-gray-800 shadow-md w-full">
-    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-      <h1 class="text-xl font-bold">👨‍💻 Sophos Studios</h1>
-      <div class="relative">
-        <button id="dropdownBtn" class="hover:bg-gray-700 px-4 py-2 rounded transition">Menu ▼</button>
-        <ul id="dropdownMenu" class="hidden absolute right-0 mt-2 bg-gray-800 border border-gray-700 rounded shadow-lg">
-          <li><a href="#" class="block px-4 py-2 hover:bg-gray-700">Projects</a></li>
-          <li><a href="#" class="block px-4 py-2 hover:bg-gray-700">Updates</a></li>
-          <li><a href="#" class="block px-4 py-2 hover:bg-gray-700">About</a></li>
-        </ul>
-      </div>
-    </div>
-  </nav>
-
-  <!-- 📦 Main Content -->
-  <div class="container max-w-7xl mx-auto flex-1 px-4 py-8" id="main-content">
-    <div class="flex flex-col md:flex-row gap-8">
-
-      <!-- 🧑 Side Profile -->
-      <aside class="w-full md:w-1/4 bg-gray-800 p-6 rounded-full shadow-lg text-center">
-        <!-- 👤 Profile Picture with pink glow -->
-        <div class="relative w-32 h-32 mx-auto mb-4">
-          <div class="absolute inset-0 rounded-full blur-xl bg-pink-500 opacity-60 z-0"></div>
-          <img src="./content/team/sophos.png" alt="Sophos" class="rounded-full border-4 border-gray-700 relative z-10" />
-        </div>
-      
-        <!-- 👨 Name -->
-        <h2 class="text-xl font-bold mb-1">Sophos</h2>
-      
-        <!-- ✉️ Email -->
-        <p class="text-sm text-pink-300 mb-4">
-          <a href="mailto:admin@sophosstudios.org" class="hover:underline">admin@sophosstudios.org</a>
-        </p>
-      
-        <!-- 🧠 About Me -->
-        <div class="text-sm text-gray-300">
-          <p>
-            Hey there! I'm Sophos — a developer passionate about creating immersive experiences across Roblox, Discord bots, and custom web platforms. I enjoy building creative tools that help others innovate!
-          </p>
-        </div>
-      </aside>
-      
-
-      <!-- 🔍 Project Viewer -->
-      <main class="flex-1">
-        <header class="mb-4">
-          <div class="flex justify-between items-center">
-            <h2 class="text-2xl font-semibold">Projects</h2>
-            <button id="theme-toggle" class="bg-gray-700 px-3 py-1 rounded">🌙</button>
-          </div>
-          <input type="text" id="search" placeholder="Search projects..." class="mt-4 w-full px-4 py-2 rounded bg-gray-700 text-white placeholder-gray-400" />
-        </header>
-
-        <section id="projects" class="space-y-4"></section>
-      </main>
-
-    </div>
-  </div>
-
-  <!-- 🔗 Socials Footer -->
-  <footer class="bg-gray-800 text-center py-6 mt-12">
-    <p class="text-sm mb-2">Made with 💻 by Sophos</p>
-    <div class="flex justify-center gap-6">
-      <a href="#" class="hover:text-blue-400">Twitter</a>
-      <a href="#" class="hover:text-blue-400">GitHub</a>
-      <a href="#" class="hover:text-blue-400">LinkedIn</a>
-      <a href="#" class="hover:text-blue-400">Discord</a>
-    </div>
-  </footer>
-
-  <script>
-    // Dropdown logic
-    const dropdownBtn = document.getElementById("dropdownBtn");
-    const dropdownMenu = document.getElementById("dropdownMenu");
-
-    dropdownBtn.addEventListener("click", () => {
-      dropdownMenu.classList.toggle("hidden");
-    });
-
-    document.addEventListener("click", (e) => {
-      if (!dropdownBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
-        dropdownMenu.classList.add("hidden");
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management Website (HTML/JS/Firebase)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+      /* Basic styling for the body and root element */
+      body {
+        font-family: 'Inter', sans-serif;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-    });
-  </script>
+      #app {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .main-content-area {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding-top: 64px; /* Adjust for navbar height */
+      }
+    </style>
+</head>
+<body class="min-h-screen font-inter bg-gradient-to-r from-blue-400 to-purple-600">
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- Navbar -->
+        <nav class="p-4 shadow-lg bg-gray-800 text-white relative z-10 rounded-b-xl">
+            <div class="container mx-auto flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <button id="nav-home" class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500 hover:scale-105 transition duration-200">
+                        SophosWRLD
+                    </button>
+                    <button id="nav-about" class="hidden md:block px-4 py-2 rounded-lg hover:bg-gray-700 transition duration-200">
+                        About
+                    </button>
+                </div>
 
-  <script src="./script.js"></script>
-  <script src="../../data/favicon.js"></script>
+                <div class="md:hidden">
+                    <button id="mobile-menu-toggle" class="text-white focus:outline-none">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path id="mobile-menu-icon-open" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                            <path id="mobile-menu-icon-close" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div id="nav-links" class="hidden md:flex items-center space-x-4">
+                    <!-- Links will be dynamically populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Mobile Menu -->
+            <div id="mobile-menu" class="hidden md:hidden bg-gray-800 absolute top-full left-0 w-full shadow-lg rounded-b-lg py-2">
+                <!-- Mobile menu items will be dynamically populated by JavaScript -->
+            </div>
+        </nav>
+
+        <!-- Main content area -->
+        <main id="content-area" class="main-content-area"></main>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+        // IMPORTANT: Replace with your actual Firebase project configuration
+        // You get this from your Firebase project settings -> "Project settings" -> "Your apps" -> "Web app"
+        const firebaseConfig = {
+          apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
+          authDomain: "sophoswrld.firebaseapp.com",
+          projectId: "sophoswrld",
+          storageBucket: "sophoswrld.firebasestorage.app",
+          messagingSenderId: "26686142400",
+          appId: "1:26686142400:web:48f8d3ae0b097731317a25",
+          measurementId: "G-6XETC98C22"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Make Firebase instances globally accessible for script.js
+        window.firebaseApp = app;
+        window.firebaseAuth = auth;
+        window.firebaseDb = db;
+        // The __app_id is used for Firestore collection paths.
+        window.__app_id = 'your-website-app-id'; // Use a consistent app ID here
+    </script>
+
+    <!-- Your JavaScript application logic -->
+    <script type="module" src="./App.js"></script>
 </body>
 </html>
