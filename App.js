@@ -515,7 +515,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Adds/updates a reaction to a post.
      * Any authenticated user can react.
      * @param {string} postId - The ID of the post.
-     * @param {string} emoji - The emoji character (e.g., '👍', '❤️').
+     * @param {string} emoji - The emoji character (e.g., '�', '❤️').
      * @returns {Promise<void>}
      */
     async function addReactionToPost(postId, emoji) {
@@ -702,9 +702,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 rounded-lg hover:bg-gray-700 text-white transition duration-200
                 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : 
                   (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : 
-                  (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : 
-                  (id.includes('founder') ? 'bg-purple-800 hover:bg-purple-900 shadow-md' : '')))}
-            `;
+                  (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}
+            `; // Removed founder-specific styling, admin styling will apply if a founder is shown admin panel
             btn.innerHTML = `${iconHtml}<span>${text}</span>`;
             btn.addEventListener('click', () => {
                 navigateTo(page);
@@ -720,9 +719,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (userData.role === 'admin' || userData.role === 'founder') {
                 createAndAppendButton(navLinks, 'nav-admin', 'Admin Panel', 'admin');
             }
-            if (userData.role === 'founder') { // New: Founder Panel for desktop
-                createAndAppendButton(navLinks, 'nav-founder', 'Founder Panel', 'admin');
-            }
+            // Removed specific 'Founder Panel' button as requested, Founders use Admin Panel now.
 
             const profileIconSrc = userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`;
             const profileIconHtml = `
@@ -738,9 +735,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (userData.role === 'admin' || userData.role === 'founder') {
                 createAndAppendButton(sideDrawerMenu, 'mobile-nav-admin', 'Admin Panel', 'admin', '', true);
             }
-            if (userData.role === 'founder') { // New: Founder Panel for mobile
-                createAndAppendButton(sideDrawerMenu, 'mobile-nav-founder', 'Founder Panel', 'admin', '', true);
-            }
+            // Removed specific 'Founder Panel' button for mobile, Founders use Admin Panel now.
             createAndAppendButton(sideDrawerMenu, 'mobile-nav-profile', 'Profile', 'profile', '', true);
             createAndAppendButton(sideDrawerMenu, 'mobile-nav-sign-out', 'Sign Out', 'logout', '', true);
 
@@ -757,6 +752,34 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Renders the Home page content.
      */
     function renderHomePage() {
+        // Function to get VFX and color for role
+        const getRoleVFX = (role) => {
+            let emoji = '';
+            let colorClass = 'text-gray-800'; // Default color
+
+            switch (role) {
+                case 'member':
+                    emoji = '👤'; // User emoji
+                    colorClass = 'text-blue-600'; // Member color
+                    break;
+                case 'admin':
+                    emoji = '🛡️'; // Shield emoji
+                    colorClass = 'text-red-600'; // Admin color
+                    break;
+                case 'founder':
+                    emoji = '✨'; // Sparkles emoji
+                    colorClass = 'text-purple-600'; // Founder color
+                    break;
+                default:
+                    emoji = '';
+                    colorClass = 'text-gray-800';
+            }
+            // Apply a subtle animation for all roles, or only privileged ones
+            const animationClass = (role === 'admin' || role === 'founder') ? 'animate-pulse' : ''; 
+            return `<span class="font-semibold ${colorClass} ${animationClass}">${emoji} ${role}</span>`;
+        };
+
+
         contentArea.innerHTML = `
             <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
                 <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-green-600 mb-6">
@@ -765,7 +788,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ${currentUser && userData ? `
                     <p class="text-xl text-gray-700 mb-4">
                         Hello, <span class="font-semibold text-blue-600">${userData.username || currentUser.email}</span>!
-                        You are logged in as a <span class="font-semibold text-purple-600">${userData.role}</span>.
+                        You are logged in as a ${getRoleVFX(userData.role)}.
                     </p>
                     <p class="text-lg text-gray-600 mb-6">
                         Explore your profile settings, check out the forum, or visit the admin panel if you have the permissions.
