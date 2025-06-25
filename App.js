@@ -10,12 +10,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // IMPORTANT: Replace with your actual Firebase project configuration
     // You get this from your Firebase project settings -> "Project settings" -> "Your apps" -> "Web app"
     const firebaseConfig = {
-        apiKey: "YOUR_API_KEY", // <--- REPLACE THIS
-        authDomain: "YOUR_AUTH_DOMAIN", // <--- REPLACE THIS
-        projectId: "YOUR_PROJECT_ID", // <--- REPLACE THIS
-        storageBucket: "YOUR_STORAGE_BUCKET", // <--- REPLACE THIS
-        messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // <--- REPLACE THIS
-        appId: "YOUR_APP_ID" // <--- REPLACE THIS
+      apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
+      authDomain: "sophoswrld.firebaseapp.com",
+      projectId: "sophoswrld",
+      storageBucket: "sophoswrld.firebasestorage.app",
+      messagingSenderId: "26686142400",
+      appId: "1:26686142400:web:48f8d3ae0b097731317a25",
+      measurementId: "G-6XETC98C22"
     };
 
     // Initialize Firebase within App.js
