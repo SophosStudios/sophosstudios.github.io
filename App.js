@@ -4,7 +4,7 @@
 // Import Firebase functions directly into this module
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, signInAnonymously, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', async () => {
     // IMPORTANT: Replace with your actual Firebase project configuration
@@ -138,18 +138,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Updates the body's background class based on user data.
+     * Updates the body's background. Can be a Tailwind class string or a direct image URL.
      */
     function updateBodyBackground() {
-        document.body.className = ''; // Clear existing classes
+        // Clear all previous body classes and inline styles to avoid conflicts
+        document.body.className = ''; 
+        document.body.style.backgroundImage = '';
+        document.body.style.backgroundSize = '';
+        document.body.style.backgroundPosition = '';
+        document.body.style.backgroundRepeat = '';
+        document.body.style.backgroundAttachment = '';
+
         if (userData && userData.backgroundUrl) {
-            // FIX: Split the backgroundUrl string into individual class names
-            const backgroundClasses = userData.backgroundUrl.split(' ');
-            document.body.classList.add(...backgroundClasses, 'min-h-screen', 'font-inter');
+            // Check if it's a direct URL (http or https)
+            if (userData.backgroundUrl.startsWith('http://') || userData.backgroundUrl.startsWith('https://')) {
+                document.body.style.backgroundImage = `url('${userData.backgroundUrl}')`;
+                document.body.style.backgroundSize = 'cover';
+                document.body.style.backgroundPosition = 'center';
+                document.body.style.backgroundRepeat = 'no-repeat';
+                document.body.style.backgroundAttachment = 'fixed'; // Makes background fixed on scroll
+            } else {
+                // Assume it's a Tailwind CSS class string
+                const backgroundClasses = userData.backgroundUrl.split(' ');
+                document.body.classList.add(...backgroundClasses);
+            }
         } else {
-            // Default fallback
-            document.body.classList.add('bg-gradient-to-r', 'from-blue-400', 'to-purple-600', 'min-h-screen', 'font-inter');
+            // Default fallback if no user data or backgroundUrl
+            document.body.classList.add('bg-gradient-to-r', 'from-blue-400', 'to-purple-600');
         }
+        // Always add core classes for consistent styling
+        document.body.classList.add('min-h-screen', 'font-inter');
     }
 
     // --- Firebase Integration Functions ---
@@ -188,6 +206,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 // Create user document if it doesn't exist (e.g., new Google user)
                 const usernameToUse = user.displayName || user.email?.split('@')[0] || 'User';
+                // Prioritize user.photoURL from auth provider, fallback to placeholder
                 const profilePicToUse = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
 
                 await setDoc(userDocRef, {
@@ -401,6 +420,77 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Creates a new post in Firestore.
+     * Only callable by admins.
+     * @param {string} title - The title of the post.
+     * @param {string} content - The content of the post.
+     * @returns {Promise<void>}
+     */
+    async function createPostFirestore(title, content) {
+        if (!currentUser || userData.role !== 'admin') {
+            throw new Error("Only admins can create posts.");
+        }
+        showLoadingSpinner();
+        try {
+            const postsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
+            await setDoc(doc(postsCollectionRef), { // Use setDoc with an auto-generated ID for new doc
+                title: title,
+                content: content,
+                authorId: currentUser.uid,
+                authorUsername: userData.username || currentUser.displayName || currentUser.email,
+                timestamp: serverTimestamp() // Use server timestamp for consistency
+            });
+            showMessageModal('Post created successfully!');
+        } catch (error) {
+            console.error("Error creating post:", error.message);
+            throw new Error("Failed to create post: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Fetches all posts from Firestore, ordered by timestamp.
+     * @returns {Promise<Array<object>>} - List of all posts.
+     */
+    async function fetchAllPostsFirestore() {
+        showLoadingSpinner();
+        try {
+            const postsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
+            const q = query(postsCollectionRef, orderBy('timestamp', 'desc')); // Order by newest first
+
+            const querySnapshot = await new Promise((resolve, reject) => {
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    unsubscribe(); // Unsubscribe immediately after first fetch
+                    resolve(snapshot);
+                }, (error) => {
+                    reject(error);
+                });
+            });
+
+            const postsData = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                postsData.push({
+                    id: doc.id,
+                    title: data.title,
+                    content: data.content,
+                    authorUsername: data.authorUsername,
+                    // Format timestamp for display
+                    timestamp: data.timestamp ? data.timestamp.toDate().toLocaleString() : 'N/A'
+                });
+            });
+            return postsData;
+        } catch (error) {
+            console.error("Error fetching posts:", error.message);
+            throw new Error("Failed to fetch posts: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+
     // --- UI Rendering Functions ---
 
     /**
@@ -413,7 +503,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const createButton = (id, text, page, iconHtml = '') => {
             const btn = document.createElement('button');
             btn.id = id;
-            btn.className = `px-4 py-2 rounded-lg hover:bg-gray-700 transition duration-200 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}`;
+            btn.className = `px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}`;
             btn.innerHTML = `${iconHtml}<span>${text}</span>`;
             btn.addEventListener('click', () => {
                 navigateTo(page);
@@ -430,7 +520,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const createMobileButton = (id, text, page) => {
             const btn = document.createElement('button');
             btn.id = id;
-            btn.className = `block w-full text-left px-4 py-2 hover:bg-gray-700 transition duration-200 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700' : (id.includes('auth') ? 'bg-green-600 hover:bg-green-700' : (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700' : ''))}`;
+            btn.className = `block w-full text-left px-4 py-2 hover:bg-gray-700 text-white transition duration-200 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700' : (id.includes('auth') ? 'bg-green-600 hover:bg-green-700' : (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700' : ''))}`;
             btn.textContent = text;
             btn.addEventListener('click', () => {
                 navigateTo(page);
@@ -446,6 +536,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (currentUser && userData) {
             // Logged in user
+            navLinks.appendChild(createButton('nav-forum', 'Forum', 'forum')); // Forum for all authenticated users
+            mobileMenu.appendChild(createMobileButton('mobile-nav-forum', 'Forum', 'forum'));
+
             if (userData.role === 'admin') {
                 navLinks.appendChild(createButton('nav-admin', 'Admin Panel', 'admin'));
                 mobileMenu.appendChild(createMobileButton('mobile-nav-admin', 'Admin Panel', 'admin'));
@@ -458,7 +551,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const profileBtn = document.createElement('button');
             profileBtn.id = 'nav-profile';
-            profileBtn.className = 'px-4 py-2 rounded-lg hover:bg-gray-700 transition duration-200 flex items-center space-x-2';
+            profileBtn.className = 'px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 flex items-center space-x-2';
             profileBtn.innerHTML = `${profileIconHtml}<span>${userData.username || currentUser.email}</span>`;
             profileBtn.addEventListener('click', () => navigateTo('profile'));
             navLinks.appendChild(profileBtn);
@@ -481,7 +574,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         contentArea.innerHTML = `
             <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
                 <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-green-600 mb-6">
-                    Welcome to SophosWRLD!
+                    Welcome to MyWebsite!
                 </h1>
                 ${currentUser && userData ? `
                     <p class="text-xl text-gray-700 mb-4">
@@ -489,11 +582,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         You are logged in as a <span class="font-semibold text-purple-600">${userData.role}</span>.
                     </p>
                     <p class="text-lg text-gray-600 mb-6">
-                        Explore your profile settings or check out the admin panel if you have the permissions.
+                        Explore your profile settings, check out the forum, or visit the admin panel if you have the permissions.
                     </p>
                     <div class="flex flex-col sm:flex-row justify-center gap-4">
                         <button id="go-to-profile-btn" class="py-3 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Go to Profile
+                        </button>
+                        <button id="go-to-forum-btn" class="py-3 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Visit Forum
                         </button>
                         ${userData.role === 'admin' ? `
                         <button id="go-to-admin-btn" class="py-3 px-6 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -513,6 +609,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (currentUser && userData) {
             document.getElementById('go-to-profile-btn').addEventListener('click', () => navigateTo('profile'));
+            document.getElementById('go-to-forum-btn').addEventListener('click', () => navigateTo('forum'));
             if (userData.role === 'admin') {
                 document.getElementById('go-to-admin-btn').addEventListener('click', () => navigateTo('admin'));
             }
@@ -643,10 +740,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const backgroundOptions = [
-            { name: 'Blue-Purple Gradient', class: 'bg-gradient-to-r from-blue-400 to-purple-600' },
+            { name: 'Blue-Purple Gradient (Default)', class: 'bg-gradient-to-r from-blue-400 to-purple-600' },
             { name: 'Green-Cyan Gradient', class: 'bg-gradient-to-r from-green-400 to-cyan-600' },
-            { name: 'Red-Orange Gradient', class: 'bg-gradient-to-r from-red-400 to-orange-600' },
-            // Add more options as desired
+            { name: 'Red-Black Gradient', class: 'bg-gradient-to-r from-red-800 to-black' }, // New
+            { name: 'Orange-Red Gradient', class: 'bg-gradient-to-r from-orange-600 to-red-600' }, // New
+            // Note: Custom URL for images/GIFs is handled by the input field directly below
         ];
 
         contentArea.innerHTML = `
@@ -673,14 +771,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <input type="url" id="profile-pic-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., https://example.com/your-image.jpg" value="${userData.profilePicUrl || ''}">
                         </div>
                         <div>
-                            <label for="profile-background" class="block text-gray-700 text-sm font-semibold mb-2">Website Background</label>
-                            <select id="profile-background" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
+                            <label for="profile-background-select" class="block text-gray-700 text-sm font-semibold mb-2">Website Background Theme</label>
+                            <select id="profile-background-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
                                 ${backgroundOptions.map(option => `
                                     <option value="${option.class}" ${userData.backgroundUrl === option.class ? 'selected' : ''}>
                                         ${option.name}
                                     </option>
                                 `).join('')}
                             </select>
+                        </div>
+                        <div>
+                            <label for="custom-background-url" class="block text-gray-700 text-sm font-semibold mb-2">Custom Background Image/GIF URL (Overrides Theme)</label>
+                            <input type="url" id="custom-background-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., https://example.com/your-animated.gif" value="${(userData.backgroundUrl && (userData.backgroundUrl.startsWith('http') || userData.backgroundUrl.startsWith('https'))) ? userData.backgroundUrl : ''}">
+                            <p class="text-xs text-gray-500 mt-1">For GIFs, choose a subtle or abstract one for a formal look. This will override the theme selection above.</p>
                         </div>
                         <button type="submit" id="save-profile-btn" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Save Changes
@@ -693,7 +796,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const profileForm = document.getElementById('profile-form');
         const usernameInput = document.getElementById('profile-username');
         const profilePicUrlInput = document.getElementById('profile-pic-url');
-        const backgroundSelect = document.getElementById('profile-background');
+        const backgroundSelect = document.getElementById('profile-background-select'); // Changed ID
+        const customBackgroundUrlInput = document.getElementById('custom-background-url'); // New input
         const profilePicDisplay = document.getElementById('profile-pic-display');
 
         // Update profile picture preview as URL changes
@@ -709,13 +813,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             const newUsername = usernameInput.value;
             const newProfilePicUrl = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(newUsername || 'U').charAt(0).toUpperCase()}`;
-            const newBackgroundUrl = backgroundSelect.value;
+            
+            let newBackgroundUrl;
+            // If custom URL is provided, use it. Otherwise, use the selected theme.
+            if (customBackgroundUrlInput.value) {
+                newBackgroundUrl = customBackgroundUrlInput.value;
+            } else {
+                newBackgroundUrl = backgroundSelect.value;
+            }
 
             try {
                 const updatedData = await updateProfileData({
                     username: newUsername,
                     profilePicUrl: newProfilePicUrl,
-                    backgroundUrl: newBackgroundUrl
+                    backgroundUrl: newBackgroundUrl // This can now be a class string or a URL
                 });
                 if (updatedData) {
                     userData = updatedData; // Update global userData
@@ -786,7 +897,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Admin Panel</h2>
                     <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts here.</p>
+                    <div class="mb-6 text-center">
+                        <button id="create-post-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Create New Post
+                        </button>
+                    </div>
 
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Manage Users</h3>
                     ${usersList.length === 0 ? `
                         <p class="text-center text-gray-600">No users found.</p>
                     ` : `
@@ -896,14 +1013,113 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
         }
+        document.getElementById('create-post-btn').addEventListener('click', () => navigateTo('create-post'));
     }
 
+    /**
+     * Renders the Create Post page for admins.
+     */
+    function renderCreatePostPage() {
+        if (!currentUser || userData.role !== 'admin') {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">You do not have administrative privileges to create posts.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Create New Post</h2>
+                    <form id="create-post-form" class="space-y-6">
+                        <div>
+                            <label for="post-title" class="block text-gray-700 text-sm font-semibold mb-2">Post Title</label>
+                            <input type="text" id="post-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter post title" required>
+                        </div>
+                        <div>
+                            <label for="post-content" class="block text-gray-700 text-sm font-semibold mb-2">Post Content</label>
+                            <textarea id="post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Write your post content here..." required></textarea>
+                        </div>
+                        <button type="submit" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Publish Post
+                        </button>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('create-post-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('post-title').value;
+            const content = document.getElementById('post-content').value;
+
+            try {
+                await createPostFirestore(title, content);
+                navigateTo('forum'); // Redirect to forum after posting
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+    }
+
+    /**
+     * Renders the Forum page, displaying all posts.
+     */
+    async function renderForumPage() {
+        if (!currentUser) {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">Please sign in to view the forum posts.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let posts = [];
+        try {
+            posts = await fetchAllPostsFirestore();
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+            posts = [];
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Forum & Announcements</h2>
+                    ${posts.length === 0 ? `
+                        <p class="text-center text-gray-600">No posts yet. Check back later!</p>
+                    ` : `
+                        <div id="posts-list" class="space-y-6">
+                            ${posts.map(post => `
+                                <div class="bg-gray-50 p-6 rounded-lg shadow-md border border-gray-200">
+                                    <h3 class="text-2xl font-bold text-gray-800 mb-2">${post.title}</h3>
+                                    <p class="text-gray-700 whitespace-pre-wrap">${post.content}</p>
+                                    <p class="text-sm text-gray-500 mt-4">
+                                        Posted by <span class="font-semibold">${post.authorUsername}</span> on ${post.timestamp}
+                                    </p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+    }
 
     // --- Navigation and Initialization ---
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'logout').
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'forum', 'logout').
      */
     async function navigateTo(page) {
         // Store the current page in a data attribute on the content area for tracking
@@ -943,6 +1159,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'admin':
                 renderAdminPanelPage();
                 break;
+            case 'create-post': // New case
+                renderCreatePostPage();
+                break;
+            case 'forum': // New case
+                renderForumPage();
+                break;
             default:
                 renderHomePage();
         }
@@ -972,6 +1194,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     // where a user exists in Auth but not Firestore.
                     console.warn("User exists in Auth but not Firestore. Creating default entry.");
                     const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+                    // Prioritize photoURL from auth provider, fallback to placeholder
                     const defaultProfilePic = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.displayName || user.email || 'U').charAt(0).toUpperCase()}`;
                     const defaultBackground = 'bg-gradient-to-r from-blue-400 to-purple-600';
                     await setDoc(userDocRef, {
