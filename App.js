@@ -1,12 +1,12 @@
 // App.js
 // This script contains the entire application logic, including Firebase initialization
 // and new features like forum, post management, reactions, comments, enhanced backgrounds,
-// and robust authentication state management for proper rendering.
+// and robust authentication state management for proper rendering, now with integrated chat rooms.
 
 // Import Firebase functions
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField, addDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js"; // Added addDoc here
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js"; // Added getDocs here
 
 // Import configuration from config.js
 import CONFIG from './config.js'; // Make sure config.js is in the same directory
@@ -47,6 +47,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     let roomsList = []; // List of all rooms for admin panel and rooms page
     let currentModal = null; // To manage active message modal
     let isAuthReady = false; // Flag to indicate if Firebase Auth state has been initialized
+
+    // Room-specific global state variables for chat functionality
+    let currentRoomId = null;
+    let currentRoomTitle = '';
+    let presenceInterval = null; // Interval for presence updates
+    let messagesUnsubscribe = null; // Unsubscribe function for messages listener
+    let presenceUnsubscribe = null; // Unsubscribe function for presence listener
 
     // --- Utility Functions ---
 
@@ -143,7 +150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     function updateBodyBackground() {
         // Clear all previous body classes and inline styles to avoid conflicts
-        document.body.className = ''; 
+        document.body.className = '';
         document.body.style.backgroundImage = '';
         document.body.style.backgroundSize = '';
         document.body.style.backgroundPosition = '';
@@ -310,9 +317,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log("Default user document created in Firestore.");
                 fetchedUserData = newUserData;
             }
-            // Store user data in localStorage for other pages (like rooms.html)
+            // Store user data in localStorage for other pages (like rooms.html, if it existed)
             localStorage.setItem('currentUserUid', currentUser.uid);
             localStorage.setItem('userData', JSON.stringify(fetchedUserData));
+            // Also store background directly for easier access by other pages or for body updates
+            localStorage.setItem('userBackgroundUrl', fetchedUserData.backgroundUrl);
+
             return fetchedUserData;
 
         } catch (error) {
@@ -352,6 +362,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Update localStorage with the latest user data
             if (updatedFetchedData) {
                 localStorage.setItem('userData', JSON.stringify(updatedFetchedData));
+                localStorage.setItem('userBackgroundUrl', updatedFetchedData.backgroundUrl); // Update background URL in localStorage
             }
             return updatedFetchedData;
         } catch (error) {
@@ -411,7 +422,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             throw new Error("Not authorized to change roles.");
         }
-        
+
         // Prevent admins from setting founder role (only founders can do this)
         if (newRole === 'founder' && userData.role !== 'founder') {
             throw new Error("Only a founder can assign the 'founder' role.");
@@ -604,7 +615,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (postSnap.exists()) {
                 const postData = postSnap.data();
                 const currentReactions = postData.reactions || {};
-                
+
                 // Get the user's previously reacted emoji for this post, if any
                 const userPreviousReaction = postData.userReactions ? postData.userReactions[currentUser.uid] : null;
 
@@ -631,7 +642,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updates[`reactions.${emoji}`] = (currentReactions[emoji] || 0) + 1;
                     updates[`userReactions.${currentUser.uid}`] = emoji; // Store user's new reaction
                 }
-                
+
                 // Perform the update
                 await updateDoc(postDocRef, updates);
                 console.log(`User ${currentUser.uid} reacted to post ${postId} with ${emoji}.`);
@@ -642,7 +653,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
             hideLoadingSpinner();
             // Re-render forum page to show updated reactions
-            renderForumPage(); 
+            renderForumPage();
         }
     }
 
@@ -684,7 +695,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
             hideLoadingSpinner();
             // Re-render forum page to show updated comments
-            renderForumPage(); 
+            renderForumPage();
         }
     }
 
@@ -915,6 +926,165 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Sends a new chat message to Firestore.
+     * This function now resides in App.js as rooms are integrated.
+     * @param {string} messageText - The content of the message.
+     */
+    async function sendMessage(messageText) {
+        if (!currentUser || !userData || !currentRoomId) {
+            showMessageModal("You must be logged in and in a room to send messages.", 'info');
+            return;
+        }
+        if (!messageText.trim()) {
+            showMessageModal("Message cannot be empty.", 'info');
+            return;
+        }
+
+        try {
+            const messagesCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms/${currentRoomId}/messages`);
+            await addDoc(messagesCollectionRef, {
+                text: messageText,
+                authorId: currentUser.uid,
+                authorUsername: userData.username || currentUser.displayName || currentUser.email,
+                profilePicUrl: userData.profilePicUrl || '', // Store sender's profile picture URL
+                timestamp: serverTimestamp()
+            });
+            // Clear input after sending, assuming the input element is accessible
+            const messageInput = document.getElementById('message-input');
+            if (messageInput) messageInput.value = '';
+        } catch (error) {
+            console.error("Error sending message:", error);
+            showMessageModal("Failed to send message: " + error.message, 'error');
+        }
+    }
+
+    /**
+     * Sets up real-time presence tracking for the current user in the room.
+     * This function now resides in App.js as rooms are integrated.
+     */
+    async function setupPresence() {
+        if (!currentUser || !currentRoomId) return;
+
+        // Clean up previous presence listener and interval if any
+        if (presenceUnsubscribe) presenceUnsubscribe();
+        if (presenceInterval) clearInterval(presenceInterval);
+
+        const presenceRef = doc(db, `/artifacts/${APP_ID}/public/data/rooms/${currentRoomId}/presence`, currentUser.uid);
+
+        // Update presence immediately and then every few seconds
+        const updateMyPresence = async () => {
+            await setDoc(presenceRef, {
+                userId: currentUser.uid,
+                username: userData.username || currentUser.displayName || currentUser.email,
+                profilePicUrl: userData.profilePicUrl || '',
+                lastSeen: serverTimestamp(),
+            }, { merge: true }); // Use merge to avoid overwriting other fields if added later
+        };
+
+        // Initial update
+        updateMyPresence();
+
+        // Set up interval for periodic updates (e.g., every 5 seconds)
+        presenceInterval = setInterval(updateMyPresence, 5000);
+
+        // Listen for other users' presence
+        const presenceCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms/${currentRoomId}/presence`);
+        const q = query(presenceCollectionRef, orderBy('lastSeen', 'desc')); // No time filter here, filter client-side for simplicity
+
+        presenceUnsubscribe = onSnapshot(q, (snapshot) => {
+            const activeUsersListDiv = document.getElementById('active-users-list');
+            if (!activeUsersListDiv) return; // Ensure element exists after contentArea is rendered
+
+            activeUsersListDiv.innerHTML = '';
+            let activeUsersCount = 0;
+            const activeThreshold = new Date(Date.now() - 15 * 1000); // Users seen in last 15 seconds
+
+            snapshot.forEach((userDoc) => {
+                const presenceData = userDoc.data();
+                if (presenceData.lastSeen && presenceData.lastSeen.toDate() > activeThreshold) {
+                    activeUsersCount++;
+                    const userElement = document.createElement('div');
+                    userElement.className = 'flex items-center space-x-3 p-2 bg-gray-100 rounded-md shadow-sm';
+                    const userProfilePic = presenceData.profilePicUrl || `https://placehold.co/30x30/F0F0F0/000000?text=${(presenceData.username || 'U').charAt(0).toUpperCase()}`;
+
+                    userElement.innerHTML = `
+                        <img src="${userProfilePic}" alt="User Avatar" class="w-8 h-8 rounded-full object-cover border-2 border-green-500" onerror="this.onerror=null; this.src='https://placehold.co/30x30/F0F0F0/000000?text=${(presenceData.username || 'U').charAt(0).toUpperCase()}'">
+                        <span class="font-semibold text-gray-800">${presenceData.username}</span>
+                        ${presenceData.userId === currentUser.uid ? '<span class="text-xs text-blue-500">(You)</span>' : ''}
+                    `;
+                    activeUsersListDiv.appendChild(userElement);
+                }
+            });
+
+            if (activeUsersCount === 0) {
+                activeUsersListDiv.innerHTML = '<p class="text-gray-500 text-center text-sm">No one else is online.</p>';
+            }
+        }, (error) => {
+            console.error("Error fetching active users:", error);
+            const activeUsersListDiv = document.getElementById('active-users-list');
+            if (activeUsersListDiv) activeUsersListDiv.innerHTML = '<p class="text-red-500 text-center text-sm">Error loading active users.</p>';
+        });
+
+        // Clean up presence when user leaves the page or app is closed
+        window.removeEventListener('beforeunload', cleanupRoomListeners); // Remove previous listener to avoid duplicates
+        window.addEventListener('beforeunload', cleanupRoomListeners);
+    }
+
+    /**
+     * Loads messages for the current room and sets up real-time listener.
+     */
+    async function loadRoomMessages() {
+        if (!currentUser || !currentRoomId) return;
+
+        // Clean up previous messages listener if any
+        if (messagesUnsubscribe) messagesUnsubscribe();
+
+        const messagesRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms/${currentRoomId}/messages`);
+        const q = query(messagesRef, orderBy('timestamp', 'asc'));
+
+        messagesUnsubscribe = onSnapshot(q, async (snapshot) => {
+            const chatMessagesDiv = document.getElementById('chat-messages');
+            if (!chatMessagesDiv) return; // Ensure element exists after contentArea is rendered
+
+            chatMessagesDiv.innerHTML = ''; // Clear existing messages
+
+            // Fetch all user profiles for message display (optimize by caching if needed)
+            const usersCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
+            const usersSnapshot = await getDocs(usersCollectionRef);
+            const usersMap = {};
+            usersSnapshot.forEach(doc => {
+                usersMap[doc.id] = doc.data();
+            });
+
+            snapshot.forEach((msgDoc) => {
+                const msg = msgDoc.data();
+                const senderData = usersMap[msg.authorId] || { username: 'Unknown User', profilePicUrl: '' };
+                const profilePic = senderData.profilePicUrl || `https://placehold.co/40x40/F0F0F0/000000?text=${(senderData.username || 'U').charAt(0).toUpperCase()}`;
+
+                const messageElement = document.createElement('div');
+                messageElement.className = `
+                    flex items-start gap-3 p-3 rounded-lg shadow-sm w-full
+                    ${msg.authorId === currentUser.uid ? 'bg-blue-200 self-end ml-auto flex-row-reverse' : 'bg-gray-200 self-start mr-auto'}
+                `;
+                messageElement.innerHTML = `
+                    <img src="${profilePic}" alt="Avatar" class="w-10 h-10 rounded-full object-cover border-2 border-gray-300 flex-shrink-0" onerror="this.onerror=null; this.src='https://placehold.co/40x40/F0F0F0/000000?text=${(senderData.username || 'U').charAt(0).toUpperCase()}'">
+                    <div class="flex flex-col ${msg.authorId === currentUser.uid ? 'items-end' : 'items-start'} flex-grow">
+                        <p class="font-semibold text-sm ${msg.authorId === currentUser.uid ? 'text-blue-800' : 'text-gray-800'}">${msg.authorUsername}</p>
+                        <p class="text-gray-700 break-words">${msg.text}</p>
+                        <p class="text-xs text-gray-500 mt-1">${msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleString() : 'N/A'}</p>
+                    </div>
+                `;
+                chatMessagesDiv.appendChild(messageElement);
+            });
+            chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight; // Scroll to bottom
+        }, (error) => {
+            console.error("Error fetching messages:", error);
+            const chatMessagesDiv = document.getElementById('chat-messages');
+            if (chatMessagesDiv) chatMessagesDiv.innerHTML = '<p class="text-red-500 text-center text-sm">Error loading chat messages.</p>';
+        });
+    }
+
 
     // --- UI Rendering Functions ---
 
@@ -928,7 +1098,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             console.warn("Element with ID 'nav-links' not found. Desktop navigation may not render correctly.");
         }
-        
+
         // Clear only dynamically added items from side drawer (keeping static Home/About)
         // Find the index of the first dynamic button (or the length if none)
         let firstDynamicIndex = 2; // Assuming mobile-drawer-home and mobile-drawer-about are always first 2 static elements
@@ -959,8 +1129,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.className = `
                 ${isMobile ? 'block w-full text-left px-4 py-3 text-lg font-semibold' : 'px-4 py-2'}
                 rounded-lg hover:bg-gray-700 text-white transition duration-200
-                ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : 
-                  (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : 
+                ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' :
+                  (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' :
                   (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}
             `; // Removed founder-specific styling, admin styling will apply if a founder is shown admin panel
             btn.innerHTML = `${iconHtml}<span>${text}</span>`;
@@ -974,13 +1144,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                         localStorage.removeItem('firebaseConfig');
                         localStorage.removeItem('APP_ID');
                         localStorage.removeItem('__initial_auth_token');
+                        localStorage.removeItem('userBackgroundUrl'); // Clear background too
                         // Reload or navigate to home to clear state
                         window.location.href = 'index.html'; // Ensure full refresh on logout
                     }).catch(error => {
                         showMessageModal("Failed to sign out: " + error.message, 'error');
                     });
-                } else if (page.endsWith('.html')) { // Direct navigation to an HTML file
-                    window.location.href = page;
                 } else { // In-page navigation
                     navigateTo(page);
                 }
@@ -995,7 +1164,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 name: 'Community',
                 items: [
                     { id: 'nav-forum', text: 'Forum', page: 'forum' },
-                    { id: 'nav-rooms', text: 'Rooms', page: 'rooms', passId: false }, // Modified: page: 'rooms'
+                    { id: 'nav-rooms', text: 'Rooms', page: 'rooms' },
                     { id: 'nav-team', text: 'Meet the Team', page: 'team' }
                 ],
                 authRequired: true
@@ -1120,15 +1289,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 localStorage.removeItem('firebaseConfig');
                                 localStorage.removeItem('APP_ID');
                                 localStorage.removeItem('__initial_auth_token');
+                                localStorage.removeItem('userBackgroundUrl'); // Clear background too
                                 window.location.href = 'index.html'; // Full reload to clear state
                             }).catch(error => {
                                 showMessageModal("Failed to sign out: " + error.message, 'error');
                             });
-                        } else if (navItem.page === 'rooms' && navItem.passId === false) { // Special case for generic rooms link
-                            // Do nothing or navigate to rooms list. For now, navigateTo('admin') as rooms are managed there.
-                            navigateTo('admin'); // Assuming 'Rooms' link from nav goes to admin panel to list rooms
-                        } else if (navItem.page.endsWith('.html')) {
-                            window.location.href = navItem.page; // Navigate to external HTML file
                         } else {
                             navigateTo(navItem.page); // Navigate within this index.html
                         }
@@ -1184,7 +1349,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         openContent.classList.remove('open');
                         openContent.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
                     });
-                    
+
                     dropdownContent.style.maxHeight = dropdownContent.scrollHeight + 'px';
                     dropdownContent.classList.add('open');
                     dropdownIcon.classList.add('rotate-180');
@@ -1204,14 +1369,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 localStorage.removeItem('firebaseConfig');
                                 localStorage.removeItem('APP_ID');
                                 localStorage.removeItem('__initial_auth_token');
+                                localStorage.removeItem('userBackgroundUrl'); // Clear background too
                                 window.location.href = 'index.html'; // Full reload on logout
                             }).catch(error => {
                                 showMessageModal("Failed to sign out: " + error.message, 'error');
                             });
-                        } else if (navItem.page === 'rooms' && navItem.passId === false) { // Special case for generic rooms link
-                            navigateTo('admin'); // Assuming 'Rooms' link from nav goes to admin panel to list rooms
-                        } else if (navItem.page.endsWith('.html')) { // Direct navigation to an HTML file
-                            window.location.href = navItem.page;
                         } else { // In-page navigation
                             navigateTo(navItem.page);
                         }
@@ -1256,7 +1418,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     colorClass = 'text-gray-800';
             }
             // Apply a subtle animation for all roles, or only privileged ones
-            const animationClass = (role === 'admin' || role === 'founder') ? 'animate-pulse' : ''; 
+            const animationClass = (role === 'admin' || role === 'founder') ? 'animate-pulse' : '';
             return `<span class="font-semibold ${colorClass} ${animationClass}">${emoji} ${role}</span>`;
         };
 
@@ -1504,7 +1666,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             const newUsername = usernameInput.value;
             const newProfilePicUrl = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(newUsername || 'U').charAt(0).toUpperCase()}`;
-            
+
             let newBackgroundUrl;
             // If custom URL is provided, use it. Otherwise, use the selected theme.
             if (customBackgroundUrlInput.value) {
@@ -1594,7 +1756,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Admin Panel</h2>
                     <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts, forum posts, and communication rooms.</p>
-                    
+
                     <div class="mb-8 text-center space-x-4">
                         <button id="view-forum-admin-btn" class="py-2 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Manage Posts (Forum)
@@ -1635,7 +1797,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </table>
                         </div>
                     `}
-                    
+
                     <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Manage Rooms</h3>
                     <div class="mb-6 text-center">
                         <button id="create-room-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -1681,7 +1843,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const usersTableBody = document.getElementById('users-table-body');
             usersTableBody.innerHTML = usersList.map(user => {
                 const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
-                const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; 
+                const isDisabled = user.id === currentUser.uid ? 'disabled' : '';
                 const canAssignFounder = userData.role === 'founder';
                 const showFounderOption = canAssignFounder || user.role === 'founder'; // Show founder option if current user is founder or if target user is already a founder
 
@@ -1786,11 +1948,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             roomsTableBody.querySelectorAll('[data-delete-room-id]').forEach(button => {
                 button.addEventListener('click', (e) => {
-                    const roomId = e.target.dataset.deleteRoomId;
-                    const roomTitle = e.target.dataset.roomTitle;
-                    showMessageModal(`Are you sure you want to delete room "${roomTitle}"? This action cannot be undone.`, 'confirm', async () => {
+                    const roomIdToDelete = e.target.dataset.deleteRoomId;
+                    const roomTitleToDelete = e.target.dataset.roomTitle;
+                    showMessageModal(`Are you sure you want to delete room "${roomTitleToDelete}"? This action cannot be undone.`, 'confirm', async () => {
                         try {
-                            await deleteRoomFirestore(roomId);
+                            await deleteRoomFirestore(roomIdToDelete);
                             renderAdminPanelPage(); // Re-render admin panel to reflect changes
                         } catch (error) {
                             showMessageModal(error.message, 'error');
@@ -1802,17 +1964,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Event listener for "Join Chat" buttons
             roomsTableBody.querySelectorAll('[data-join-room-id]').forEach(button => {
                 button.addEventListener('click', (e) => {
-                    const roomId = e.target.dataset.joinRoomId;
-                    const roomTitle = e.target.dataset.roomTitle;
-                    // Navigate to rooms.html and pass the room ID and title as URL parameters
-                    window.location.href = `rooms.html?id=${roomId}&title=${encodeURIComponent(roomTitle)}`;
+                    const roomIdToJoin = e.target.dataset.joinRoomId;
+                    const roomTitleToJoin = e.target.dataset.roomTitle;
+                    navigateTo('room-chat', { id: roomIdToJoin, title: roomTitleToJoin }); // Pass room details to navigate
                 });
             });
         }
 
         document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum'));
         // Clicking "Manage Rooms" just re-renders the current admin panel
-        document.getElementById('manage-rooms-admin-btn').addEventListener('click', () => renderAdminPanelPage()); 
+        document.getElementById('manage-rooms-admin-btn').addEventListener('click', () => renderAdminPanelPage());
         document.getElementById('create-room-btn').addEventListener('click', () => showCreateRoomModal());
     }
 
@@ -1836,7 +1997,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full relative">
                 <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold" id="close-take-action-modal">&times;</button>
                 <h3 class="text-2xl font-extrabold text-gray-800 mb-6">User Actions</h3>
-                
+
                 <div class="flex flex-col items-center mb-6">
                     <img src="${profileIconSrc}" alt="User Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-3">
                     <p class="text-xl font-semibold text-gray-900">${user.username}</p>
@@ -2110,7 +2271,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <p class="text-sm text-gray-500 mt-4">
                                         Posted by <span class="font-semibold">${post.authorUsername}</span> on ${post.timestamp}
                                     </p>
-                                    
+
                                     <div class="flex items-center space-x-4 mt-4 border-t pt-4 border-gray-300">
                                         <!-- Reactions Section -->
                                         <div class="flex items-center space-x-2">
@@ -2306,7 +2467,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Meet the Team</h2>
-                    
+
                     ${isAdminOrFounder ? `
                         <div class="mb-8 p-6 bg-gray-100 rounded-lg shadow-inner">
                             <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Add New Team Member</h3>
@@ -2385,8 +2546,158 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Renders the Rooms page, displaying available chat rooms.
+     * This function now serves as the entry point for room listings (from nav link).
+     */
+    async function renderRoomsPage() { // Renamed from loadRoomsPage and now takes no arguments
+        if (!currentUser) {
+            console.warn("Attempted to render Rooms page without current user.");
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">Please sign in to view the chat rooms.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let rooms = [];
+        try {
+            rooms = await fetchAllRoomsFirestore(); // Re-using existing fetch
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+            rooms = [];
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Available Chat Rooms</h2>
+
+                    ${rooms.length === 0 ? `
+                        <p class="text-center text-gray-600">No rooms available yet. Admins can create new ones!</p>
+                    ` : `
+                        <div id="rooms-list" class="space-y-4">
+                            ${rooms.map(room => `
+                                <div class="bg-gray-50 p-6 rounded-lg shadow-md border border-gray-200 flex flex-col sm:flex-row justify-between items-center">
+                                    <div>
+                                        <h3 class="text-xl font-bold text-gray-800">${room.title}</h3>
+                                        <p class="text-gray-700 text-sm">${room.description}</p>
+                                        <p class="text-xs text-gray-500 mt-2">Created by ${room.creatorUsername} on ${room.timestamp}</p>
+                                    </div>
+                                    <button class="mt-4 sm:mt-0 py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-md hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg"
+                                            data-join-room-id="${room.id}" data-room-title="${room.title}">
+                                        Join Chat
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+
+        // Add event listeners for "Join Chat" buttons within this page
+        contentArea.querySelectorAll('[data-join-room-id]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const roomIdToJoin = e.target.dataset.joinRoomId;
+                const roomTitleToJoin = e.target.dataset.roomTitle;
+                navigateTo('room-chat', { id: roomIdToJoin, title: roomTitleToJoin });
+            });
+        });
+    }
+
+    /**
+     * Renders the actual chat interface for a specific room.
+     * This is the function that replaces rooms.html content.
+     * @param {string} id - The ID of the room to chat in.
+     * @param {string} title - The title of the room.
+     */
+    async function renderRoomChatPage(id, title) {
+        if (!currentUser || !userData) {
+            showMessageModal("You must be logged in to join chat rooms.", 'info');
+            navigateTo('auth');
+            return;
+        }
+
+        currentRoomId = id;
+        currentRoomTitle = title;
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col md:flex-row items-start justify-center p-4 w-full h-full min-h-screen gap-4">
+                <!-- Main Chat Area -->
+                <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200" style="height: 80vh; max-height: 700px; display: flex; flex-direction: column;">
+                    <h2 id="room-title-chat" class="text-3xl font-extrabold text-center text-gray-800 mb-6">Chat in "${decodeURIComponent(currentRoomTitle)}"</h2>
+                    <div id="chat-messages" class="bg-gray-100 p-4 rounded-lg mb-4 space-y-3" style="flex-grow: 1; overflow-y: auto; scroll-behavior: smooth;">
+                        <!-- Chat messages will be loaded here -->
+                    </div>
+                    <form id="chat-form" class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                        <textarea id="message-input" rows="1" class="flex-grow resize-none px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Type your message..." required></textarea>
+                        <button type="submit" id="send-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 transform hover:scale-105 shadow-lg">
+                            Send
+                        </button>
+                    </form>
+                    <div class="mt-4 text-center">
+                        <button id="back-to-rooms-list-btn" class="py-2 px-4 rounded-full bg-gray-500 text-white font-bold text-sm hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Back to Room List
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Active Users Panel -->
+                <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-xs backdrop-blur-sm bg-opacity-80 border border-gray-200 h-fit md:h-[80vh]">
+                    <h3 class="text-2xl font-extrabold text-center text-gray-800 mb-4">Active Users</h3>
+                    <div id="active-users-list" class="space-y-2 overflow-y-auto max-h-[calc(80vh-100px)]">
+                        <!-- Active users will be listed here -->
+                        <p class="text-gray-500 text-center text-sm">Loading active users...</p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Set up listeners for the current room
+        loadRoomMessages();
+        setupPresence();
+
+        // Add event listeners specific to this page
+        document.getElementById('chat-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const messageInput = document.getElementById('message-input');
+            sendMessage(messageInput.value);
+        });
+
+        document.getElementById('back-to-rooms-list-btn').addEventListener('click', () => {
+            navigateTo('rooms'); // Go back to the list of rooms
+        });
+    }
+
 
     // --- Navigation and Initialization ---
+
+    /**
+     * Cleans up active Firebase listeners and intervals related to the chat rooms.
+     * This should be called before navigating away from a chat room.
+     */
+    function cleanupRoomListeners() {
+        console.log("Cleaning up room listeners...");
+        if (messagesUnsubscribe) {
+            messagesUnsubscribe();
+            messagesUnsubscribe = null;
+        }
+        if (presenceUnsubscribe) {
+            presenceUnsubscribe();
+            presenceUnsubscribe = null;
+        }
+        if (presenceInterval) {
+            clearInterval(presenceInterval);
+            presenceInterval = null;
+        }
+        currentRoomId = null; // Clear current room state
+        currentRoomTitle = '';
+    }
 
     /**
      * Closes the side drawer menu.
@@ -2406,21 +2717,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team', 'rooms').
-     * @param {string} [id=null] - Optional: postId for edit-post route, or any other ID.
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team', 'rooms', 'room-chat').
+     * @param {string|object} [param=null] - Optional: postId for edit-post route, or {id, title} for room-chat.
      */
-    async function navigateTo(page, id = null) {
+    async function navigateTo(page, param = null) {
         // Store the current page in a data attribute on the content area for tracking
         contentArea.dataset.currentPage = page;
-        contentArea.dataset.currentId = id; // Store generic ID if applicable
+        contentArea.dataset.currentParam = typeof param === 'object' ? JSON.stringify(param) : param;
 
-        // Close any open desktop dropdowns on navigation
-        document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
-            content.classList.add('hidden');
-            content.style.maxHeight = '0px';
-            const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
-            if (icon) icon.classList.remove('rotate-180');
-        });
+        // Cleanup any active room listeners before navigating to a new page
+        cleanupRoomListeners();
 
         // Handle logout outside of switch to ensure consistent sign out flow
         if (page === 'logout') {
@@ -2435,6 +2741,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 localStorage.removeItem('firebaseConfig');
                 localStorage.removeItem('APP_ID');
                 localStorage.removeItem('__initial_auth_token');
+                localStorage.removeItem('userBackgroundUrl');
                 showMessageModal('You have been signed out.');
                 window.location.href = 'index.html'; // Full refresh to home
             } catch (error) {
@@ -2445,22 +2752,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             return; // Exit navigateTo
         }
-
-        // Redirect to full HTML pages if needed, passing ID if rooms page is targetted
-        if (page === 'rooms') { // Handle rooms.html with ID
-            let url = 'rooms.html';
-            if (id) {
-                // If ID is an object (e.g., {id: '...', title: '...'}), destructure it
-                if (typeof id === 'object' && id !== null) {
-                    url += `?id=${id.id}&title=${encodeURIComponent(id.title || '')}`;
-                } else { // Assume it's just the ID string
-                    url += `?id=${id}`;
-                }
-            }
-            window.location.href = url;
-            return;
-        }
-
 
         // For in-page navigation (fragments)
         switch (page) {
@@ -2480,18 +2771,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderAdminPanelPage();
                 break;
             case 'edit-post': // For editing existing posts
-                if (id) {
-                    renderEditPostPage(id);
+                if (param) {
+                    renderEditPostPage(param);
                 } else {
                     showMessageModal("Invalid post ID for editing.", 'error');
                     navigateTo('forum');
                 }
                 break;
-            case 'forum': // Forum page now includes create post functionality
+            case 'forum': // Forum page
                 renderForumPage();
                 break;
             case 'team': // New Team page
                 renderTeamPage();
+                break;
+            case 'rooms': // List of all chat rooms
+                renderRoomsPage();
+                break;
+            case 'room-chat': // Specific chat room
+                if (param && param.id && param.title) {
+                    renderRoomChatPage(param.id, param.title);
+                } else {
+                    showMessageModal("Invalid room details provided.", 'error');
+                    navigateTo('rooms'); // Go back to room list
+                }
                 break;
             default:
                 renderHomePage();
@@ -2532,6 +2834,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showLoadingSpinner();
         try {
             // Store firebaseConfig and APP_ID in localStorage when auth state changes (or on app load)
+            // This is primarily for the *external* rooms.html, but keeping it for consistency.
             localStorage.setItem('firebaseConfig', JSON.stringify(firebaseConfig));
             localStorage.setItem('APP_ID', APP_ID);
             // Check if __initial_auth_token is available from the Canvas environment
@@ -2552,6 +2855,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Clear localStorage for user data on logout
                 localStorage.removeItem('currentUserUid');
                 localStorage.removeItem('userData');
+                localStorage.removeItem('userBackgroundUrl');
             }
             isAuthReady = true; // Mark auth state as ready
             updateBodyBackground(); // Apply user's saved background or default
@@ -2559,19 +2863,47 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Determine which page to render based on current URL hash or default
             const currentHash = window.location.hash.substring(1); // Remove '#'
-            let pageToRender = currentHash || 'home';
-            let currentId = contentArea.dataset.currentId || null; // Preserve ID if it was set before refresh
+            let pageToRender = 'home';
+            let paramToPass = null;
+
+            if (currentHash) {
+                if (currentHash.startsWith('room-chat=')) {
+                    // Handle specific room navigation from URL hash
+                    try {
+                        const roomDetailsJson = decodeURIComponent(currentHash.substring('room-chat='.length));
+                        const roomDetails = JSON.parse(roomDetailsJson);
+                        if (roomDetails.id && roomDetails.title) {
+                            pageToRender = 'room-chat';
+                            paramToPass = roomDetails;
+                        } else {
+                            console.warn("Malformed room-chat hash:", roomDetailsJson);
+                            pageToRender = 'home'; // Fallback
+                        }
+                    } catch (e) {
+                        console.error("Error parsing room-chat hash:", e);
+                        pageToRender = 'home'; // Fallback
+                    }
+                } else {
+                    pageToRender = currentHash;
+                    // For pages like edit-post, the ID might be directly in the hash or from data-currentId
+                    paramToPass = contentArea.dataset.currentParam || null;
+                    if (paramToPass && typeof paramToPass === 'string') {
+                        try { paramToPass = JSON.parse(paramToPass); } catch (e) { /* not JSON */ }
+                    }
+                }
+            }
+
 
             // Ensure navigation to protected pages is handled after auth state is ready
-            const protectedPages = ['profile', 'admin', 'forum', 'team', 'edit-post'];
+            const protectedPages = ['profile', 'admin', 'forum', 'team', 'edit-post', 'rooms', 'room-chat'];
             const needsAuth = protectedPages.includes(pageToRender);
 
             if (needsAuth && !currentUser) {
                 console.log(`Redirecting from protected page '${pageToRender}' to 'home' due to no current user.`);
                 navigateTo('home'); // Redirect to home if trying to access protected page while logged out
             } else {
-                console.log(`Navigating to page: '${pageToRender}' with ID: '${currentId}'`);
-                navigateTo(pageToRender, currentId); // Proceed with rendering the page
+                console.log(`Navigating to page: '${pageToRender}' with param:`, paramToPass);
+                navigateTo(pageToRender, paramToPass); // Proceed with rendering the page
             }
 
         } catch (error) {
