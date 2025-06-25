@@ -1683,9 +1683,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const profileForm = document.getElementById('profile-form');
         const usernameInput = document.getElementById('profile-username');
         const profilePicUrlInput = document.getElementById('profile-pic-url');
-        const backgroundSelect = document.getElementById('profile-background-select'); // Changed ID
-        const customBackgroundUrlInput = document.getElementById('custom-background-url'); // New input
+        const backgroundSelect = document.getElementById('profile-background-select');
+        // CORRECTED ID: Changed from 'profile-custom-background-url' to 'custom-background-url'
+        const customBackgroundUrlInput = document.getElementById('custom-background-url');
         const profilePicDisplay = document.getElementById('profile-pic-display');
+
 
         // Update profile picture preview as URL changes
         profilePicUrlInput.addEventListener('input', () => {
@@ -1703,7 +1705,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             let newBackgroundUrl;
             // If custom URL is provided, use it. Otherwise, use the selected theme.
-            if (customBackgroundUrlInput.value) {
+            if (customBackgroundUrlInput && customBackgroundUrlInput.value) { // Added null check
                 newBackgroundUrl = customBackgroundUrlInput.value;
             } else {
                 newBackgroundUrl = backgroundSelect.value;
@@ -2000,7 +2002,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 button.addEventListener('click', (e) => {
                     const roomIdToJoin = e.target.dataset.joinRoomId;
                     const roomTitleToJoin = e.target.dataset.roomTitle;
-                    navigateTo('room-chat', { id: roomIdToJoin, title: roomTitleToJoin }); // Pass room details to navigate
+                    navigateTo('room-chat', { id: roomIdToJoin, title: roomTitleToJoin });
                 });
             });
         }
