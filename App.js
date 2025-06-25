@@ -288,26 +288,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
             const docSnap = await getDoc(userDocRef);
+            let fetchedUserData;
             if (docSnap.exists()) {
-                console.log("Firestore user data fetched successfully:", docSnap.data());
-                return docSnap.data();
-            }
-            console.log("Firestore document for user not found. This might be a new user or a data inconsistency.");
-            // If user exists in Auth but not Firestore, create a default entry
-            const usernameToUse = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
-            const profilePicToUse = currentUser.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
-            const defaultBackground = 'bg-gradient-to-r from-blue-400 to-purple-600';
+                fetchedUserData = docSnap.data();
+                console.log("Firestore user data fetched successfully:", fetchedUserData);
+            } else {
+                console.log("Firestore document for user not found. This might be a new user or a data inconsistency.");
+                // If user exists in Auth but not Firestore, create a default entry
+                const usernameToUse = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
+                const profilePicToUse = currentUser.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
+                const defaultBackground = 'bg-gradient-to-r from-blue-400 to-purple-600';
 
-            const newUserData = {
-                email: currentUser.email,
-                username: usernameToUse,
-                role: 'member', // Default role for new users
-                profilePicUrl: profilePicToUse,
-                backgroundUrl: defaultBackground
-            };
-            await setDoc(userDocRef, newUserData);
-            console.log("Default user document created in Firestore.");
-            return newUserData;
+                const newUserData = {
+                    email: currentUser.email,
+                    username: usernameToUse,
+                    role: 'member', // Default role for new users
+                    profilePicUrl: profilePicToUse,
+                    backgroundUrl: defaultBackground
+                };
+                await setDoc(userDocRef, newUserData);
+                console.log("Default user document created in Firestore.");
+                fetchedUserData = newUserData;
+            }
+            // Store user data in localStorage for other pages (like rooms.html)
+            localStorage.setItem('currentUserUid', currentUser.uid);
+            localStorage.setItem('userData', JSON.stringify(fetchedUserData));
+            return fetchedUserData;
 
         } catch (error) {
             console.error("Error fetching or creating user data from Firestore:", error.message);
@@ -342,7 +348,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Fetch the updated document to return the latest state
             const docSnap = await getDoc(userDocRef);
-            return docSnap.exists() ? docSnap.data() : null;
+            const updatedFetchedData = docSnap.exists() ? docSnap.data() : null;
+            // Update localStorage with the latest user data
+            if (updatedFetchedData) {
+                localStorage.setItem('userData', JSON.stringify(updatedFetchedData));
+            }
+            return updatedFetchedData;
         } catch (error) {
             console.error("Error updating profile in Firestore:", error.message);
             throw new Error("Failed to update profile. Please try again: " + error.message);
@@ -957,6 +968,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (page === 'logout') {
                     signOut(auth).then(() => {
                         showMessageModal('You have been signed out.');
+                        // Clear localStorage for user data on logout
+                        localStorage.removeItem('currentUserUid');
+                        localStorage.removeItem('userData');
+                        localStorage.removeItem('firebaseConfig');
+                        localStorage.removeItem('APP_ID');
+                        localStorage.removeItem('__initial_auth_token');
                         // Reload or navigate to home to clear state
                         window.location.href = 'index.html'; // Ensure full refresh on logout
                     }).catch(error => {
@@ -1097,6 +1114,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (navItem.page === 'logout') {
                             signOut(auth).then(() => {
                                 showMessageModal('You have been signed out.');
+                                // Clear localStorage for user data on logout
+                                localStorage.removeItem('currentUserUid');
+                                localStorage.removeItem('userData');
+                                localStorage.removeItem('firebaseConfig');
+                                localStorage.removeItem('APP_ID');
+                                localStorage.removeItem('__initial_auth_token');
                                 window.location.href = 'index.html'; // Full reload to clear state
                             }).catch(error => {
                                 showMessageModal("Failed to sign out: " + error.message, 'error');
@@ -1175,6 +1198,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (navItem.page === 'logout') {
                             signOut(auth).then(() => {
                                 showMessageModal('You have been signed out.');
+                                // Clear localStorage for user data on logout
+                                localStorage.removeItem('currentUserUid');
+                                localStorage.removeItem('userData');
+                                localStorage.removeItem('firebaseConfig');
+                                localStorage.removeItem('APP_ID');
+                                localStorage.removeItem('__initial_auth_token');
                                 window.location.href = 'index.html'; // Full reload on logout
                             }).catch(error => {
                                 showMessageModal("Failed to sign out: " + error.message, 'error');
@@ -1669,7 +1698,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <select
-                                class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                 ${isDisabled}
                                 data-role-select-id="${user.id}"
                             >
@@ -2400,6 +2429,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await signOut(auth);
                 currentUser = null;
                 userData = null;
+                // Clear localStorage for user data on logout
+                localStorage.removeItem('currentUserUid');
+                localStorage.removeItem('userData');
+                localStorage.removeItem('firebaseConfig');
+                localStorage.removeItem('APP_ID');
+                localStorage.removeItem('__initial_auth_token');
                 showMessageModal('You have been signed out.');
                 window.location.href = 'index.html'; // Full refresh to home
             } catch (error) {
@@ -2496,6 +2531,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log("onAuthStateChanged triggered. User:", user ? user.uid : "null");
         showLoadingSpinner();
         try {
+            // Store firebaseConfig and APP_ID in localStorage when auth state changes (or on app load)
+            localStorage.setItem('firebaseConfig', JSON.stringify(firebaseConfig));
+            localStorage.setItem('APP_ID', APP_ID);
+            // Check if __initial_auth_token is available from the Canvas environment
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                localStorage.setItem('__initial_auth_token', __initial_auth_token);
+            } else {
+                localStorage.removeItem('__initial_auth_token'); // Clear if not available
+            }
+
             if (user) {
                 currentUser = user;
                 userData = await fetchCurrentUserFirestoreData(); // This also handles creating default doc if missing
@@ -2504,6 +2549,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentUser = null;
                 userData = null;
                 console.log("Auth state: Logged out.");
+                // Clear localStorage for user data on logout
+                localStorage.removeItem('currentUserUid');
+                localStorage.removeItem('userData');
             }
             isAuthReady = true; // Mark auth state as ready
             updateBodyBackground(); // Apply user's saved background or default
