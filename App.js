@@ -865,6 +865,9 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'logout').
      */
     async function navigateTo(page) {
+        // Store the current page in a data attribute on the content area for tracking
+        contentArea.dataset.currentPage = page;
+
         if (page === 'logout') {
             showLoadingSpinner();
             try {
@@ -914,6 +917,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Firebase Auth State Listener
+    // This is the most critical part for initial load and ongoing authentication state changes
     onAuthStateChanged(auth, async (user) => {
         showLoadingSpinner();
         if (user) {
@@ -948,11 +952,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderNavbar(); // Update navbar with user info
                 // If the user was on the auth page and just logged in/signed up, redirect home
                 // If not, stay on current page if it's not auth or logout.
-                if (contentArea.dataset.currentPage === 'auth' || contentArea.dataset.currentPage === 'logout') {
+                if (contentArea.dataset.currentPage === 'auth' || contentArea.dataset.currentPage === 'logout' || !contentArea.dataset.currentPage) {
                     navigateTo('home');
                 } else {
                     // Re-render current page to ensure data is fresh (e.g. profile, admin panel)
-                    navigateTo(contentArea.dataset.currentPage || 'home');
+                    navigateTo(contentArea.dataset.currentPage);
                 }
 
             } catch (error) {
@@ -969,6 +973,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             userData = null;
             updateBodyBackground(); // Reset to default background
             renderNavbar(); // Update navbar to logged out state
+            // Only redirect if current page is not home or about, or if it was a protected page
             if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about') {
                  navigateTo('home'); // Redirect to home if logged out from a protected page
             }
@@ -977,10 +982,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
 
-    // Initial render based on existing state
-    navigateTo('home'); // Start on the home page initially
+    // Initial render call moved inside the DOMContentLoaded listener but outside onAuthStateChanged,
+    // to ensure elements are present for the very first render.
+    // The onAuthStateChanged listener will then handle subsequent renders based on auth state.
+    if (!contentArea.dataset.currentPage) { // Only render if no page has been set yet
+        navigateTo('home');
+    }
 
-    // Event listeners for static navbar buttons
+
+    // Event listeners for static navbar buttons (ensure these are attached AFTER initial DOM render)
     navHomeButton.addEventListener('click', () => navigateTo('home'));
     navAboutButton.addEventListener('click', () => navigateTo('about'));
 });
