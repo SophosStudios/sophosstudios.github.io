@@ -68,38 +68,7 @@
         <!-- Main content area -->
         <main id="content-area" class="main-content-area"></main>
     </div>
-
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
-
-        // IMPORTANT: Replace with your actual Firebase project configuration
-        // You get this from your Firebase project settings -> "Project settings" -> "Your apps" -> "Web app"
-        const firebaseConfig = {
-          apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
-          authDomain: "sophoswrld.firebaseapp.com",
-          projectId: "sophoswrld",
-          storageBucket: "sophoswrld.firebasestorage.app",
-          messagingSenderId: "26686142400",
-          appId: "1:26686142400:web:48f8d3ae0b097731317a25",
-          measurementId: "G-6XETC98C22"
-        };
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // Make Firebase instances globally accessible for script.js
-        window.firebaseApp = app;
-        window.firebaseAuth = auth;
-        window.firebaseDb = db;
-        // The __app_id is used for Firestore collection paths.
-        window.__app_id = '1:26686142400:web:48f8d3ae0b097731317a25'; // Use a consistent app ID here
-    </script>
-
+    
     <!-- Your JavaScript application logic -->
     <script type="module" src="./App.js"></script>
 </body>

@@ -1,13 +1,28 @@
 // App.js
-// This script runs after the Firebase SDKs are loaded in index.html
-// and their instances are made available globally via `window`.
+// This script contains the entire application logic, including Firebase initialization.
+
+// Import Firebase functions directly into this module
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Firebase instances are now available via window
-    const app = window.firebaseApp;
-    const auth = window.firebaseAuth;
-    const db = window.firebaseDb;
-    const APP_ID = window.__app_id;
+    // IMPORTANT: Replace with your actual Firebase project configuration
+    // You get this from your Firebase project settings -> "Project settings" -> "Your apps" -> "Web app"
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY", // <--- REPLACE THIS
+        authDomain: "YOUR_AUTH_DOMAIN", // <--- REPLACE THIS
+        projectId: "YOUR_PROJECT_ID", // <--- REPLACE THIS
+        storageBucket: "YOUR_STORAGE_BUCKET", // <--- REPLACE THIS
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // <--- REPLACE THIS
+        appId: "YOUR_APP_ID" // <--- REPLACE THIS
+    };
+
+    // Initialize Firebase within App.js
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const APP_ID = firebaseConfig.appId; // Use the projectId or a unique ID from your config
 
     // DOM Elements
     const contentArea = document.getElementById('content-area');
@@ -264,7 +279,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
 
             // Update Firebase Auth display name if username changed
-            if (currentUser.displayName !== newUserData.username) {
+            if (auth.currentUser && auth.currentUser.displayName !== newUserData.username) {
                 await updateProfile(auth.currentUser, { displayName: newUserData.username });
             }
 
@@ -559,19 +574,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const username = usernameInput.value;
 
             try {
-                const loggedInUser = await authenticateUser(isSignUpMode ? 'signup' : 'login', { email, password, username });
-                if (loggedInUser) {
-                    // authenticatedUser is updated by onAuthStateChanged listener
-                    // which will then trigger fetchCurrentUserFirestoreData and renderHomePage
-                    if (isSignUpMode) {
-                        showMessageModal('Account created successfully! You are now signed in.', 'info', () => {
-                            navigateTo('home');
-                        });
-                    } else {
-                        showMessageModal('Signed in successfully!', 'info', () => {
-                            navigateTo('home');
-                        });
-                    }
+                await authenticateUser(isSignUpMode ? 'signup' : 'login', { email, password, username });
+                // onAuthStateChanged listener will handle redirection after successful auth
+                if (isSignUpMode) {
+                    showMessageModal('Account created successfully! You are now signed in.');
+                } else {
+                    showMessageModal('Signed in successfully!');
                 }
             } catch (error) {
                 showMessageModal(error.message, 'error');
@@ -985,6 +993,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initial render call moved inside the DOMContentLoaded listener but outside onAuthStateChanged,
     // to ensure elements are present for the very first render.
     // The onAuthStateChanged listener will then handle subsequent renders based on auth state.
+    // It is important that this is called *after* onAuthStateChanged has been set up,
+    // to ensure initial user state can be reacted to.
     if (!contentArea.dataset.currentPage) { // Only render if no page has been set yet
         navigateTo('home');
     }
