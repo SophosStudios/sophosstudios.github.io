@@ -584,7 +584,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 authorId: currentUser.uid,
                 authorUsername: userData.username || currentUser.displayName || currentUser.email,
                 text: commentText,
-                timestamp: serverTimestamp()
+                timestamp: new Date().toISOString() // Use ISO string for client-side timestamp
             };
             await updateDoc(postDocRef, {
                 comments: arrayUnion(newComment) // Add the new comment to the array
@@ -628,8 +628,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     title: data.title,
                     content: data.content,
                     authorUsername: data.authorUsername,
-                    // Format timestamp for display
-                    timestamp: data.timestamp ? data.timestamp.toDate().toLocaleString() : 'N/A',
+                    // Format timestamp for display (handle ISO string or Firestore Timestamp)
+                    timestamp: data.timestamp ? (typeof data.timestamp === 'string' ? new Date(data.timestamp).toLocaleString() : data.timestamp.toDate().toLocaleString()) : 'N/A',
                     reactions: data.reactions || {}, // Ensure reactions is an object
                     comments: data.comments || [] // Ensure comments is an array
                 });
@@ -1103,6 +1103,46 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (usersList.length > 0) {
             const usersTableBody = document.getElementById('users-table-body');
+            // Ensure the content is reset before mapping new users to avoid duplication on re-render
+            usersTableBody.innerHTML = usersList.map(user => {
+                const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
+                const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; // Use currentUser.uid
+
+                return `
+                    <tr data-user-id="${user.id}" class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <img src="${profileIconSrc}" alt="User Icon" class="w-10 h-10 rounded-full object-cover border-2 border-gray-300" onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}'">
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            ${user.username}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${user.email}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <select
+                                class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                ${isDisabled}
+                                data-role-select-id="${user.id}"
+                            >
+                                <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
+                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                            </select>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                                class="text-red-600 hover:text-red-900 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                                ${isDisabled}
+                                data-delete-user-id="${user.id}" data-username="${user.username}"
+                            >
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Add event listeners for role change and delete buttons
             usersTableBody.querySelectorAll('[data-role-select-id]').forEach(selectElement => {
                 selectElement.addEventListener('change', async (e) => {
                     const userId = e.target.dataset.roleSelectId;
@@ -1338,7 +1378,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                                 ${post.comments.map(comment => `
                                                     <div class="bg-white p-3 rounded-lg border border-gray-200">
                                                         <p class="text-sm text-gray-700">${comment.text}</p>
-                                                        <p class="text-xs text-gray-500 mt-1">by <span class="font-medium">${comment.authorUsername}</span> on ${comment.timestamp ? new Date(comment.timestamp._seconds * 1000).toLocaleString() : 'N/A'}</p>
+                                                        <p class="text-xs text-gray-500 mt-1">by <span class="font-medium">${comment.authorUsername}</span> on ${comment.timestamp ? new Date(comment.timestamp).toLocaleString() : 'N/A'}</p>
                                                     </div>
                                                 `).join('')}
                                             `}
@@ -1474,9 +1514,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     mobileMenuToggle.addEventListener('click', () => {
         const isHidden = mobileMenu.classList.contains('hidden');
         mobileMenu.classList.toggle('hidden', !isHidden);
-        mobileMenuIconOpen.classList.toggle('hidden', !isHidden);
-        mobileMenuIconClose.classList.add('hidden'); // Ensure close icon is hidden when menu is closed
+        mobileMenuIconOpen.classList.toggle('hidden', isHidden); // Show open icon when hidden, hide when not hidden
+        mobileMenuIconClose.classList.toggle('hidden', !isHidden); // Show close icon when not hidden, hide when hidden
     });
+
 
     // Firebase Auth State Listener
     // This is the most critical part for initial load and ongoing authentication state changes

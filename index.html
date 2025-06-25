@@ -3,73 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SophosWRLD</title>
-    <!-- Tailwind CSS CDN -->
+    <title>My Awesome Community</title> <!-- This title will be updated by config.js -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts - Inter -->
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-      /* Basic styling for the body and root element */
-      body {
-        font-family: 'Inter', sans-serif;
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      #app {
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-      }
-      .main-content-area {
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding-top: 64px; /* Adjust for navbar height */
-      }
+        body { font-family: 'Inter', sans-serif; }
+        /* Basic styling for the main content area to allow scrolling */
+        #content-area {
+            min-height: calc(100vh - 64px); /* Subtract navbar height */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding-bottom: 2rem; /* Add some padding at the bottom */
+        }
+        /* Add this for smooth collapse/expand transition */
+        #mobile-menu {
+            transition: max-height 0.3s ease-out;
+            overflow: hidden;
+        }
+        #mobile-menu.hidden {
+            max-height: 0;
+        }
+        #mobile-menu:not(.hidden) {
+            max-height: 500px; /* Adjust based on max content height */
+        }
     </style>
 </head>
-<body class="min-h-screen font-inter bg-gradient-to-r from-blue-400 to-purple-600">
-    <div id="app" class="min-h-screen flex flex-col">
-        <!-- Navbar -->
-        <nav class="p-4 shadow-lg bg-gray-800 text-white relative z-10 rounded-b-xl">
-            <div class="container mx-auto flex justify-between items-center">
-                <div class="flex items-center space-x-4">
-                    <button id="nav-home" class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500 hover:scale-105 transition duration-200">
-                        SophosWRLD
-                    </button>
-                    <button id="nav-about" class="hidden md:block px-4 py-2 rounded-lg hover:bg-gray-700 transition duration-200">
-                        About
-                    </button>
-                </div>
-
-                <div class="md:hidden">
-                    <button id="mobile-menu-toggle" class="text-white focus:outline-none">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path id="mobile-menu-icon-open" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                            <path id="mobile-menu-icon-close" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-
-                <div id="nav-links" class="hidden md:flex items-center space-x-4">
-                    <!-- Links will be dynamically populated by JavaScript -->
-                </div>
+<body class="bg-gradient-to-r from-blue-400 to-purple-600 min-h-screen font-inter">
+    <nav class="bg-gray-800 p-4 text-white shadow-lg sticky top-0 z-40">
+        <div class="container mx-auto flex justify-between items-center">
+            <button id="nav-home" class="text-2xl font-bold hover:text-gray-300 transition duration-200">
+                My Awesome Community
+            </button>
+            <div class="hidden md:flex space-x-4" id="nav-links">
+                <!-- Nav links will be dynamically loaded here by App.js -->
             </div>
-
-            <!-- Mobile Menu -->
-            <div id="mobile-menu" class="hidden md:hidden bg-gray-800 absolute top-full left-0 w-full shadow-lg rounded-b-lg py-2">
-                <!-- Mobile menu items will be dynamically populated by JavaScript -->
+            <div class="md:hidden">
+                <button id="mobile-menu-toggle" class="text-white focus:outline-none p-2 rounded-md hover:bg-gray-700">
+                    <i id="mobile-menu-icon-open" class="fas fa-bars text-xl"></i>
+                    <i id="mobile-menu-icon-close" class="fas fa-times text-xl hidden"></i>
+                </button>
             </div>
-        </nav>
+        </div>
+        <div id="mobile-menu" class="md:hidden hidden space-y-2 mt-2">
+            <!-- Mobile nav links will be dynamically loaded here by App.js -->
+        </div>
+    </nav>
 
-        <!-- Main content area -->
-        <main id="content-area" class="main-content-area"></main>
-    </div>
-    
-    <!-- Your JavaScript application logic -->
-    <script type="module" src="./App.js"></script>
+    <main id="content-area" class="flex-grow p-4">
+        <!-- Page content will be loaded here by App.js -->
+    </main>
+
+    <!-- Loading Spinner Placeholder -->
+    <div id="loading-spinner"></div>
+
+    <!-- Firebase and App.js script -->
+    <script type="module" src="App.js"></script>
 </body>
 </html>
