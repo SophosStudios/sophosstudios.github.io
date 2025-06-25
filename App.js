@@ -5,7 +5,7 @@
 // Import Firebase functions
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js"; // Added deleteField
 
 // Import configuration from config.js
 import CONFIG from './config.js'; // Make sure config.js is in the same directory
@@ -518,41 +518,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (postSnap.exists()) {
                 const postData = postSnap.data();
                 const currentReactions = postData.reactions || {};
-                const userReactionKey = `reactions.${emoji}`;
-                const currentUserReactionStatus = postData.userReactions && postData.userReactions[currentUser.uid] === emoji;
+                
+                // Get the user's previously reacted emoji for this post, if any
+                const userPreviousReaction = postData.userReactions ? postData.userReactions[currentUser.uid] : null;
 
-                // Toggle logic for reaction: If user already reacted with THIS emoji, remove it. Otherwise, add/change.
-                if (currentUserReactionStatus) {
-                    // Decrement the count for the emoji
-                    currentReactions[emoji] = (currentReactions[emoji] || 0) - 1;
-                    if (currentReactions[emoji] <= 0) {
-                        delete currentReactions[emoji];
+                // Prepare updates object
+                const updates = {};
+
+                // If user previously reacted with a different emoji, decrement its count
+                if (userPreviousReaction && userPreviousReaction !== emoji) {
+                    updates[`reactions.${userPreviousReaction}`] = Math.max(0, (currentReactions[userPreviousReaction] || 0) - 1);
+                    if (updates[`reactions.${userPreviousReaction}`] <= 0) {
+                        updates[`reactions.${userPreviousReaction}`] = deleteField(); // Correctly use deleteField
                     }
-                    // Remove user's reaction mapping
-                    await updateDoc(postDocRef, {
-                        [`reactions.${emoji}`]: (currentReactions[emoji] || 0) <= 0 ? deleteField() : currentReactions[emoji], // Use deleteField if count is zero
-                        [`userReactions.${currentUser.uid}`]: deleteField() // Remove user's specific reaction
-                    });
-                } else {
-                    // Check if user reacted with a different emoji before
-                    const oldEmoji = postData.userReactions ? postData.userReactions[currentUser.uid] : null;
-                    if (oldEmoji && currentReactions[oldEmoji]) {
-                        currentReactions[oldEmoji] = Math.max(0, (currentReactions[oldEmoji] || 0) - 1);
-                        if (currentReactions[oldEmoji] <= 0) {
-                            delete currentReactions[oldEmoji];
-                        }
-                    }
-
-                    // Increment the count for the new emoji
-                    currentReactions[emoji] = (currentReactions[emoji] || 0) + 1;
-
-                    // Update the document
-                    await updateDoc(postDocRef, {
-                        [`reactions.${oldEmoji}`]: (oldEmoji && currentReactions[oldEmoji] <= 0) ? deleteField() : currentReactions[oldEmoji],
-                        [`reactions.${emoji}`]: currentReactions[emoji],
-                        [`userReactions.${currentUser.uid}`]: emoji // Store which emoji user reacted with
-                    });
                 }
+
+                // If user reacted with the same emoji, toggle it off (decrement)
+                // If user reacted with a different emoji or no emoji, toggle it on (increment)
+                if (userPreviousReaction === emoji) {
+                    updates[`reactions.${emoji}`] = Math.max(0, (currentReactions[emoji] || 0) - 1);
+                    if (updates[`reactions.${emoji}`] <= 0) {
+                        updates[`reactions.${emoji}`] = deleteField(); // Correctly use deleteField
+                    }
+                    updates[`userReactions.${currentUser.uid}`] = deleteField(); // Remove user's specific reaction
+                } else {
+                    updates[`reactions.${emoji}`] = (currentReactions[emoji] || 0) + 1;
+                    updates[`userReactions.${currentUser.uid}`] = emoji; // Store user's new reaction
+                }
+                
+                // Perform the update
+                await updateDoc(postDocRef, updates);
             }
         } catch (error) {
             console.error("Error adding reaction:", error.message);
