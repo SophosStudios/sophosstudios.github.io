@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const app = window.firebaseApp;
     const auth = window.firebaseAuth;
     const db = window.firebaseDb;
-    const APP_ID = "1:26686142400:web:48f8d3ae0b097731317a25";
+    const APP_ID = window.__app_id;
 
     // DOM Elements
     const contentArea = document.getElementById('content-area');
