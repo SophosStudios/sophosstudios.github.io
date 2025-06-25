@@ -10,20 +10,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // IMPORTANT: Replace with your actual Firebase project configuration
     // You get this from your Firebase project settings -> "Project settings" -> "Your apps" -> "Web app"
     const firebaseConfig = {
-        apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
-        authDomain: "sophoswrld.firebaseapp.com",
-        projectId: "sophoswrld",
-        storageBucket: "sophoswrld.firebasestorage.app",
-        messagingSenderId: "26686142400",
-        appId: "1:26686142400:web:48f8d3ae0b097731317a25",
-        measurementId: "G-6XETC98C22"
+        apiKey: "YOUR_API_KEY", // <--- REPLACE THIS
+        authDomain: "YOUR_AUTH_DOMAIN", // <--- REPLACE THIS
+        projectId: "YOUR_PROJECT_ID", // <--- REPLACE THIS
+        storageBucket: "YOUR_STORAGE_BUCKET", // <--- REPLACE THIS
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // <--- REPLACE THIS
+        appId: "YOUR_APP_ID" // <--- REPLACE THIS
     };
 
     // Initialize Firebase within App.js
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const APP_ID = firebaseConfig.appId; // Use the projectId or a unique ID from your config
+    const APP_ID = firebaseConfig.projectId; // Using projectId for APP_ID, ensure this matches your Firestore Rules
 
     // DOM Elements
     const contentArea = document.getElementById('content-area');
@@ -136,7 +135,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateBodyBackground() {
         document.body.className = ''; // Clear existing classes
         if (userData && userData.backgroundUrl) {
-            document.body.classList.add(userData.backgroundUrl, 'min-h-screen', 'font-inter');
+            // FIX: Split the backgroundUrl string into individual class names
+            const backgroundClasses = userData.backgroundUrl.split(' ');
+            document.body.classList.add(...backgroundClasses, 'min-h-screen', 'font-inter');
         } else {
             // Default fallback
             document.body.classList.add('bg-gradient-to-r', 'from-blue-400', 'to-purple-600', 'min-h-screen', 'font-inter');
@@ -922,7 +923,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isHidden = mobileMenu.classList.contains('hidden');
         mobileMenu.classList.toggle('hidden', !isHidden);
         mobileMenuIconOpen.classList.toggle('hidden', !isHidden);
-        mobileMenuIconClose.classList.toggle('hidden', isHidden);
+        mobileMenuIconClose.classList.add('hidden'); // Ensure close icon is hidden when menu is closed
     });
 
     // Firebase Auth State Listener
