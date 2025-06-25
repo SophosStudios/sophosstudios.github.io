@@ -870,46 +870,76 @@ document.addEventListener('DOMContentLoaded', async () => {
             );
         }
 
+        // Close all desktop dropdowns function
+        const closeAllDesktopDropdowns = () => {
+            document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
+                content.classList.add('hidden');
+                content.style.maxHeight = '0px';
+                const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
+                if (icon) icon.classList.remove('rotate-180');
+            });
+        };
+
         // Render Desktop Navigation
         categories.forEach(category => {
             if (category.authRequired && !currentUser) return; // Skip if auth required and user not logged in
             if (category.roles && (!currentUser || !category.roles.includes(userData.role))) return; // Skip if roles required and user doesn't have them
 
-            // Create dropdown for categories with multiple items or if explicitly set up
-            if (category.items.length > 1) {
-                const dropdownContainer = document.createElement('div');
-                dropdownContainer.className = 'relative group';
-                dropdownContainer.innerHTML = `
-                    <button class="px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 flex items-center space-x-2">
-                        <span>${category.name}</span>
-                        <i class="fas fa-chevron-down text-xs ml-1"></i>
-                    </button>
-                    <div class="absolute hidden group-hover:block bg-gray-700 text-white rounded-lg shadow-lg py-2 w-40 z-10 top-full mt-2 left-0 transition-all duration-300 ease-in-out origin-top scale-y-0 group-hover:scale-y-100">
-                        ${category.items.map(item => `
-                            <button id="${item.id}" class="block w-full text-left px-4 py-2 hover:bg-gray-600 transition duration-200">
-                                ${item.icon || ''}<span>${item.text}</span>
-                            </button>
-                        `).join('')}
-                    </div>
-                `;
-                navLinks.appendChild(dropdownContainer);
+            const dropdownContainer = document.createElement('div');
+            dropdownContainer.className = 'relative inline-block text-left'; // Changed from 'group'
 
-                // Attach event listeners for dropdown items
-                dropdownContainer.querySelectorAll('button[id]').forEach(btn => {
-                    const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
-                    if (page) {
-                        btn.addEventListener('click', () => {
-                            navigateTo(page);
-                        });
-                    }
-                });
+            dropdownContainer.innerHTML = `
+                <button class="px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 flex items-center space-x-2 desktop-dropdown-toggle">
+                    <span>${category.name}</span>
+                    <i class="fas fa-chevron-down text-xs ml-1 transition-transform transform"></i>
+                </button>
+                <div class="desktop-dropdown-content absolute hidden bg-gray-700 text-white rounded-lg shadow-lg py-2 w-40 z-10 top-full mt-2 left-0 origin-top overflow-hidden" style="max-height: 0px; transition: max-height 0.3s ease-in-out;">
+                    ${category.items.map(item => `
+                        <button id="${item.id}" class="block w-full text-left px-4 py-2 hover:bg-gray-600 transition duration-200">
+                            ${item.icon || ''}<span>${item.text}</span>
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+            navLinks.appendChild(dropdownContainer);
 
-            } else if (category.items.length === 1) {
-                // If only one item in category, just add it as a regular button
-                const item = category.items[0];
-                createAndAppendButton(navLinks, item.id, item.text, item.page, item.icon);
-            }
+            const toggleButton = dropdownContainer.querySelector('.desktop-dropdown-toggle');
+            const dropdownContent = dropdownContainer.querySelector('.desktop-dropdown-content');
+            const dropdownIcon = toggleButton.querySelector('.fa-chevron-down');
+
+            toggleButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent document click from immediately closing it
+                const isOpen = !dropdownContent.classList.contains('hidden');
+
+                closeAllDesktopDropdowns(); // Close all other dropdowns first
+
+                if (!isOpen) {
+                    dropdownContent.classList.remove('hidden');
+                    // Set max-height to scrollHeight to enable smooth transition
+                    dropdownContent.style.maxHeight = dropdownContent.scrollHeight + 'px';
+                    dropdownIcon.classList.add('rotate-180');
+                } else {
+                    dropdownContent.style.maxHeight = '0px';
+                    dropdownContent.classList.add('hidden');
+                    dropdownIcon.classList.remove('rotate-180');
+                }
+            });
+
+            // Attach event listeners for dropdown items
+            dropdownContent.querySelectorAll('button[id]').forEach(btn => {
+                const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
+                if (page) {
+                    btn.addEventListener('click', () => {
+                        navigateTo(page);
+                        closeAllDesktopDropdowns(); // Close dropdown after navigation
+                    });
+                }
+            });
         });
+
+        // Close desktop dropdowns when clicking anywhere on the document
+        document.removeEventListener('click', closeAllDesktopDropdowns); // Remove previous listener to prevent duplicates
+        document.addEventListener('click', closeAllDesktopDropdowns);
 
 
         // Render Mobile Drawer Navigation
@@ -1414,27 +1444,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </select>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div class="relative inline-block text-left">
-                                <button type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-indigo-500" id="options-menu-${user.id}" aria-haspopup="true" aria-expanded="true">
-                                    Take Action
-                                    <svg class="-mr-1 ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                    </svg>
-                                </button>
-                                <div class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 focus:outline-none hidden" role="menu" aria-orientation="vertical" aria-labelledby="options-menu-${user.id}" data-action-menu-for="${user.id}">
-                                    <div class="py-1" role="none">
-                                        <button class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 ${isDisabled}" role="menuitem" data-action="ban" data-user-id="${user.id}" data-username="${user.username}" ${user.isBanned ? 'hidden' : ''}>
-                                            Ban Account
-                                        </button>
-                                        <button class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 ${isDisabled}" role="menuitem" data-action="unban" data-user-id="${user.id}" data-username="${user.username}" ${!user.isBanned ? 'hidden' : ''}>
-                                            Unban Account
-                                        </button>
-                                        <button class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 text-red-600 ${isDisabled}" role="menuitem" data-action="delete" data-user-id="${user.id}" data-username="${user.username}">
-                                            Delete Account
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                            <button
+                                class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-indigo-500"
+                                data-take-action-user-id="${user.id}" data-username="${user.username}"
+                            >
+                                Take Action
+                            </button>
                         </td>
                     </tr>
                 `;
@@ -1461,79 +1476,130 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
 
-            usersTableBody.querySelectorAll('[id^="options-menu-"]').forEach(button => {
+            usersTableBody.querySelectorAll('[data-take-action-user-id]').forEach(button => {
                 button.addEventListener('click', (e) => {
-                    const userId = e.currentTarget.id.replace('options-menu-', '');
-                    const menu = document.querySelector(`[data-action-menu-for="${userId}"]`);
-                    if (menu) {
-                        menu.classList.toggle('hidden');
+                    const userId = e.target.dataset.takeActionUserId;
+                    const userToActOn = usersList.find(user => user.id === userId);
+                    if (userToActOn) {
+                        showTakeActionModal(userToActOn);
                     }
-                    // Close other menus if open
-                    document.querySelectorAll('.origin-top-right').forEach(otherMenu => {
-                        if (otherMenu !== menu) {
-                            otherMenu.classList.add('hidden');
-                        }
-                    });
-                });
-            });
-
-            usersTableBody.querySelectorAll('[data-action="ban"]').forEach(button => {
-                button.addEventListener('click', async (e) => {
-                    const userId = e.target.dataset.userId;
-                    const username = e.target.dataset.username;
-                    showMessageModal(`Are you sure you want to BAN user "${username}"? They will no longer be able to log in.`, 'confirm', async () => {
-                        try {
-                            const success = await setUserBanStatusFirestore(userId, true);
-                            if (success) {
-                                showMessageModal(`User "${username}" has been banned.`);
-                                renderAdminPanelPage(); // Re-render to update UI
-                            }
-                        } catch (error) {
-                            showMessageModal(error.message, 'error');
-                        }
-                    });
-                });
-            });
-
-            usersTableBody.querySelectorAll('[data-action="unban"]').forEach(button => {
-                button.addEventListener('click', async (e) => {
-                    const userId = e.target.dataset.userId;
-                    const username = e.target.dataset.username;
-                    showMessageModal(`Are you sure you want to UNBAN user "${username}"? They will regain login access.`, 'confirm', async () => {
-                        try {
-                            const success = await setUserBanStatusFirestore(userId, false);
-                            if (success) {
-                                showMessageModal(`User "${username}" has been unbanned.`);
-                                renderAdminPanelPage(); // Re-render to update UI
-                            }
-                        } catch (error) {
-                            showMessageModal(error.message, 'error');
-                        }
-                    });
-                });
-            });
-
-            usersTableBody.querySelectorAll('[data-action="delete"]').forEach(button => {
-                button.addEventListener('click', async (e) => {
-                    const userId = e.target.dataset.userId;
-                    const username = e.target.dataset.username;
-                    showMessageModal(`Are you sure you want to DELETE user "${username}"? This action cannot be undone and will only remove their data from Firestore.`, 'confirm', async () => {
-                        try {
-                            const success = await deleteUserFirestore(userId);
-                            if (success) { // Only show success if the operation actually proceeded
-                                showMessageModal(`User "${username}" data deleted successfully!`);
-                                renderAdminPanelPage(); // Re-render admin panel to reflect changes
-                            }
-                        } catch (error) {
-                            showMessageModal(error.message, 'error');
-                        }
-                    });
                 });
             });
         }
         // Removed create-post-btn from here, as it's now on the forum page
         document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins/Founders can manage from forum view
     }
+
+    /**
+     * Shows a modal for taking action on a user (Ban/Unban/Delete).
+     * @param {object} user - The user object to display and act upon.
+     */
+    function showTakeActionModal(user) {
+        if (currentModal) {
+            currentModal.remove(); // Remove any existing modal
+        }
+
+        const modal = document.createElement('div');
+        modal.id = 'take-action-modal';
+        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+
+        const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
+        const isDisabledForSelf = user.id === currentUser.uid ? 'disabled' : '';
+
+        modal.innerHTML = `
+            <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full relative">
+                <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold" id="close-take-action-modal">&times;</button>
+                <h3 class="text-2xl font-extrabold text-gray-800 mb-6">User Actions</h3>
+                
+                <div class="flex flex-col items-center mb-6">
+                    <img src="${profileIconSrc}" alt="User Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-3">
+                    <p class="text-xl font-semibold text-gray-900">${user.username}</p>
+                    <p class="text-md text-gray-600">${user.email}</p>
+                    <p class="text-md font-medium text-gray-700 mt-2">Role: <span class="font-bold">${user.role}</span></p>
+                    <p class="text-md font-medium text-gray-700">Status: <span class="font-bold ${user.isBanned ? 'text-red-600' : 'text-green-600'}">${user.isBanned ? 'Banned' : 'Active'}</span></p>
+                </div>
+
+                <div class="space-y-4">
+                    <button id="ban-user-btn" class="w-full py-3 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg ${user.isBanned ? 'hidden' : ''} ${isDisabledForSelf}">
+                        Ban Account
+                    </button>
+                    <button id="unban-user-btn" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg ${!user.isBanned ? 'hidden' : ''} ${isDisabledForSelf}">
+                        Unban Account
+                    </button>
+                    <button id="delete-user-btn" class="w-full py-3 rounded-full bg-gray-500 text-white font-bold text-lg hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg ${isDisabledForSelf}">
+                        Delete Account
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        currentModal = modal;
+
+        document.getElementById('close-take-action-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+        });
+
+        const banBtn = document.getElementById('ban-user-btn');
+        const unbanBtn = document.getElementById('unban-user-btn');
+        const deleteBtn = document.getElementById('delete-user-btn');
+
+        if (banBtn) {
+            banBtn.addEventListener('click', () => {
+                showMessageModal(`Are you sure you want to BAN user "${user.username}"? They will no longer be able to log in.`, 'confirm', async () => {
+                    try {
+                        const success = await setUserBanStatusFirestore(user.id, true);
+                        if (success) {
+                            showMessageModal(`User "${user.username}" has been banned.`);
+                            currentModal.remove(); // Close modal after action
+                            currentModal = null;
+                            renderAdminPanelPage(); // Re-render admin panel to update UI
+                        }
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
+                });
+            });
+        }
+
+        if (unbanBtn) {
+            unbanBtn.addEventListener('click', () => {
+                showMessageModal(`Are you sure you want to UNBAN user "${user.username}"? They will regain login access.`, 'confirm', async () => {
+                    try {
+                        const success = await setUserBanStatusFirestore(user.id, false);
+                        if (success) {
+                            showMessageModal(`User "${user.username}" has been unbanned.`);
+                            currentModal.remove(); // Close modal after action
+                            currentModal = null;
+                            renderAdminPanelPage(); // Re-render to update UI
+                        }
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
+                });
+            });
+        }
+
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                showMessageModal(`Are you sure you want to DELETE user "${user.username}"? This action cannot be undone and will only remove their data from Firestore.`, 'confirm', async () => {
+                    try {
+                        const success = await deleteUserFirestore(user.id);
+                        if (success) {
+                            showMessageModal(`User "${user.username}" data deleted successfully!`);
+                            currentModal.remove(); // Close modal after action
+                            currentModal = null;
+                            renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                        }
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
+                });
+            });
+        }
+    }
+
 
     /**
      * Renders the Create Post page for admins/founders.
@@ -1952,6 +2018,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Store the current page in a data attribute on the content area for tracking
         contentArea.dataset.currentPage = page;
         contentArea.dataset.currentId = id; // Store generic ID if applicable
+
+        // Close any open desktop dropdowns on navigation
+        document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
+            content.classList.add('hidden');
+            content.style.maxHeight = '0px';
+            const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
+            if (icon) icon.classList.remove('rotate-180');
+        });
 
         if (page === 'logout') {
             showLoadingSpinner();
