@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Awesome Community</title> <!-- This title will be updated by config.js -->
+    <title>SophosWRLD</title> <!-- This title will be updated by config.js -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -19,39 +19,87 @@
             align-items: center;
             padding-bottom: 2rem; /* Add some padding at the bottom */
         }
-        /* Add this for smooth collapse/expand transition */
-        #mobile-menu {
-            transition: max-height 0.3s ease-out;
-            overflow: hidden;
+
+        /* Styles for the side drawer menu */
+        #side-drawer-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 280px; /* Adjust width as needed */
+            background-color: #1f2937; /* Gray-800 equivalent */
+            z-index: 50; /* Above content, below modal */
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.5); /* Shadow on open */
+            overflow-y: auto; /* Allow scrolling for many menu items */
+            padding-top: 4rem; /* Space for fixed navbar/status bar */
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
         }
-        #mobile-menu.hidden {
-            max-height: 0;
+
+        #side-drawer-menu.open {
+            transform: translateX(0);
         }
-        #mobile-menu:not(.hidden) {
-            max-height: 500px; /* Adjust based on max content height */
+
+        /* Overlay for when the side drawer is open */
+        #overlay-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 40; /* Below drawer, above main content */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+
+        #overlay-backdrop.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Hide desktop nav links when mobile menu is open */
+        @media (max-width: 767px) { /* Tailind's md breakpoint is 768px */
+            #nav-links.hidden-on-mobile-menu-open {
+                display: none;
+            }
         }
     </style>
 </head>
 <body class="bg-gradient-to-r from-blue-400 to-purple-600 min-h-screen font-inter">
+
+    <!-- The overlay backdrop -->
+    <div id="overlay-backdrop"></div>
+
     <nav class="bg-gray-800 p-4 text-white shadow-lg sticky top-0 z-40">
         <div class="container mx-auto flex justify-between items-center">
+            <!-- Mobile Menu Toggle Button (Hamburger/X icon) -->
+            <button id="mobile-menu-toggle" class="text-white focus:outline-none p-2 rounded-md hover:bg-gray-700 md:hidden">
+                <i id="mobile-menu-icon-open" class="fas fa-bars text-xl"></i>
+                <i id="mobile-menu-icon-close" class="fas fa-times text-xl hidden"></i>
+            </button>
+
             <button id="nav-home" class="text-2xl font-bold hover:text-gray-300 transition duration-200">
-                My Awesome Community
+                SophosWRLD
             </button>
             <div class="hidden md:flex space-x-4" id="nav-links">
-                <!-- Nav links will be dynamically loaded here by App.js -->
+                <!-- Desktop Nav links will be dynamically loaded here by App.js -->
             </div>
-            <div class="md:hidden">
-                <button id="mobile-menu-toggle" class="text-white focus:outline-none p-2 rounded-md hover:bg-gray-700">
-                    <i id="mobile-menu-icon-open" class="fas fa-bars text-xl"></i>
-                    <i id="mobile-menu-icon-close" class="fas fa-times text-xl hidden"></i>
-                </button>
-            </div>
-        </div>
-        <div id="mobile-menu" class="md:hidden hidden space-y-2 mt-2">
-            <!-- Mobile nav links will be dynamically loaded here by App.js -->
+            
         </div>
     </nav>
+
+    <!-- Side Drawer Menu -->
+    <div id="side-drawer-menu">
+        <!-- Mobile Nav links will be dynamically loaded here by App.js -->
+        <button id="mobile-drawer-home" class="block w-full text-left px-4 py-3 hover:bg-gray-700 text-white transition duration-200 text-lg font-semibold">Home</button>
+        <button id="mobile-drawer-about" class="block w-full text-left px-4 py-3 hover:bg-gray-700 text-white transition duration-200 text-lg font-semibold">About</button>
+        <!-- Dynamic links will be appended here -->
+    </div>
 
     <main id="content-area" class="flex-grow p-4">
         <!-- Page content will be loaded here by App.js -->
