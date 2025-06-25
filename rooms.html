@@ -3,129 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rooms - Your Website</title>
-    <!-- Tailwind CSS CDN -->
+    <title>Room Chat - SophosWRLD</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"></link>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <script src="./config.js"></script>
     <style>
-        /* Custom styles for smoother transitions and font */
         body {
-            font-family: "Inter", sans-serif;
-            transition: background-image 0.5s ease-in-out, background-color 0.5s ease-in-out;
-            min-height: 100vh; /* Ensure body takes full viewport height */
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s ease-in-out, background-image 0.3s ease-in-out;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #a78bfa; /* Default purple */
+            background-image: linear-gradient(to right, #60a5fa, #a78bfa); /* Default gradient */
+        }
+        .chat-container {
+            height: 80vh; /* Responsive height */
+            max-height: 700px;
             display: flex;
             flex-direction: column;
         }
-        .animate-spin {
-            animation: spin 1s linear infinite;
+        .chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            scroll-behavior: smooth;
         }
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+        /* Custom scrollbar for Webkit browsers */
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-messages::-webkit-scrollbar-track {
+            background: #e2e8f0; /* bg-gray-200 */
+            border-radius: 10px;
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #9ca3af; /* bg-gray-400 */
+            border-radius: 10px;
+        }
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* bg-gray-500 */
         }
     </style>
 </head>
-<body class="bg-gradient-to-r from-blue-400 to-purple-600">
+<body class="min-h-screen font-inter bg-gradient-to-r from-blue-400 to-purple-600">
+
     <!-- Loading Spinner -->
     <div id="loading-spinner" class="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 hidden">
         <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-white"></div>
     </div>
 
-    <!-- Message Modal -->
+    <!-- Message Modal (Re-usable and matching App.js structure) -->
     <div id="message-modal" class="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4 hidden">
         <div class="bg-white p-8 rounded-lg shadow-xl text-center max-w-sm w-full">
-            <p id="modal-message" class="text-xl mb-6 text-gray-800"></p>
-            <div class="flex justify-center space-x-4">
-                <button id="modal-ok-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 transform hover:scale-105">
-                    OK
-                </button>
+            <p id="modal-message-content" class="text-xl mb-6 text-gray-800"></p>
+            <div id="modal-buttons" class="flex justify-center space-x-4">
+                <button id="modal-ok-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 transform hover:scale-105">OK</button>
+                <button id="modal-confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 transform hover:scale-105 hidden">Confirm</button>
+                <button id="modal-cancel-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-full transition duration-300 transform hover:scale-105 hidden">Cancel</button>
             </div>
         </div>
     </div>
 
-    <!-- Navbar -->
-    <nav class="bg-gray-800 p-4 shadow-md flex justify-between items-center z-20 sticky top-0">
-        <div class="flex items-center space-x-4">
-            <button id="mobile-menu-toggle" class="lg:hidden text-white text-2xl focus:outline-none">
-                <i id="mobile-menu-icon-open" class="fas fa-bars"></i>
-                <i id="mobile-menu-icon-close" class="fas fa-times hidden"></i>
-            </button>
-            <a href="index.html" id="nav-home" class="text-white text-2xl font-bold hover:text-gray-300 transition duration-200">Your Website</a>
+    <div class="flex flex-col md:flex-row items-start justify-center p-4 w-full h-full min-h-screen gap-4">
+        <!-- Main Chat Area -->
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200 chat-container">
+            <h2 id="room-title" class="text-3xl font-extrabold text-center text-gray-800 mb-6">Loading Room...</h2>
+            <div id="chat-messages" class="chat-messages bg-gray-100 p-4 rounded-lg mb-4 space-y-3">
+                <!-- Chat messages will be loaded here -->
+            </div>
+            <form id="chat-form" class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                <textarea id="message-input" rows="1" class="flex-grow resize-none px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Type your message..." required></textarea>
+                <button type="submit" id="send-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 transform hover:scale-105 shadow-lg">
+                    Send
+                </button>
+            </form>
+            <div class="mt-4 text-center">
+                <button id="back-to-admin-btn" class="py-2 px-4 rounded-full bg-gray-500 text-white font-bold text-sm hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                    Back to Admin Panel
+                </button>
+            </div>
         </div>
-        <div id="nav-links" class="hidden lg:flex items-center space-x-6">
-            <!-- Desktop navigation links populated by App.js -->
-        </div>
-        <!-- Profile Icon / Sign In link for larger screens will be injected by JS -->
-    </nav>
 
-    <!-- Side Drawer Menu (for mobile) -->
-    <div id="side-drawer-menu" class="fixed inset-y-0 left-0 w-64 bg-gray-800 text-white transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out z-30 shadow-lg flex flex-col pt-20 lg:hidden">
-        <button id="mobile-drawer-home" class="block w-full text-left px-4 py-3 text-lg font-semibold rounded-lg hover:bg-gray-700 transition duration-200">Home</button>
-        <button id="mobile-drawer-about" class="block w-full text-left px-4 py-3 text-lg font-semibold rounded-lg hover:bg-gray-700 transition duration-200">About</button>
-        <!-- Dynamic mobile navigation links populated by App.js -->
+        <!-- Active Users Panel -->
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-xs backdrop-blur-sm bg-opacity-80 border border-gray-200 h-fit md:h-[80vh]">
+            <h3 class="text-2xl font-extrabold text-center text-gray-800 mb-4">Active Users</h3>
+            <div id="active-users-list" class="space-y-2 overflow-y-auto max-h-[calc(80vh-100px)]">
+                <!-- Active users will be listed here -->
+                <p class="text-gray-500 text-center text-sm">Loading active users...</p>
+            </div>
+        </div>
     </div>
 
-    <!-- Overlay Backdrop for Side Drawer (for mobile) -->
-    <div id="overlay-backdrop" class="fixed inset-0 bg-black opacity-50 z-20 hidden lg:hidden"></div>
-
-    <!-- Main Content Area -->
-    <main id="content-area" class="flex-grow flex items-start justify-center p-4">
-        <!-- Content will be dynamically loaded here by rooms.js -->
-    </main>
-
-    <!-- Footer (Optional) -->
-    <footer class="bg-gray-800 p-4 text-white text-center text-sm mt-auto">
-        &copy; 2024 Your Website. All rights reserved.
-    </footer>
-
-    <!-- Firebase SDK (Version 10.0.0) -->
     <script type="module">
+        // Import Firebase functions
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
-        import { getFirestore, collection, query, orderBy, onSnapshot, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
-        import CONFIG from './config.js'; // Ensure config.js is accessible
+        import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously, signOut } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
-        // Use Firebase configuration from config.js
-        const firebaseConfig = CONFIG.firebaseConfig;
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const APP_ID = firebaseConfig.projectId;
-
-        // DOM Elements (re-declared for this script's scope)
-        const contentArea = document.getElementById('content-area');
-        const navLinks = document.getElementById('nav-links');
-        const sideDrawerMenu = document.getElementById('side-drawer-menu');
-        const overlayBackdrop = document.getElementById('overlay-backdrop');
-        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-        const mobileMenuIconOpen = document.getElementById('mobile-menu-icon-open');
-        const mobileMenuIconClose = document.getElementById('mobile-menu-icon-close');
-        const navHomeButton = document.getElementById('nav-home');
-        const mobileDrawerHomeButton = document.getElementById('mobile-drawer-home');
-        const mobileDrawerAboutButton = document.getElementById('mobile-drawer-about');
-        const messageModal = document.getElementById('message-modal');
-        const modalMessage = document.getElementById('modal-message');
-        const modalOkBtn = document.getElementById('modal-ok-btn');
-        const loadingSpinner = document.getElementById('loading-spinner');
-
-        // Global State Variables
+        // Global variables for Firebase and user data
+        let app, auth, db;
         let currentUser = null;
         let userData = null;
+        let APP_ID = '';
+        let roomId = null;
+        let roomTitle = '';
+        let currentModal = null; // To manage active message modal
+        let presenceInterval = null; // Interval for presence updates
 
-        // --- Utility Functions (duplicated for standalone file) ---
-        function showLoadingSpinner() { loadingSpinner.classList.remove('hidden'); }
-        function hideLoadingSpinner() { loadingSpinner.classList.add('hidden'); }
+        // --- Utility Functions (Duplicated from App.js for standalone page) ---
 
-        function showMessageModal(message, type = 'info') {
-            modalMessage.textContent = message;
-            modalMessage.className = `text-xl mb-6 ${type === 'error' ? 'text-red-600' : 'text-gray-800'}`;
-            messageModal.classList.remove('hidden');
-            modalOkBtn.onclick = () => messageModal.classList.add('hidden');
+        /**
+         * Shows a loading spinner.
+         */
+        function showLoadingSpinner() {
+            let spinner = document.getElementById('loading-spinner');
+            if (!spinner) {
+                spinner = document.createElement('div');
+                spinner.id = 'loading-spinner';
+                spinner.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50';
+                spinner.innerHTML = `<div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-white"></div>`;
+                document.body.appendChild(spinner);
+            }
+            spinner.classList.remove('hidden'); // Ensure it's visible
         }
 
+        /**
+         * Hides the loading spinner.
+         */
+        function hideLoadingSpinner() {
+            const spinner = document.getElementById('loading-spinner');
+            if (spinner) {
+                spinner.classList.add('hidden'); // Hide it
+            }
+        }
+
+        /**
+         * Displays a message modal.
+         * @param {string} message - The message to display.
+         * @param {string} type - 'info', 'error', or 'confirm'.
+         * @param {function} onConfirm - Callback for 'confirm' type (only for 'confirm' type).
+         */
+        function showMessageModal(message, type = 'info', onConfirm = null) {
+            if (currentModal && !currentModal.classList.contains('hidden')) {
+                // If a modal is already open, close it before opening a new one
+                currentModal.classList.add('hidden');
+            }
+
+            const modal = document.getElementById('message-modal');
+            const modalMessage = document.getElementById('modal-message-content');
+            const modalOkBtn = document.getElementById('modal-ok-btn');
+            const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+            const modalCancelBtn = document.getElementById('modal-cancel-btn');
+
+            modalMessage.textContent = message;
+            modalMessage.className = `text-xl mb-6 ${type === 'error' ? 'text-red-600' : 'text-gray-800'}`;
+
+            // Reset button visibility
+            modalOkBtn.classList.add('hidden');
+            modalConfirmBtn.classList.add('hidden');
+            modalCancelBtn.classList.add('hidden');
+
+            if (type === 'confirm') {
+                modalConfirmBtn.classList.remove('hidden');
+                modalCancelBtn.classList.remove('hidden');
+            } else {
+                modalOkBtn.classList.remove('hidden');
+            }
+
+            modal.classList.remove('hidden');
+            currentModal = modal; // Set the current modal reference
+
+            const closeModal = () => {
+                if (currentModal) {
+                    currentModal.classList.add('hidden');
+                    currentModal = null;
+                }
+            };
+
+            modalOkBtn.onclick = closeModal;
+            modalCancelBtn.onclick = closeModal;
+            modalConfirmBtn.onclick = () => {
+                closeModal();
+                if (onConfirm) onConfirm();
+            };
+        }
+
+
+        /**
+         * Updates the body's background. Reads from localStorage or uses default.
+         */
         function updateBodyBackground() {
             document.body.className = '';
             document.body.style.backgroundImage = '';
@@ -134,16 +203,16 @@
             document.body.style.backgroundRepeat = '';
             document.body.style.backgroundAttachment = '';
 
-            if (userData && userData.backgroundUrl) {
-                if (userData.backgroundUrl.startsWith('http://') || userData.backgroundUrl.startsWith('https://')) {
-                    document.body.style.backgroundImage = `url('${userData.backgroundUrl}')`;
+            let backgroundUrl = localStorage.getItem('userBackgroundUrl');
+            if (backgroundUrl) {
+                if (backgroundUrl.startsWith('http://') || backgroundUrl.startsWith('https://')) {
+                    document.body.style.backgroundImage = `url('${backgroundUrl}')`;
                     document.body.style.backgroundSize = 'cover';
                     document.body.style.backgroundPosition = 'center';
                     document.body.style.backgroundRepeat = 'no-repeat';
                     document.body.style.backgroundAttachment = 'fixed';
                 } else {
-                    const backgroundClasses = userData.backgroundUrl.split(' ');
-                    document.body.classList.add(...backgroundClasses);
+                    document.body.classList.add(...backgroundUrl.split(' '));
                 }
             } else {
                 document.body.classList.add('bg-gradient-to-r', 'from-blue-400', 'to-purple-600');
@@ -151,399 +220,285 @@
             document.body.classList.add('min-h-screen', 'font-inter');
         }
 
-        // --- Navigation and Firebase Functions (adapted for rooms.html) ---
+        // --- Core Chat Functionality ---
 
         /**
-         * Fetches the current user's data from Firestore.
-         * @returns {Promise<object|null>} - User data or null if not authenticated/found.
+         * Initializes Firebase and checks authentication status.
          */
-        async function fetchCurrentUserFirestoreData() {
-            if (!currentUser) return null;
+        async function initializeFirebaseAndAuth() {
             showLoadingSpinner();
             try {
-                const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
-                const docSnap = await getDoc(userDocRef);
-                return docSnap.exists() ? docSnap.data() : null;
+                let firebaseConfig;
+                let appId;
+                let initialAuthToken;
+
+                // Prioritize global variables from Canvas runtime if available
+                if (typeof __firebase_config !== 'undefined' && typeof __app_id !== 'undefined') {
+                    firebaseConfig = JSON.parse(__firebase_config);
+                    appId = __app_id;
+                    initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                    console.log("Firebase config loaded from global Canvas variables.");
+                } else {
+                    // Fallback to localStorage if not running in Canvas or globals not present
+                    const configString = localStorage.getItem('firebaseConfig');
+                    const appIdString = localStorage.getItem('APP_ID');
+                    initialAuthToken = localStorage.getItem('__initial_auth_token');
+
+                    if (!configString || !appIdString) {
+                        throw new Error("Firebase configuration or App ID not found. Please log in through the main application.");
+                    }
+                    firebaseConfig = JSON.parse(configString);
+                    appId = appIdString;
+                    console.log("Firebase config loaded from localStorage.");
+                }
+
+                APP_ID = appId; // Set global APP_ID
+
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Use the custom auth token if available, otherwise sign in anonymously
+                if (initialAuthToken) {
+                    try {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                        console.log("Signed in with custom token.");
+                    } catch (error) {
+                        console.warn("Custom token sign-in failed, trying anonymous:", error);
+                        await signInAnonymously(auth);
+                    }
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Listen for auth state changes
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        currentUser = user;
+                        // Attempt to load user data from localStorage first
+                        let userDataString = localStorage.getItem('userData');
+                        if (userDataString) {
+                            userData = JSON.parse(userDataString);
+                            console.log("User data loaded from localStorage:", userData);
+                            updateBodyBackground(); // Apply user's background
+                        } else {
+                            // If not in localStorage, fetch from Firestore (should be rare if App.js works correctly)
+                            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
+                            const docSnap = await getDoc(userDocRef);
+                            if (docSnap.exists()) {
+                                userData = docSnap.data();
+                                localStorage.setItem('userData', JSON.stringify(userData)); // Save to localStorage
+                                updateBodyBackground(); // Apply user's background
+                            } else {
+                                showMessageModal("User profile not found. Please log in again.", 'error', () => {
+                                    signOut(auth); // Sign out if profile not found
+                                    window.location.href = 'index.html'; // Go back to home
+                                });
+                                hideLoadingSpinner();
+                                return;
+                            }
+                        }
+                        loadRoomDetailsAndMessages(); // Proceed to load chat
+                        setupPresence(); // Start presence tracking
+                    } else {
+                        // User is logged out or session expired
+                        currentUser = null;
+                        userData = null;
+                        showMessageModal("You must be logged in to access chat rooms. Redirecting to login.", 'info', () => {
+                            window.location.href = 'index.html#auth'; // Redirect to auth page
+                        });
+                        hideLoadingSpinner();
+                        // Clear any ongoing presence updates if logged out
+                        if (presenceInterval) clearInterval(presenceInterval);
+                    }
+                });
+
             } catch (error) {
-                console.error("Error fetching user data from Firestore:", error.message);
-                return null;
-            } finally {
+                console.error("Firebase initialization or auth error:", error);
+                showMessageModal("Failed to initialize chat: " + error.message, 'error', () => {
+                    window.location.href = 'index.html'; // Go back to home on critical error
+                });
                 hideLoadingSpinner();
             }
         }
 
         /**
-         * Fetches all rooms from Firestore.
-         * @returns {Promise<Array<object>>} - List of all rooms.
+         * Fetches room details and sets up real-time listener for messages.
          */
-        async function fetchAllRoomsFirestore() {
-            showLoadingSpinner();
-            try {
-                const roomsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms`);
-                const q = query(roomsCollectionRef, orderBy('timestamp', 'desc')); // Order by newest first
+        async function loadRoomDetailsAndMessages() {
+            const urlParams = new URLSearchParams(window.location.search);
+            roomId = urlParams.get('id');
+            roomTitle = urlParams.get('title') || 'Unknown Room';
 
-                const querySnapshot = await new Promise((resolve, reject) => {
-                    const unsubscribe = onSnapshot(q, (snapshot) => {
-                        unsubscribe(); // Unsubscribe immediately after first fetch
-                        resolve(snapshot);
-                    }, (error) => {
-                        reject(error);
-                    });
+            if (!roomId) {
+                showMessageModal("No room ID provided. Returning to admin panel.", 'error', () => {
+                    window.location.href = 'index.html#admin';
                 });
-
-                const roomsData = [];
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    roomsData.push({
-                        id: doc.id,
-                        title: data.title,
-                        description: data.description,
-                        creatorUsername: data.creatorUsername,
-                        timestamp: data.timestamp ? (typeof data.timestamp === 'string' ? new Date(data.timestamp).toLocaleString() : data.timestamp.toDate().toLocaleString()) : 'N/A',
-                    });
-                });
-                return roomsData;
-            } catch (error) {
-                console.error("Error fetching rooms:", error.message);
-                throw new Error("Failed to fetch rooms: " + error.message);
-            } finally {
-                hideLoadingSpinner();
-            }
-        }
-
-        /**
-         * Renders the Navbar links based on authentication status.
-         */
-        function renderNavbar() {
-            if (navLinks) {
-                navLinks.innerHTML = '';
-            }
-            if (sideDrawerMenu) {
-                // Clear dynamic mobile nav items (after home/about)
-                while (sideDrawerMenu.children.length > 2) {
-                    sideDrawerMenu.removeChild(sideDrawerMenu.lastChild);
-                }
-            }
-
-            const categories = [
-                {
-                    name: 'Community',
-                    items: [
-                        { id: 'nav-forum', text: 'Forum', page: 'index.html#forum' },
-                        { id: 'nav-rooms', text: 'Rooms', page: 'rooms.html' },
-                        { id: 'nav-team', text: 'Meet the Team', page: 'index.html#team' }
-                    ],
-                    authRequired: true
-                },
-                {
-                    name: 'Administration',
-                    items: [
-                        { id: 'nav-admin', text: 'Admin Panel', page: 'index.html#admin' }
-                    ],
-                    authRequired: true,
-                    roles: ['admin', 'founder']
-                },
-                {
-                    name: 'Account',
-                    items: [],
-                    authRequired: false
-                }
-            ];
-
-            const accountCategory = categories.find(cat => cat.name === 'Account');
-            if (currentUser && userData) {
-                const profileIconSrc = userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`;
-                const profileIconHtml = `
-                    <img src="${profileIconSrc}" alt="Profile" class="w-8 h-8 rounded-full object-cover border-2 border-gray-400"
-                        onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}'">`;
-
-                accountCategory.items.push(
-                    { id: 'nav-profile', text: userData.username || currentUser.email, page: 'index.html#profile', icon: profileIconHtml },
-                    { id: 'nav-sign-out', text: 'Sign Out', page: 'logout' }
-                );
-            } else {
-                accountCategory.items.push(
-                    { id: 'nav-auth', text: 'Sign In / Up', page: 'index.html#auth' }
-                );
-            }
-
-            const closeAllDesktopDropdowns = () => {
-                document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
-                    content.classList.add('hidden');
-                    content.style.maxHeight = '0px';
-                    const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
-                    if (icon) icon.classList.remove('rotate-180');
-                });
-            };
-
-            categories.forEach(category => {
-                if (category.authRequired && !currentUser) return;
-                if (category.roles && (!currentUser || !category.roles.includes(userData.role))) return;
-
-                const dropdownContainer = document.createElement('div');
-                dropdownContainer.className = 'relative inline-block text-left';
-                dropdownContainer.innerHTML = `
-                    <button class="px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 flex items-center space-x-2 desktop-dropdown-toggle">
-                        <span>${category.name}</span>
-                        <i class="fas fa-chevron-down text-xs ml-1 transition-transform transform"></i>
-                    </button>
-                    <div class="desktop-dropdown-content absolute hidden bg-gray-700 text-white rounded-lg shadow-lg py-2 w-40 z-10 top-full mt-2 left-0 origin-top overflow-hidden" style="max-height: 0px; transition: max-height 0.3s ease-in-out;">
-                        ${category.items.map(item => `
-                            <button id="${item.id}" class="block w-full text-left px-4 py-2 hover:bg-gray-600 transition duration-200">
-                                ${item.icon || ''}<span>${item.text}</span>
-                            </button>
-                        `).join('')}
-                    </div>
-                `;
-                navLinks.appendChild(dropdownContainer);
-
-                const toggleButton = dropdownContainer.querySelector('.desktop-dropdown-toggle');
-                const dropdownContent = dropdownContainer.querySelector('.desktop-dropdown-content');
-                const dropdownIcon = toggleButton.querySelector('.fa-chevron-down');
-
-                toggleButton.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const isOpen = !dropdownContent.classList.contains('hidden');
-                    closeAllDesktopDropdowns();
-                    if (!isOpen) {
-                        dropdownContent.classList.remove('hidden');
-                        dropdownContent.style.maxHeight = dropdownContent.scrollHeight + 'px';
-                        dropdownIcon.classList.add('rotate-180');
-                    } else {
-                        dropdownContent.style.maxHeight = '0px';
-                        dropdownContent.classList.add('hidden');
-                        dropdownIcon.classList.remove('rotate-180');
-                    }
-                });
-
-                dropdownContent.querySelectorAll('button[id]').forEach(btn => {
-                    const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
-                    if (page) {
-                        btn.addEventListener('click', () => {
-                            if (page === 'logout') {
-                                signOut(auth).then(() => {
-                                    showMessageModal('You have been signed out.', 'info', () => {
-                                        window.location.href = 'index.html'; // Redirect to home on logout
-                                    });
-                                }).catch(error => {
-                                    showMessageModal('Failed to sign out: ' + error.message, 'error');
-                                });
-                            } else {
-                                window.location.href = page; // Navigate directly for other pages
-                            }
-                            closeAllDesktopDropdowns();
-                        });
-                    }
-                });
-            });
-
-            document.removeEventListener('click', closeAllDesktopDropdowns);
-            document.addEventListener('click', closeAllDesktopDropdowns);
-
-            // Mobile menu for drawer
-            const createMobileDropdown = (categoryName, items) => {
-                const dropdownWrapper = document.createElement('div');
-                dropdownWrapper.className = 'w-full';
-                dropdownWrapper.innerHTML = `
-                    <button class="mobile-dropdown-toggle block w-full text-left px-4 py-3 text-lg font-semibold bg-gray-700 hover:bg-gray-600 transition duration-200 flex justify-between items-center rounded-md">
-                        <span>${categoryName}</span>
-                        <i class="fas fa-chevron-down text-sm transition-transform transform"></i>
-                    </button>
-                    <div class="mobile-dropdown-content hidden bg-gray-700 py-1 rounded-b-lg overflow-hidden transition-all duration-300 ease-in-out" style="max-height: 0px;">
-                        ${items.map(item => `
-                            <button id="${item.id}" class="block w-full text-left px-6 py-2 text-md hover:bg-gray-600 text-white transition duration-200">
-                                ${item.icon || ''}<span>${item.text}</span>
-                            </button>
-                        `).join('')}
-                    </div>
-                `;
-                sideDrawerMenu.appendChild(dropdownWrapper);
-
-                const toggleButton = dropdownWrapper.querySelector('.mobile-dropdown-toggle');
-                const dropdownContent = dropdownWrapper.querySelector('.mobile-dropdown-content');
-                const dropdownIcon = dropdownWrapper.querySelector('.fa-chevron-down');
-
-                toggleButton.addEventListener('click', () => {
-                    const isOpen = dropdownContent.classList.contains('open');
-                    if (isOpen) {
-                        dropdownContent.style.maxHeight = '0px';
-                        dropdownContent.classList.remove('open');
-                        dropdownIcon.classList.remove('rotate-180');
-                    } else {
-                        sideDrawerMenu.querySelectorAll('.mobile-dropdown-content.open').forEach(openContent => {
-                            openContent.style.maxHeight = '0px';
-                            openContent.classList.remove('open');
-                            openContent.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
-                        });
-                        dropdownContent.style.maxHeight = dropdownContent.scrollHeight + 'px';
-                        dropdownContent.classList.add('open');
-                        dropdownIcon.classList.add('rotate-180');
-                    }
-                });
-
-                dropdownContent.querySelectorAll('button[id]').forEach(btn => {
-                    const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
-                    if (page) {
-                        btn.addEventListener('click', () => {
-                            if (page === 'logout') {
-                                signOut(auth).then(() => {
-                                    showMessageModal('You have been signed out.', 'info', () => {
-                                        window.location.href = 'index.html';
-                                    });
-                                }).catch(error => {
-                                    showMessageModal('Failed to sign out: ' + error.message, 'error');
-                                });
-                            } else {
-                                window.location.href = page;
-                            }
-                            closeSideDrawer();
-                        });
-                    }
-                });
-            };
-
-            categories.forEach(category => {
-                if (category.authRequired && !currentUser) return;
-                if (category.roles && (!currentUser || !category.roles.includes(userData.role))) return;
-                createMobileDropdown(category.name, category.items);
-            });
-        }
-
-        function closeSideDrawer() {
-            if (sideDrawerMenu) sideDrawerMenu.classList.remove('open');
-            if (overlayBackdrop) overlayBackdrop.classList.remove('visible');
-            if (mobileMenuIconOpen) mobileMenuIconOpen.classList.remove('hidden');
-            if (mobileMenuIconClose) mobileMenuIconClose.classList.add('hidden');
-            sideDrawerMenu.querySelectorAll('.mobile-dropdown-content.open').forEach(openContent => {
-                openContent.style.maxHeight = '0px';
-                openContent.classList.remove('open');
-                openContent.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
-            });
-        }
-
-        /**
-         * Renders the rooms list page.
-         */
-        async function renderRoomsPage() {
-            if (!currentUser) {
-                contentArea.innerHTML = `
-                    <div class="flex flex-col items-center justify-center p-4 h-full">
-                        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                            <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                            <p class="text-lg text-gray-700">Please sign in to view the communication rooms.</p>
-                        </div>
-                    </div>
-                `;
                 return;
             }
 
-            let rooms = [];
-            try {
-                rooms = await fetchAllRoomsFirestore();
-            } catch (error) {
-                showMessageModal(error.message, 'error');
-                rooms = [];
-            }
+            document.getElementById('room-title').textContent = `Chat in "${decodeURIComponent(roomTitle)}"`;
 
-            contentArea.innerHTML = `
-                <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                        <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Communication Rooms</h2>
-                        ${rooms.length === 0 ? `
-                            <p class="text-center text-gray-600">No rooms available yet. Check back later!</p>
-                        ` : `
-                            <div id="rooms-list" class="space-y-6">
-                                ${rooms.map(room => `
-                                    <div class="bg-gray-50 p-6 rounded-lg shadow-md border border-gray-200">
-                                        <h3 class="text-2xl font-bold text-gray-800 mb-2">${room.title}</h3>
-                                        <p class="text-gray-700 whitespace-pre-wrap mb-4">${room.description}</p>
-                                        <p class="text-sm text-gray-500 mt-2">
-                                            Created by <span class="font-semibold">${room.creatorUsername}</span> on ${room.timestamp}
-                                        </p>
-                                        <div class="mt-4 border-t pt-4 border-gray-300 flex justify-end">
-                                            <button class="join-room-btn py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg" data-room-id="${room.id}" data-room-title="${room.title}">
-                                                Join Room
-                                            </button>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        `}
-                    </div>
-                </div>
-            `;
+            const messagesRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms/${roomId}/messages`);
+            const q = query(messagesRef, orderBy('timestamp', 'asc'));
 
-            document.querySelectorAll('.join-room-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const roomId = e.target.dataset.roomId;
-                    const roomTitle = e.target.dataset.roomTitle;
-                    // Placeholder for actual call/chat functionality
-                    showMessageModal(`Joining room: "${roomTitle}" (ID: ${roomId}). Call/chat functionality to be implemented.`, 'info');
+            onSnapshot(q, async (snapshot) => {
+                const chatMessagesDiv = document.getElementById('chat-messages');
+                chatMessagesDiv.innerHTML = ''; // Clear existing messages
+
+                // Fetch all user profiles for message display
+                const usersCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
+                const usersSnapshot = await getDocs(usersCollectionRef); // Fetch all user docs once
+                const usersMap = {};
+                usersSnapshot.forEach(doc => {
+                    usersMap[doc.id] = doc.data();
                 });
+
+                snapshot.forEach((msgDoc) => {
+                    const msg = msgDoc.data();
+                    const senderData = usersMap[msg.authorId] || { username: 'Unknown User', profilePicUrl: '' };
+                    const profilePic = senderData.profilePicUrl || `https://placehold.co/40x40/F0F0F0/000000?text=${(senderData.username || 'U').charAt(0).toUpperCase()}`;
+
+                    const messageElement = document.createElement('div');
+                    messageElement.className = `
+                        flex items-start gap-3 p-3 rounded-lg shadow-sm w-full
+                        ${msg.authorId === currentUser.uid ? 'bg-blue-200 self-end ml-auto flex-row-reverse' : 'bg-gray-200 self-start mr-auto'}
+                    `;
+                    messageElement.innerHTML = `
+                        <img src="${profilePic}" alt="Avatar" class="w-10 h-10 rounded-full object-cover border-2 border-gray-300 flex-shrink-0" onerror="this.onerror=null; this.src='https://placehold.co/40x40/F0F0F0/000000?text=${(senderData.username || 'U').charAt(0).toUpperCase()}'">
+                        <div class="flex flex-col ${msg.authorId === currentUser.uid ? 'items-end' : 'items-start'} flex-grow">
+                            <p class="font-semibold text-sm ${msg.authorId === currentUser.uid ? 'text-blue-800' : 'text-gray-800'}">${msg.authorUsername}</p>
+                            <p class="text-gray-700 break-words">${msg.text}</p>
+                            <p class="text-xs text-gray-500 mt-1">${new Date(msg.timestamp.toDate()).toLocaleString()}</p>
+                        </div>
+                    `;
+                    chatMessagesDiv.appendChild(messageElement);
+                });
+                chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight; // Scroll to bottom
+            }, (error) => {
+                console.error("Error fetching messages:", error);
+                showMessageModal("Failed to load chat messages: " + error.message, 'error');
             });
         }
 
-        // --- Event Listeners and Initialization ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // Mobile menu toggle
-            if (mobileMenuToggle) {
-                mobileMenuToggle.addEventListener('click', () => {
-                    const isOpen = sideDrawerMenu && sideDrawerMenu.classList.contains('open');
-                    if (isOpen) {
-                        closeSideDrawer();
-                    } else {
-                        if (sideDrawerMenu) sideDrawerMenu.classList.add('open');
-                        if (overlayBackdrop) overlayBackdrop.classList.add('visible');
-                        if (mobileMenuIconOpen) mobileMenuIconOpen.classList.add('hidden');
-                        if (mobileMenuIconClose) mobileMenuIconClose.classList.remove('hidden');
+        /**
+         * Sends a new chat message to Firestore.
+         * @param {string} messageText - The content of the message.
+         */
+        async function sendMessage(messageText) {
+            if (!currentUser || !userData || !roomId) {
+                showMessageModal("You must be logged in and in a room to send messages.", 'info');
+                return;
+            }
+            if (!messageText.trim()) {
+                showMessageModal("Message cannot be empty.", 'info');
+                return;
+            }
+
+            try {
+                const messagesCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms/${roomId}/messages`);
+                await addDoc(messagesCollectionRef, {
+                    text: messageText,
+                    authorId: currentUser.uid,
+                    authorUsername: userData.username || currentUser.displayName || currentUser.email,
+                    profilePicUrl: userData.profilePicUrl || '', // Store sender's profile picture URL
+                    timestamp: serverTimestamp()
+                });
+                document.getElementById('message-input').value = ''; // Clear input
+            } catch (error) {
+                console.error("Error sending message:", error);
+                showMessageModal("Failed to send message: " + error.message, 'error');
+            }
+        }
+
+        /**
+         * Sets up real-time presence tracking for the current user in the room.
+         */
+        async function setupPresence() {
+            if (!currentUser || !roomId) return;
+
+            const presenceRef = doc(db, `/artifacts/${APP_ID}/public/data/rooms/${roomId}/presence`, currentUser.uid);
+
+            // Update presence immediately and then every few seconds
+            const updateMyPresence = async () => {
+                await setDoc(presenceRef, {
+                    userId: currentUser.uid,
+                    username: userData.username || currentUser.displayName || currentUser.email,
+                    profilePicUrl: userData.profilePicUrl || '',
+                    lastSeen: serverTimestamp(),
+                }, { merge: true }); // Use merge to avoid overwriting other fields if added later
+            };
+
+            // Initial update
+            updateMyPresence();
+
+            // Set up interval for periodic updates (e.g., every 5 seconds)
+            presenceInterval = setInterval(updateMyPresence, 5000);
+
+            // Listen for other users' presence
+            const presenceCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms/${roomId}/presence`);
+            // Query for users seen within the last 15 seconds (3 * 5 second intervals + buffer)
+            const activeThreshold = new Date(Date.now() - 15 * 1000);
+            const q = query(presenceCollectionRef, orderBy('lastSeen', 'desc'));
+
+            onSnapshot(q, (snapshot) => {
+                const activeUsersListDiv = document.getElementById('active-users-list');
+                activeUsersListDiv.innerHTML = '';
+                let activeUsersCount = 0;
+
+                snapshot.forEach((userDoc) => {
+                    const presenceData = userDoc.data();
+                    // Filter out users not seen recently
+                    if (presenceData.lastSeen && presenceData.lastSeen.toDate() > activeThreshold) {
+                        activeUsersCount++;
+                        const userElement = document.createElement('div');
+                        userElement.className = 'flex items-center space-x-3 p-2 bg-gray-100 rounded-md shadow-sm';
+                        const userProfilePic = presenceData.profilePicUrl || `https://placehold.co/30x30/F0F0F0/000000?text=${(presenceData.username || 'U').charAt(0).toUpperCase()}`;
+
+                        userElement.innerHTML = `
+                            <img src="${userProfilePic}" alt="User Avatar" class="w-8 h-8 rounded-full object-cover border-2 border-green-500">
+                            <span class="font-semibold text-gray-800">${presenceData.username}</span>
+                            ${presenceData.userId === currentUser.uid ? '<span class="text-xs text-blue-500">(You)</span>' : ''}
+                        `;
+                        activeUsersListDiv.appendChild(userElement);
                     }
                 });
-            }
 
-            // Close side drawer when clicking on the overlay backdrop
-            if (overlayBackdrop) {
-                overlayBackdrop.addEventListener('click', closeSideDrawer);
-            }
-
-            // Static nav button listeners
-            if (navHomeButton) navHomeButton.addEventListener('click', () => window.location.href = 'index.html');
-            if (mobileDrawerHomeButton) mobileDrawerHomeButton.addEventListener('click', () => window.location.href = 'index.html');
-            if (mobileDrawerAboutButton) mobileDrawerAboutButton.addEventListener('click', () => window.location.href = 'index.html#about');
-
-
-            // Firebase Auth State Listener
-            onAuthStateChanged(auth, async (user) => {
-                showLoadingSpinner();
-                if (user) {
-                    currentUser = user;
-                    try {
-                        userData = await fetchCurrentUserFirestoreData();
-                        if (userData) {
-                            updateBodyBackground();
-                            renderNavbar();
-                            renderRoomsPage(); // Render rooms page content on authentication
-                        } else {
-                            // User exists in Auth but not Firestore, redirect to registration or show error
-                            showMessageModal("User data not found in Firestore. Please ensure your account is set up correctly.", 'error', () => {
-                                signOut(auth); // Sign out if data is inconsistent
-                                window.location.href = 'index.html#auth'; // Redirect to main auth page
-                            });
-                        }
-                    } catch (error) {
-                        console.error("Error fetching user data in rooms.html:", error);
-                        showMessageModal("Failed to load user data. Please try again.", 'error', () => {
-                            signOut(auth);
-                            window.location.href = 'index.html#auth';
-                        });
-                    }
-                } else {
-                    currentUser = null;
-                    userData = null;
-                    updateBodyBackground(); // Reset to default background
-                    renderNavbar(); // Update navbar to logged out state
-                    renderRoomsPage(); // Still render rooms page, but with access denied message
+                if (activeUsersCount === 0) {
+                    activeUsersListDiv.innerHTML = '<p class="text-gray-500 text-center text-sm">No one else is online.</p>';
                 }
-                hideLoadingSpinner();
+            }, (error) => {
+                console.error("Error fetching active users:", error);
+                activeUsersListDiv.innerHTML = '<p class="text-red-500 text-center text-sm">Error loading active users.</p>';
+            });
+
+            // Clean up presence when user leaves the page
+            // This is a best-effort approach as 'beforeunload' is not guaranteed for all scenarios
+            window.addEventListener('beforeunload', async () => {
+                if (currentUser && roomId) {
+                    // Update lastSeen one final time (or remove document)
+                    // Removing might be too aggressive if user just refreshes or navigates quickly
+                    // For a more robust solution, Firestore's server-side timestamps and TTL might be better
+                    // but that requires Firebase Functions. For client-side, updating lastSeen is safer.
+                    await setDoc(presenceRef, { lastSeen: serverTimestamp() }, { merge: true });
+                }
+                if (presenceInterval) clearInterval(presenceInterval);
+            });
+        }
+
+
+        // --- Event Listeners ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeFirebaseAndAuth();
+
+            document.getElementById('chat-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const messageInput = document.getElementById('message-input');
+                sendMessage(messageInput.value);
+            });
+
+            document.getElementById('back-to-admin-btn').addEventListener('click', () => {
+                window.location.href = 'index.html#admin';
             });
         });
     </script>
