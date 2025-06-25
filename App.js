@@ -1,36 +1,30 @@
 // App.js
-// This script contains the entire application logic, including Firebase initialization.
+// This script contains the entire application logic, including Firebase initialization
+// and new features like forum, post management, reactions, comments, and enhanced backgrounds.
 
-// Import Firebase functions directly into this module
+// Import Firebase functions
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, signInAnonymously, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+// Import configuration from config.js
+import CONFIG from './config.js'; // Make sure config.js is in the same directory
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // IMPORTANT: Replace with your actual Firebase project configuration
-    // You get this from your Firebase project settings -> "Project settings" -> "Your apps" -> "Web app"
-    const firebaseConfig = {
-      apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
-      authDomain: "sophoswrld.firebaseapp.com",
-      projectId: "sophoswrld",
-      storageBucket: "sophoswrld.firebasestorage.app",
-      messagingSenderId: "26686142400",
-      appId: "1:26686142400:web:48f8d3ae0b097731317a25",
-      measurementId: "G-6XETC98C22"
-    };
+    // Use Firebase configuration from config.js
+    const firebaseConfig = CONFIG.firebaseConfig;
 
-    // Initialize Firebase within App.js
+    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
     // Use the projectId as the APP_ID for consistent Firestore collection paths and rules
-    const APP_ID = firebaseConfig.projectId; 
+    const APP_ID = firebaseConfig.projectId;
 
     // Initialize Auth Provider for Google
     const googleProvider = new GoogleAuthProvider();
     googleProvider.addScope('profile'); // Request profile access
     googleProvider.addScope('email'); // Request email access
-
 
     // DOM Elements
     const contentArea = document.getElementById('content-area');
@@ -40,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const mobileMenuIconOpen = document.getElementById('mobile-menu-icon-open');
     const mobileMenuIconClose = document.getElementById('mobile-menu-icon-close');
     const navHomeButton = document.getElementById('nav-home');
-    const navAboutButton = document.getElementById('nav-about'); // Get About button too
+    const navAboutButton = document.getElementById('nav-about');
 
     // Global State Variables
     let currentUser = null; // Firebase Auth user object
@@ -439,7 +433,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 content: content,
                 authorId: currentUser.uid,
                 authorUsername: userData.username || currentUser.displayName || currentUser.email,
-                timestamp: serverTimestamp() // Use server timestamp for consistency
+                timestamp: serverTimestamp(), // Use server timestamp for consistency
+                reactions: {}, // Initialize empty reactions map
+                comments: [] // Initialize empty comments array
             });
             showMessageModal('Post created successfully!');
         } catch (error) {
@@ -449,6 +445,166 @@ document.addEventListener('DOMContentLoaded', async () => {
             hideLoadingSpinner();
         }
     }
+
+    /**
+     * Updates an existing post in Firestore.
+     * Only callable by admins.
+     * @param {string} postId - The ID of the post to update.
+     * @param {string} title - The new title.
+     * @param {string} content - The new content.
+     * @returns {Promise<void>}
+     */
+    async function updatePostFirestore(postId, title, content) {
+        if (!currentUser || userData.role !== 'admin') {
+            throw new Error("Only admins can edit posts.");
+        }
+        showLoadingSpinner();
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            await updateDoc(postDocRef, {
+                title: title,
+                content: content,
+                // Do not update author or timestamp here, only content
+            });
+            showMessageModal('Post updated successfully!');
+        } catch (error) {
+            console.error("Error updating post:", error.message);
+            throw new Error("Failed to update post: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Deletes a post from Firestore.
+     * Only callable by admins.
+     * @param {string} postId - The ID of the post to delete.
+     * @returns {Promise<void>}
+     */
+    async function deletePostFirestore(postId) {
+        if (!currentUser || userData.role !== 'admin') {
+            throw new Error("Only admins can delete posts.");
+        }
+        showLoadingSpinner();
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            await deleteDoc(postDocRef);
+            showMessageModal('Post deleted successfully!');
+        } catch (error) {
+            console.error("Error deleting post:", error.message);
+            throw new Error("Failed to delete post: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Adds/updates a reaction to a post.
+     * Any authenticated user can react.
+     * @param {string} postId - The ID of the post.
+     * @param {string} emoji - The emoji character (e.g., '👍', '❤️').
+     * @returns {Promise<void>}
+     */
+    async function addReactionToPost(postId, emoji) {
+        if (!currentUser) {
+            showMessageModal("You must be logged in to react to posts.", 'info');
+            return;
+        }
+        showLoadingSpinner();
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            const postSnap = await getDoc(postDocRef);
+
+            if (postSnap.exists()) {
+                const postData = postSnap.data();
+                const currentReactions = postData.reactions || {};
+                const userReactionKey = `reactions.${emoji}`;
+                const currentUserReactionStatus = postData.userReactions && postData.userReactions[currentUser.uid] === emoji;
+
+                // Toggle logic for reaction: If user already reacted with THIS emoji, remove it. Otherwise, add/change.
+                if (currentUserReactionStatus) {
+                    // Decrement the count for the emoji
+                    currentReactions[emoji] = (currentReactions[emoji] || 0) - 1;
+                    if (currentReactions[emoji] <= 0) {
+                        delete currentReactions[emoji];
+                    }
+                    // Remove user's reaction mapping
+                    await updateDoc(postDocRef, {
+                        [`reactions.${emoji}`]: (currentReactions[emoji] || 0) <= 0 ? deleteField() : currentReactions[emoji], // Use deleteField if count is zero
+                        [`userReactions.${currentUser.uid}`]: deleteField() // Remove user's specific reaction
+                    });
+                } else {
+                    // Check if user reacted with a different emoji before
+                    const oldEmoji = postData.userReactions ? postData.userReactions[currentUser.uid] : null;
+                    if (oldEmoji && currentReactions[oldEmoji]) {
+                        currentReactions[oldEmoji] = Math.max(0, (currentReactions[oldEmoji] || 0) - 1);
+                        if (currentReactions[oldEmoji] <= 0) {
+                            delete currentReactions[oldEmoji];
+                        }
+                    }
+
+                    // Increment the count for the new emoji
+                    currentReactions[emoji] = (currentReactions[emoji] || 0) + 1;
+
+                    // Update the document
+                    await updateDoc(postDocRef, {
+                        [`reactions.${oldEmoji}`]: (oldEmoji && currentReactions[oldEmoji] <= 0) ? deleteField() : currentReactions[oldEmoji],
+                        [`reactions.${emoji}`]: currentReactions[emoji],
+                        [`userReactions.${currentUser.uid}`]: emoji // Store which emoji user reacted with
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("Error adding reaction:", error.message);
+            showMessageModal("Failed to add reaction: " + error.message, 'error');
+        } finally {
+            hideLoadingSpinner();
+            // Re-render forum page to show updated reactions
+            renderForumPage(); 
+        }
+    }
+
+
+    /**
+     * Adds a comment to a post.
+     * Any authenticated user can comment.
+     * @param {string} postId - The ID of the post.
+     * @param {string} commentText - The comment content.
+     * @returns {Promise<void>}
+     */
+    async function addCommentToPost(postId, commentText) {
+        if (!currentUser) {
+            showMessageModal("You must be logged in to comment on posts.", 'info');
+            return;
+        }
+        if (!commentText.trim()) {
+            showMessageModal("Comment cannot be empty.", 'info');
+            return;
+        }
+
+        showLoadingSpinner();
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            const newComment = {
+                authorId: currentUser.uid,
+                authorUsername: userData.username || currentUser.displayName || currentUser.email,
+                text: commentText,
+                timestamp: serverTimestamp()
+            };
+            await updateDoc(postDocRef, {
+                comments: arrayUnion(newComment) // Add the new comment to the array
+            });
+            showMessageModal('Comment added successfully!');
+        } catch (error) {
+            console.error("Error adding comment:", error.message);
+            showMessageModal("Failed to add comment: " + error.message, 'error');
+        } finally {
+            hideLoadingSpinner();
+            // Re-render forum page to show updated comments
+            renderForumPage(); 
+        }
+    }
+
 
     /**
      * Fetches all posts from Firestore, ordered by timestamp.
@@ -478,7 +634,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     content: data.content,
                     authorUsername: data.authorUsername,
                     // Format timestamp for display
-                    timestamp: data.timestamp ? data.timestamp.toDate().toLocaleString() : 'N/A'
+                    timestamp: data.timestamp ? data.timestamp.toDate().toLocaleString() : 'N/A',
+                    reactions: data.reactions || {}, // Ensure reactions is an object
+                    comments: data.comments || [] // Ensure comments is an array
                 });
             });
             return postsData;
@@ -499,6 +657,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderNavbar() {
         navLinks.innerHTML = '';
         mobileMenu.innerHTML = '';
+
+        // Update website title from config.js
+        document.querySelector('title').textContent = CONFIG.websiteTitle;
+        document.getElementById('nav-home').textContent = CONFIG.websiteTitle; // Update home button text
 
         const createButton = (id, text, page, iconHtml = '') => {
             const btn = document.createElement('button');
@@ -574,7 +736,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         contentArea.innerHTML = `
             <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
                 <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-green-600 mb-6">
-                    Welcome to SophosWRLD!
+                    Welcome to ${CONFIG.websiteTitle}!
                 </h1>
                 ${currentUser && userData ? `
                     <p class="text-xl text-gray-700 mb-4">
@@ -847,7 +1009,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-600 mb-6">About Our Website</h2>
+                    <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-600 mb-6">About ${CONFIG.websiteTitle}</h2>
                     <p class="text-lg text-gray-700 mb-4">
                         Welcome to a secure and user-friendly platform designed to streamline your online experience. We offer robust user authentication, allowing you to sign up and sign in with ease, keeping your data safe.
                     </p>
@@ -855,7 +1017,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         Our platform is built with a focus on personalization. You can update your profile information, choose a custom background theme, and manage your personal details within a dedicated settings section.
                     </p>
                     <p class="text-lg text-gray-700 mb-4">
-                        For administrators, we provide a powerful admin panel. This feature allows designated users to oversee all registered accounts, view user details, and manage roles (assigning 'admin' or 'member' status) to ensure smooth operation and access control.
+                        For administrators, we provide a powerful admin panel. This feature allows designated users to oversee all registered accounts, view user details, and manage roles (assigning 'admin' or 'member' status) to ensure smooth operation and access control. Admins can also create and manage forum posts.
+                    </p>
+                    <p class="text-lg text-gray-700 mb-4">
+                        Members can engage with forum posts by adding reactions and comments, fostering a dynamic community environment.
                     </p>
                     <p class="text-lg text-gray-700 mb-4">
                         We prioritize responsive design, ensuring that our website looks great and functions perfectly on any device, from desktops to mobile phones. Our clean, modern interface is powered by efficient technologies to provide a seamless browsing experience.
@@ -896,10 +1061,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Admin Panel</h2>
-                    <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts here.</p>
-                    <div class="mb-6 text-center">
+                    <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts, and create forum posts.</p>
+                    <div class="mb-6 text-center space-x-4">
                         <button id="create-post-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Create New Post
+                        </button>
+                        <button id="view-forum-admin-btn" class="py-2 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Manage Posts (Forum)
                         </button>
                     </div>
 
@@ -940,45 +1108,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (usersList.length > 0) {
             const usersTableBody = document.getElementById('users-table-body');
-            usersTableBody.innerHTML = usersList.map(user => {
-                const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
-                const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; // Use currentUser.uid
-
-                return `
-                    <tr data-user-id="${user.id}" class="hover:bg-gray-50">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <img src="${profileIconSrc}" alt="User Icon" class="w-10 h-10 rounded-full object-cover border-2 border-gray-300" onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}'">
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            ${user.username}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            ${user.email}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <select
-                                class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                ${isDisabled}
-                                data-role-select-id="${user.id}"
-                            >
-                                <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
-                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                            </select>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button
-                                class="text-red-600 hover:text-red-900 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                                ${isDisabled}
-                                data-delete-user-id="${user.id}" data-username="${user.username}"
-                            >
-                                Delete
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-
-            // Add event listeners for role change and delete buttons
             usersTableBody.querySelectorAll('[data-role-select-id]').forEach(selectElement => {
                 selectElement.addEventListener('change', async (e) => {
                     const userId = e.target.dataset.roleSelectId;
@@ -1014,6 +1143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         document.getElementById('create-post-btn').addEventListener('click', () => navigateTo('create-post'));
+        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins can manage from forum view
     }
 
     /**
@@ -1068,6 +1198,83 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
+     * Renders the Edit Post page for admins.
+     * @param {string} postId - The ID of the post to edit.
+     */
+    async function renderEditPostPage(postId) {
+        if (!currentUser || userData.role !== 'admin') {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">You do not have administrative privileges to edit posts.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        showLoadingSpinner();
+        let postData;
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            const docSnap = await getDoc(postDocRef);
+            if (docSnap.exists()) {
+                postData = docSnap.data();
+            } else {
+                showMessageModal('Post not found.', 'error');
+                navigateTo('forum');
+                return;
+            }
+        } catch (error) {
+            showMessageModal('Error fetching post for editing: ' + error.message, 'error');
+            navigateTo('forum');
+            return;
+        } finally {
+            hideLoadingSpinner();
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Edit Post</h2>
+                    <form id="edit-post-form" class="space-y-6">
+                        <div>
+                            <label for="post-title" class="block text-gray-700 text-sm font-semibold mb-2">Post Title</label>
+                            <input type="text" id="post-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="${postData.title}" required>
+                        </div>
+                        <div>
+                            <label for="post-content" class="block text-gray-700 text-sm font-semibold mb-2">Post Content</label>
+                            <textarea id="post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>${postData.content}</textarea>
+                        </div>
+                        <button type="submit" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Save Changes
+                        </button>
+                        <button type="button" id="cancel-edit-btn" class="w-full py-3 rounded-full bg-gray-500 text-white font-bold text-lg hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg mt-2">
+                            Cancel
+                        </button>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('edit-post-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('post-title').value;
+            const content = document.getElementById('post-content').value;
+
+            try {
+                await updatePostFirestore(postId, title, content);
+                navigateTo('forum'); // Redirect to forum after editing
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+
+        document.getElementById('cancel-edit-btn').addEventListener('click', () => navigateTo('forum'));
+    }
+
+    /**
      * Renders the Forum page, displaying all posts.
      */
     async function renderForumPage() {
@@ -1106,6 +1313,48 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <p class="text-sm text-gray-500 mt-4">
                                         Posted by <span class="font-semibold">${post.authorUsername}</span> on ${post.timestamp}
                                     </p>
+                                    
+                                    <div class="flex items-center space-x-4 mt-4 border-t pt-4 border-gray-300">
+                                        <!-- Reactions Section -->
+                                        <div class="flex items-center space-x-2">
+                                            ${['👍', '❤️', '😂', '🔥'].map(emoji => `
+                                                <button class="text-xl p-1 rounded-full hover:bg-gray-200 transition duration-200" data-post-id="${post.id}" data-emoji="${emoji}">
+                                                    ${emoji} <span class="text-sm text-gray-600">${post.reactions[emoji] || 0}</span>
+                                                </button>
+                                            `).join('')}
+                                        </div>
+
+                                        <!-- Admin Actions (Edit/Delete) -->
+                                        ${userData.role === 'admin' ? `
+                                            <div class="ml-auto space-x-2">
+                                                <button class="text-blue-600 hover:text-blue-800 font-semibold" data-post-id="${post.id}" data-action="edit">Edit</button>
+                                                <button class="text-red-600 hover:text-red-800 font-semibold" data-post-id="${post.id}" data-action="delete">Delete</button>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+
+                                    <!-- Comments Section -->
+                                    <div class="mt-6 border-t pt-4 border-gray-300">
+                                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Comments (${post.comments.length})</h4>
+                                        <div class="space-y-3 mb-4">
+                                            ${post.comments.length === 0 ? `
+                                                <p class="text-sm text-gray-500">No comments yet. Be the first to comment!</p>
+                                            ` : `
+                                                ${post.comments.map(comment => `
+                                                    <div class="bg-white p-3 rounded-lg border border-gray-200">
+                                                        <p class="text-sm text-gray-700">${comment.text}</p>
+                                                        <p class="text-xs text-gray-500 mt-1">by <span class="font-medium">${comment.authorUsername}</span> on ${comment.timestamp ? new Date(comment.timestamp._seconds * 1000).toLocaleString() : 'N/A'}</p>
+                                                    </div>
+                                                `).join('')}
+                                            `}
+                                        </div>
+                                        <form class="comment-form" data-post-id="${post.id}">
+                                            <textarea class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" rows="2" placeholder="Add a comment..." required></textarea>
+                                            <button type="submit" class="mt-2 py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-200 text-sm">
+                                                Post Comment
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
                             `).join('')}
                         </div>
@@ -1113,17 +1362,64 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
             </div>
         `;
+
+        // Add event listeners for reactions
+        contentArea.querySelectorAll('[data-emoji]').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const postId = e.target.closest('[data-post-id]').dataset.postId;
+                const emoji = e.target.dataset.emoji || e.target.parentElement.dataset.emoji; // Handles click on span inside button
+                if (postId && emoji) {
+                    await addReactionToPost(postId, emoji);
+                }
+            });
+        });
+
+        // Add event listeners for admin actions (Edit/Delete)
+        contentArea.querySelectorAll('[data-action="edit"]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const postId = e.target.dataset.postId;
+                navigateTo('edit-post', postId); // Pass postId to navigateTo
+            });
+        });
+
+        contentArea.querySelectorAll('[data-action="delete"]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const postId = e.target.dataset.postId;
+                showMessageModal('Are you sure you want to delete this post? This action cannot be undone.', 'confirm', async () => {
+                    try {
+                        await deletePostFirestore(postId);
+                        renderForumPage(); // Re-render to show updated list
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
+                });
+            });
+        });
+
+        // Add event listeners for comments
+        contentArea.querySelectorAll('.comment-form').forEach(form => {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const postId = form.dataset.postId;
+                const textarea = form.querySelector('textarea');
+                const commentText = textarea.value;
+                await addCommentToPost(postId, commentText);
+                textarea.value = ''; // Clear textarea after posting
+            });
+        });
     }
 
     // --- Navigation and Initialization ---
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'forum', 'logout').
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout').
+     * @param {string} [postId=null] - Optional: postId for edit-post route.
      */
-    async function navigateTo(page) {
+    async function navigateTo(page, postId = null) {
         // Store the current page in a data attribute on the content area for tracking
         contentArea.dataset.currentPage = page;
+        contentArea.dataset.currentPostId = postId; // Store postId if applicable
 
         if (page === 'logout') {
             showLoadingSpinner();
@@ -1161,6 +1457,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
             case 'create-post': // New case
                 renderCreatePostPage();
+                break;
+            case 'edit-post': // New case for editing
+                if (postId) {
+                    renderEditPostPage(postId);
+                } else {
+                    showMessageModal("Invalid post ID for editing.", 'error');
+                    navigateTo('forum');
+                }
                 break;
             case 'forum': // New case
                 renderForumPage();
@@ -1214,14 +1518,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 updateBodyBackground(); // Apply user's saved background
                 renderNavbar(); // Update navbar with user info
-                // If the user was on the auth page and just logged in/signed up, redirect home
-                // If not, stay on current page if it's not auth or logout.
-                if (contentArea.dataset.currentPage === 'auth' || contentArea.dataset.currentPage === 'logout' || !contentArea.dataset.currentPage) {
-                    navigateTo('home');
-                } else {
-                    // Re-render current page to ensure data is fresh (e.g. profile, admin panel)
-                    navigateTo(contentArea.dataset.currentPage);
+                // Determine which page to render based on current state or previous navigation
+                let pageToRender = contentArea.dataset.currentPage || 'home';
+                let postIdToRender = contentArea.dataset.currentPostId || null;
+
+                if (pageToRender === 'auth' || pageToRender === 'logout') {
+                    pageToRender = 'home'; // Always redirect to home if coming from auth/logout
                 }
+                navigateTo(pageToRender, postIdToRender); // Navigate to the appropriate page
 
             } catch (error) {
                 console.error("Error setting up user data after auth state change:", error);
