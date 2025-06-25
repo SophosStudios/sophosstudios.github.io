@@ -23,7 +23,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const APP_ID = firebaseConfig.projectId; // Using projectId for APP_ID, ensure this matches your Firestore Rules
+    // Use the projectId as the APP_ID for consistent Firestore collection paths and rules
+    const APP_ID = firebaseConfig.projectId; 
 
     // DOM Elements
     const contentArea = document.getElementById('content-area');
@@ -211,8 +212,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 errorMessage = 'Invalid email address.';
             } else if (error.code === 'auth/weak-password') {
                 errorMessage = 'Password should be at least 6 characters.';
-            } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-                errorMessage = 'Invalid email or password.';
+            } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-api-key' || error.code === 'auth/unauthorized-domain') {
+                errorMessage = 'Invalid email, password, or Firebase configuration error. Please check console for details.';
             }
             throw new Error(errorMessage); // Re-throw with a user-friendly message
         } finally {
