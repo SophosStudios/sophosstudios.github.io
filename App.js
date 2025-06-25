@@ -1,6 +1,7 @@
 // App.js
 // This script contains the entire application logic, including Firebase initialization
-// and new features like forum, post management, reactions, comments, and enhanced backgrounds.
+// and new features like forum, post management, reactions, comments, enhanced backgrounds,
+// and robust authentication state management for proper rendering.
 
 // Import Firebase functions
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
@@ -45,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let usersList = []; // List of all users for admin panel
     let roomsList = []; // List of all rooms for admin panel and rooms page
     let currentModal = null; // To manage active message modal
+    let isAuthReady = false; // Flag to indicate if Firebase Auth state has been initialized
 
     // --- Utility Functions ---
 
@@ -60,6 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             spinner.innerHTML = `<div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-white"></div>`;
             document.body.appendChild(spinner);
         }
+        spinner.classList.remove('hidden'); // Ensure it's visible
     }
 
     /**
@@ -68,7 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function hideLoadingSpinner() {
         const spinner = document.getElementById('loading-spinner');
         if (spinner) {
-            spinner.remove();
+            spinner.classList.add('hidden'); // Hide it
         }
     }
 
@@ -275,20 +278,41 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<object|null>} - User data or null if not authenticated/found.
      */
     async function fetchCurrentUserFirestoreData() {
-        if (!currentUser) return null;
+        if (!currentUser) {
+            console.log("No current user to fetch Firestore data for.");
+            return null;
+        }
 
+        console.log("Attempting to fetch Firestore data for user:", currentUser.uid);
         showLoadingSpinner();
         try {
             const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
             const docSnap = await getDoc(userDocRef);
             if (docSnap.exists()) {
+                console.log("Firestore user data fetched successfully:", docSnap.data());
                 return docSnap.data();
             }
-            console.log("Firestore document for user not found.");
-            return null;
+            console.log("Firestore document for user not found. This might be a new user or a data inconsistency.");
+            // If user exists in Auth but not Firestore, create a default entry
+            const usernameToUse = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
+            const profilePicToUse = currentUser.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
+            const defaultBackground = 'bg-gradient-to-r from-blue-400 to-purple-600';
+
+            const newUserData = {
+                email: currentUser.email,
+                username: usernameToUse,
+                role: 'member', // Default role for new users
+                profilePicUrl: profilePicToUse,
+                backgroundUrl: defaultBackground
+            };
+            await setDoc(userDocRef, newUserData);
+            console.log("Default user document created in Firestore.");
+            return newUserData;
+
         } catch (error) {
-            console.error("Error fetching user data from Firestore:", error.message);
-            return null;
+            console.error("Error fetching or creating user data from Firestore:", error.message);
+            // Propagate the error so onAuthStateChanged can handle a critical failure
+            throw new Error("Failed to load user profile: " + error.message);
         } finally {
             hideLoadingSpinner();
         }
@@ -333,6 +357,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function fetchAllUsersFirestore() {
         if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            console.warn("Attempted to fetch all users without sufficient privileges.");
             throw new Error("Not authorized to view users list.");
         }
 
@@ -354,6 +379,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             querySnapshot.forEach((doc) => {
                 usersData.push({ id: doc.id, ...doc.data() });
             });
+            console.log("Fetched all users successfully:", usersData.length);
             return usersData;
         } catch (error) {
             console.error("Error fetching all users:", error.message);
@@ -390,6 +416,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
             await updateDoc(userDocRef, { role: newRole });
+            console.log(`User ${userId} role updated to ${newRole}.`);
             return true;
         } catch (error) {
             console.error("Error updating user role in Firestore:", error.message);
@@ -418,6 +445,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
             await updateDoc(userDocRef, { isBanned: isBanned });
+            console.log(`User ${userId} ban status set to ${isBanned}.`);
             return true;
         } catch (error) {
             console.error("Error setting user ban status in Firestore:", error.message);
@@ -448,6 +476,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
             await deleteDoc(userDocRef);
+            console.log(`User ${userId} data deleted from Firestore.`);
             return true;
         } catch (error) {
             console.error("Error deleting user from Firestore:", error.message);
@@ -481,6 +510,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 comments: [] // Initialize empty comments array
             });
             showMessageModal('Post created successfully!');
+            console.log("New post created.");
         } catch (error) {
             console.error("Error creating post:", error.message);
             throw new Error("Failed to create post: " + error.message);
@@ -510,6 +540,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Do not update author or timestamp here, only content
             });
             showMessageModal('Post updated successfully!');
+            console.log(`Post ${postId} updated.`);
         } catch (error) {
             console.error("Error updating post:", error.message);
             throw new Error("Failed to update post: " + error.message);
@@ -533,6 +564,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
             await deleteDoc(postDocRef);
             showMessageModal('Post deleted successfully!');
+            console.log(`Post ${postId} deleted.`);
         } catch (error) {
             console.error("Error deleting post:", error.message);
             throw new Error("Failed to delete post: " + error.message);
@@ -591,6 +623,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 // Perform the update
                 await updateDoc(postDocRef, updates);
+                console.log(`User ${currentUser.uid} reacted to post ${postId} with ${emoji}.`);
             }
         } catch (error) {
             console.error("Error adding reaction:", error.message);
@@ -633,6 +666,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 comments: arrayUnion(newComment) // Add the new comment to the array
             });
             showMessageModal('Comment added successfully!');
+            console.log(`New comment added to post ${postId}.`);
         } catch (error) {
             console.error("Error adding comment:", error.message);
             showMessageModal("Failed to add comment: " + error.message, 'error');
@@ -677,6 +711,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     comments: data.comments || [] // Ensure comments is an array
                 });
             });
+            console.log("Fetched all posts successfully:", postsData.length);
             return postsData;
         } catch (error) {
             console.error("Error fetching posts:", error.message);
@@ -709,6 +744,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             querySnapshot.forEach((doc) => {
                 teamMembersData.push({ id: doc.id, ...doc.data() });
             });
+            console.log("Fetched all team members successfully:", teamMembersData.length);
             return teamMembersData;
         } catch (error) {
             console.error("Error fetching team members:", error.message);
@@ -740,6 +776,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 timestamp: serverTimestamp()
             });
             showMessageModal('Team member added successfully!');
+            console.log("New team member added.");
         } catch (error) {
             console.error("Error adding team member:", error.message);
             throw new Error("Failed to add team member: " + error.message);
@@ -763,6 +800,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const teamMemberDocRef = doc(db, `/artifacts/${APP_ID}/public/data/team`, teamMemberId);
             await deleteDoc(teamMemberDocRef);
             showMessageModal('Team member deleted successfully!');
+            console.log(`Team member ${teamMemberId} deleted.`);
         } catch (error) {
             console.error("Error deleting team member:", error.message);
             throw new Error("Failed to delete team member: " + error.message);
@@ -793,6 +831,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 timestamp: serverTimestamp(),
             });
             showMessageModal('Room created successfully!');
+            console.log("New room created.");
         } catch (error) {
             console.error("Error creating room:", error.message);
             throw new Error("Failed to create room: " + error.message);
@@ -816,6 +855,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const roomDocRef = doc(db, `/artifacts/${APP_ID}/public/data/rooms`, roomId);
             await deleteDoc(roomDocRef);
             showMessageModal('Room deleted successfully!');
+            console.log(`Room ${roomId} deleted.`);
         } catch (error) {
             console.error("Error deleting room:", error.message);
             throw new Error("Failed to delete room: " + error.message);
@@ -836,7 +876,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const querySnapshot = await new Promise((resolve, reject) => {
                 const unsubscribe = onSnapshot(q, (snapshot) => {
-                    unsubscribe();
+                    unsubscribe(); // Unsubscribe immediately after first fetch
                     resolve(snapshot);
                 }, (error) => {
                     reject(error);
@@ -854,6 +894,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     timestamp: data.timestamp ? (typeof data.timestamp === 'string' ? new Date(data.timestamp).toLocaleString() : data.timestamp.toDate().toLocaleString()) : 'N/A',
                 });
             });
+            console.log("Fetched all rooms successfully:", roomsData.length);
             return roomsData;
         } catch (error) {
             console.error("Error fetching rooms:", error.message);
@@ -913,8 +954,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             `; // Removed founder-specific styling, admin styling will apply if a founder is shown admin panel
             btn.innerHTML = `${iconHtml}<span>${text}</span>`;
             btn.addEventListener('click', () => {
-                navigateTo(page);
-                // Close side drawer after navigation
+                if (page === 'logout') {
+                    signOut(auth).then(() => {
+                        showMessageModal('You have been signed out.');
+                        // Reload or navigate to home to clear state
+                        window.location.href = 'index.html'; // Ensure full refresh on logout
+                    }).catch(error => {
+                        showMessageModal("Failed to sign out: " + error.message, 'error');
+                    });
+                } else if (page.endsWith('.html')) { // Direct navigation to an HTML file
+                    window.location.href = page;
+                } else { // In-page navigation
+                    navigateTo(page);
+                }
                 closeSideDrawer();
             });
             container.appendChild(btn);
@@ -926,7 +978,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 name: 'Community',
                 items: [
                     { id: 'nav-forum', text: 'Forum', page: 'forum' },
-                    { id: 'nav-rooms', text: 'Rooms', page: 'rooms' }, // Added Rooms here
+                    { id: 'nav-rooms', text: 'Rooms', page: 'rooms.html' }, // Points to rooms.html
                     { id: 'nav-team', text: 'Meet the Team', page: 'team' }
                 ],
                 authRequired: true
@@ -965,13 +1017,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Close all desktop dropdowns function
-        const closeAllDesktopDropdowns = () => {
-            document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
-                content.classList.add('hidden');
-                content.style.maxHeight = '0px';
-                const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
-                if (icon) icon.classList.remove('rotate-180');
+        const closeAllDesktopDropdowns = (e) => {
+            // Check if the click was outside of any dropdown container or toggle button
+            let clickedInsideDropdown = false;
+            document.querySelectorAll('.desktop-dropdown-toggle, .desktop-dropdown-content').forEach(element => {
+                if (element.contains(e.target)) {
+                    clickedInsideDropdown = true;
+                }
             });
+
+            if (!clickedInsideDropdown) {
+                document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
+                    content.classList.add('hidden');
+                    content.style.maxHeight = '0px';
+                    const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
+                    if (icon) icon.classList.remove('rotate-180');
+                });
+            }
         };
 
         // Render Desktop Navigation
@@ -1005,7 +1067,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 e.stopPropagation(); // Prevent document click from immediately closing it
                 const isOpen = !dropdownContent.classList.contains('hidden');
 
-                closeAllDesktopDropdowns(); // Close all other dropdowns first
+                // Close all other dropdowns, but only if they are not the one being toggled
+                document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
+                    if (content !== dropdownContent) {
+                        content.classList.add('hidden');
+                        content.style.maxHeight = '0px';
+                        const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
+                        if (icon) icon.classList.remove('rotate-180');
+                    }
+                });
 
                 if (!isOpen) {
                     dropdownContent.classList.remove('hidden');
@@ -1024,14 +1094,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
                 if (page) {
                     btn.addEventListener('click', () => {
-                        navigateTo(page);
-                        closeAllDesktopDropdowns(); // Close dropdown after navigation
+                        if (page === 'logout') {
+                            signOut(auth).then(() => {
+                                showMessageModal('You have been signed out.');
+                                window.location.href = 'index.html'; // Full reload to clear state
+                            }).catch(error => {
+                                showMessageModal("Failed to sign out: " + error.message, 'error');
+                            });
+                        } else if (page.endsWith('.html')) {
+                            window.location.href = page; // Navigate to external HTML file
+                        } else {
+                            navigateTo(page); // Navigate within this index.html
+                        }
+                        closeAllDesktopDropdowns({target: document.body}); // Simulate click on body to close dropdown
                     });
                 }
             });
         });
 
         // Close desktop dropdowns when clicking anywhere on the document
+        // This listener ensures dropdowns close when clicking outside of them
         document.removeEventListener('click', closeAllDesktopDropdowns); // Remove previous listener to prevent duplicates
         document.addEventListener('click', closeAllDesktopDropdowns);
 
@@ -1087,7 +1169,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
                 if (page) {
                     btn.addEventListener('click', () => {
-                        navigateTo(page);
+                        if (page === 'logout') {
+                            signOut(auth).then(() => {
+                                showMessageModal('You have been signed out.');
+                                window.location.href = 'index.html'; // Full reload on logout
+                            }).catch(error => {
+                                showMessageModal("Failed to sign out: " + error.message, 'error');
+                            });
+                        } else if (page.endsWith('.html')) { // Direct navigation to an HTML file
+                            window.location.href = page;
+                        } else { // In-page navigation
+                            navigateTo(page);
+                        }
                         closeSideDrawer(); // Close drawer after navigating
                     });
                 }
@@ -1154,7 +1247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button id="go-to-forum-btn" class="py-3 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Visit Forum
                         </button>
-                        ${userData.role === 'admin' || userData.role === 'founder' ? `
+                        ${(userData.role === 'admin' || userData.role === 'founder') ? `
                         <button id="go-to-admin-btn" class="py-3 px-6 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Admin Panel
                         </button>` : ''}
@@ -1298,7 +1391,8 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     function renderProfilePage() {
         if (!currentUser || !userData) {
-            navigateTo('auth'); // Redirect to auth if not logged in
+            console.warn("Attempted to render profile page without current user or user data.");
+            navigateTo('auth'); // Redirect to auth if not logged in or data not ready
             return;
         }
 
@@ -1438,7 +1532,8 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Renders the Admin Panel page.
      */
     async function renderAdminPanelPage() {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        if (!currentUser || !userData || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            console.warn("Attempted to render Admin Panel without sufficient privileges.");
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -1554,7 +1649,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
                 const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; 
                 const canAssignFounder = userData.role === 'founder';
-                const showFounderOption = canAssignFounder || user.role === 'founder';
+                const showFounderOption = canAssignFounder || user.role === 'founder'; // Show founder option if current user is founder or if target user is already a founder
 
                 return `
                     <tr data-user-id="${user.id}" class="hover:bg-gray-50">
@@ -1597,14 +1692,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     showMessageModal(`Are you sure you want to change this user's role to "${newRole}"?`, 'confirm', async () => {
                         try {
                             const success = await updateUserRoleFirestore(userId, newRole);
-                            if (success) {
+                            if (success) { // Only show success if the operation actually proceeded (not blocked by self-check)
                                 showMessageModal(`User role updated to "${newRole}" successfully!`);
-                                renderAdminPanelPage();
+                                renderAdminPanelPage(); // Re-render admin panel to reflect changes
                             }
                         }
                         catch (error) {
                             showMessageModal(error.message, 'error');
-                            renderAdminPanelPage();
+                            renderAdminPanelPage(); // Re-render to revert dropdown if failed
                         }
                     });
                 });
@@ -1666,7 +1761,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum'));
-        document.getElementById('manage-rooms-admin-btn').addEventListener('click', () => renderAdminPanelPage()); // Already on this page, but useful if we add tabs
+        // Clicking "Manage Rooms" just re-renders the current admin panel
+        document.getElementById('manage-rooms-admin-btn').addEventListener('click', () => renderAdminPanelPage()); 
         document.getElementById('create-room-btn').addEventListener('click', () => showCreateRoomModal());
     }
 
@@ -1839,17 +1935,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Renders the Create Post page for admins/founders.
-     * This page is now removed and creation happens directly on forum.
-     */
-    // function renderCreatePostPage() { /* ... removed ... */ }
-
-    /**
      * Renders the Edit Post page for admins/founders.
      * @param {string} postId - The ID of the post to edit.
      */
     async function renderEditPostPage(postId) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        if (!currentUser || !userData || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            console.warn("Attempted to render Edit Post page without sufficient privileges.");
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -1926,6 +2017,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function renderForumPage() {
         if (!currentUser) {
+            console.warn("Attempted to render Forum page without current user.");
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -1949,7 +2041,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Forum & Announcements</h2>
-                    ${userData.role === 'admin' || userData.role === 'founder' ? `
+                    ${(userData && (userData.role === 'admin' || userData.role === 'founder')) ? `
                         <div class="mb-6 text-center">
                             <button id="create-post-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
                                 Create New Post
@@ -1980,7 +2072,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         </div>
 
                                         <!-- Admin Actions (Edit/Delete) -->
-                                        ${userData.role === 'admin' || userData.role === 'founder' ? `
+                                        ${(userData && (userData.role === 'admin' || userData.role === 'founder')) ? `
                                             <div class="ml-auto space-x-2">
                                                 <button class="text-blue-600 hover:text-blue-800 font-semibold" data-post-id="${post.id}" data-action="edit">Edit</button>
                                                 <button class="text-red-600 hover:text-red-800 font-semibold" data-post-id="${post.id}" data-action="delete">Delete</button>
@@ -2078,6 +2170,10 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Shows a modal for creating a new post.
      */
     function showCreatePostModal() {
+        if (currentModal) {
+            currentModal.remove();
+        }
+
         const modal = document.createElement('div');
         modal.id = 'create-post-modal';
         modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
@@ -2132,6 +2228,18 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Renders the "Meet the Team" page.
      */
     async function renderTeamPage() {
+        if (!currentUser) {
+             console.warn("Attempted to render Team page without current user.");
+             contentArea.innerHTML = `
+                 <div class="flex flex-col items-center justify-center p-4">
+                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                         <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                         <p class="text-lg text-gray-700">Please sign in to view the team members.</p>
+                     </div>
+                 </div>
+             `;
+             return;
+         }
         showLoadingSpinner();
         let teamMembers = [];
         try {
@@ -2142,7 +2250,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             hideLoadingSpinner();
         }
 
-        const isAdminOrFounder = currentUser && (userData.role === 'admin' || userData.role === 'founder');
+        const isAdminOrFounder = currentUser && (userData && (userData.role === 'admin' || userData.role === 'founder'));
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
@@ -2264,6 +2372,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (icon) icon.classList.remove('rotate-180');
         });
 
+        // Handle logout outside of switch to ensure consistent sign out flow
         if (page === 'logout') {
             showLoadingSpinner();
             try {
@@ -2271,17 +2380,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentUser = null;
                 userData = null;
                 showMessageModal('You have been signed out.');
-                page = 'home'; // Redirect to home after logout
+                window.location.href = 'index.html'; // Full refresh to home
             } catch (error) {
                 console.error("Error signing out:", error.message);
                 showMessageModal("Failed to sign out. Please try again.", 'error');
-                hideLoadingSpinner();
-                return; // Prevent navigating away if sign out fails
             } finally {
                 hideLoadingSpinner();
             }
+            return; // Exit navigateTo
         }
 
+        // Redirect to full HTML pages if needed
+        if (page.endsWith('.html')) {
+            window.location.href = page;
+            return;
+        }
+
+        // For in-page navigation (fragments)
         switch (page) {
             case 'home':
                 renderHomePage();
@@ -2298,7 +2413,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'admin':
                 renderAdminPanelPage();
                 break;
-            // Removed 'create-post' as a direct navigation target, now part of forum page actions
             case 'edit-post': // For editing existing posts
                 if (id) {
                     renderEditPostPage(id);
@@ -2312,9 +2426,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
             case 'team': // New Team page
                 renderTeamPage();
-                break;
-            case 'rooms': // Navigate to the new rooms.html file
-                window.location.href = 'rooms.html';
                 break;
             default:
                 renderHomePage();
@@ -2351,83 +2462,58 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Firebase Auth State Listener
     // This is the most critical part for initial load and ongoing authentication state changes
     onAuthStateChanged(auth, async (user) => {
+        console.log("onAuthStateChanged triggered. User:", user ? user.uid : "null");
         showLoadingSpinner();
-        if (user) {
-            currentUser = user;
-            try {
-                const fetchedUserData = await fetchCurrentUserFirestoreData();
-                if (fetchedUserData) {
-                    userData = fetchedUserData;
-                } else {
-                    // This scenario should be rare if signup works correctly, but handles edge cases
-                    // where a user exists in Auth but not Firestore.
-                    console.warn("User exists in Auth but not Firestore. Creating default entry.");
-                    const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
-                    // Prioritize photoURL from auth provider, fallback to placeholder
-                    const defaultProfilePic = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.displayName || user.email || 'U').charAt(0).toUpperCase()}`;
-                    const defaultBackground = 'bg-gradient-to-r from-blue-400 to-purple-600';
-                    await setDoc(userDocRef, {
-                        email: user.email,
-                        username: user.displayName || user.email?.split('@')[0],
-                        role: 'member',
-                        profilePicUrl: defaultProfilePic,
-                        backgroundUrl: defaultBackground
-                    });
-                    userData = {
-                        email: user.email,
-                        username: user.displayName || user.email?.split('@')[0],
-                        role: 'member',
-                        profilePicUrl: defaultProfilePic,
-                        backgroundUrl: defaultBackground
-                    };
-                }
-                updateBodyBackground(); // Apply user's saved background
-                renderNavbar(); // Update navbar with user info
-                // Determine which page to render based on current state or previous navigation
-                let pageToRender = contentArea.dataset.currentPage || 'home';
-                let currentId = contentArea.dataset.currentId || null;
-
-                if (pageToRender === 'auth' || pageToRender === 'logout') {
-                    pageToRender = 'home'; // Always redirect to home if coming from auth/logout
-                }
-                navigateTo(pageToRender, currentId); // Navigate to the appropriate page
-
-            } catch (error) {
-                console.error("Error setting up user data after auth state change:", error);
-                // Attempt to sign out if data fetching fails critically
-                await signOut(auth);
+        try {
+            if (user) {
+                currentUser = user;
+                userData = await fetchCurrentUserFirestoreData(); // This also handles creating default doc if missing
+                console.log("Auth state: Logged in. User data:", userData);
+            } else {
                 currentUser = null;
                 userData = null;
-                showMessageModal("Failed to load user data. Please try signing in again.", 'error');
-                navigateTo('auth');
+                console.log("Auth state: Logged out.");
             }
-        } else {
+            isAuthReady = true; // Mark auth state as ready
+            updateBodyBackground(); // Apply user's saved background or default
+            renderNavbar(); // Always update navbar based on current auth state
+
+            // Determine which page to render based on current URL hash or default
+            const currentHash = window.location.hash.substring(1); // Remove '#'
+            let pageToRender = currentHash || 'home';
+            let currentId = contentArea.dataset.currentId || null; // Preserve ID if it was set before refresh
+
+            // Ensure navigation to protected pages is handled after auth state is ready
+            const protectedPages = ['profile', 'admin', 'forum', 'team', 'edit-post'];
+            const needsAuth = protectedPages.includes(pageToRender);
+
+            if (needsAuth && !currentUser) {
+                console.log(`Redirecting from protected page '${pageToRender}' to 'home' due to no current user.`);
+                navigateTo('home'); // Redirect to home if trying to access protected page while logged out
+            } else {
+                console.log(`Navigating to page: '${pageToRender}' with ID: '${currentId}'`);
+                navigateTo(pageToRender, currentId); // Proceed with rendering the page
+            }
+
+        } catch (error) {
+            console.error("Error in onAuthStateChanged:", error);
+            showMessageModal(`Critical error during authentication setup: ${error.message}. Please try again.`, 'error', () => {
+                signOut(auth); // Attempt to sign out on critical error
+                window.location.href = 'index.html'; // Force reload to clean state
+            });
             currentUser = null;
             userData = null;
-            updateBodyBackground(); // Reset to default background
-            renderNavbar(); // Update navbar to logged out state
-            // Only redirect if current page is not home or about, or if it was a protected page
-            if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about' && contentArea.dataset.currentPage !== 'team' && contentArea.dataset.currentPage !== 'rooms') {
-                 navigateTo('home'); // Redirect to home if logged out from a protected page
-            }
+            isAuthReady = true; // Still set true to prevent infinite loading state
+            renderNavbar(); // Render logout state navbar
+            navigateTo('home'); // Go to home page
+        } finally {
+            hideLoadingSpinner();
         }
-        hideLoadingSpinner();
     });
 
 
-    // Initial render call moved inside the DOMContentLoaded listener but outside onAuthStateChanged,
-    // to ensure elements are present for the very first render.
-    // The onAuthStateChanged listener will then handle subsequent renders based on auth state.
-    // It is important that this is called *after* onAuthStateChanged has been set up,
-    // to ensure initial user state can be reacted to.
-    if (!contentArea.dataset.currentPage) { // Only render if no page has been set yet
-        navigateTo('home');
-    }
-
-
-    // Event listeners for static navbar buttons (ensure these are attached AFTER initial DOM render)
-    // The home and about buttons in the main navbar are static in index.html, so their event listeners
-    // are attached here, but they are *not* added dynamically by renderNavbar
+    // Initial render call for static nav buttons.
+    // The main page content render is now handled by onAuthStateChanged after auth is ready.
     if (navHomeButton) { // Defensive check
         navHomeButton.addEventListener('click', () => navigateTo('home'));
     } else {
@@ -2444,5 +2530,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (mobileDrawerAboutButton) { // Defensive check
         mobileDrawerAboutButton.addEventListener('click', () => navigateTo('about'));
+    }
+
+    // Handle initial page load based on URL hash if no direct navigation has happened yet
+    if (!window.location.hash && !contentArea.dataset.currentPage) {
+        console.log("No hash or current page set. Navigating to home on initial load.");
+        // This initial call will trigger renderHomePage, and then onAuthStateChanged will re-render
+        // if user data changes the UI.
+        navigateTo('home');
     }
 });
