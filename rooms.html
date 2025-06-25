@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-    <script src="./config.js"></script>
+    <script src="./config.js"></script> <!-- Ensure this path is correct and config.js exists -->
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -228,40 +228,54 @@
         async function initializeFirebaseAndAuth() {
             showLoadingSpinner();
             try {
-                let firebaseConfig;
-                let appId;
-                let initialAuthToken;
+                let firebaseConfigData = null; // Renamed to avoid confusion with the object
+                let appIdData = null;
+                let authToken = null; // Renamed to avoid confusion
 
-                // Prioritize global variables from Canvas runtime if available
+                // 1. Prioritize global variables from Canvas runtime
                 if (typeof __firebase_config !== 'undefined' && typeof __app_id !== 'undefined') {
-                    firebaseConfig = JSON.parse(__firebase_config);
-                    appId = __app_id;
-                    initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                    firebaseConfigData = JSON.parse(__firebase_config);
+                    appIdData = __app_id;
+                    authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
                     console.log("Firebase config loaded from global Canvas variables.");
-                } else {
-                    // Fallback to localStorage if not running in Canvas or globals not present
+                }
+                // 2. Fallback to CONFIG object from direct script import (config.js)
+                else if (typeof CONFIG !== 'undefined' && CONFIG.firebaseConfig) {
+                    firebaseConfigData = CONFIG.firebaseConfig;
+                    appIdData = CONFIG.firebaseConfig.projectId; // Assuming projectId is the APP_ID
+                    // Auth token from global won't be in CONFIG, so still need localStorage or direct
+                    authToken = localStorage.getItem('__initial_auth_token'); // Try localStorage for auth token
+                    console.log("Firebase config loaded from config.js global variable.");
+                }
+                // 3. Fallback to localStorage
+                else {
                     const configString = localStorage.getItem('firebaseConfig');
                     const appIdString = localStorage.getItem('APP_ID');
-                    initialAuthToken = localStorage.getItem('__initial_auth_token');
+                    authToken = localStorage.getItem('__initial_auth_token');
 
                     if (!configString || !appIdString) {
                         throw new Error("Firebase configuration or App ID not found. Please log in through the main application.");
                     }
-                    firebaseConfig = JSON.parse(configString);
-                    appId = appIdString;
+                    firebaseConfigData = JSON.parse(configString);
+                    appIdData = appIdString;
                     console.log("Firebase config loaded from localStorage.");
                 }
 
-                APP_ID = appId; // Set global APP_ID
+                // If none of the above sources yielded data, throw an error
+                if (!firebaseConfigData || !appIdData) {
+                    throw new Error("Firebase configuration or App ID could not be determined. Please ensure config.js is loaded or log in via the main application.");
+                }
 
-                app = initializeApp(firebaseConfig);
+                APP_ID = appIdData; // Set global APP_ID with the determined value
+
+                app = initializeApp(firebaseConfigData); // Use determined config
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                // Use the custom auth token if available, otherwise sign in anonymously
-                if (initialAuthToken) {
+                // Use the determined auth token
+                if (authToken) {
                     try {
-                        await signInWithCustomToken(auth, initialAuthToken);
+                        await signInWithCustomToken(auth, authToken);
                         console.log("Signed in with custom token.");
                     } catch (error) {
                         console.warn("Custom token sign-in failed, trying anonymous:", error);
