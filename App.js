@@ -6,7 +6,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
-import CONFIG from './config.js';
+import CONFIG from './config.js'; // Retained as per user request
 
 // Import configuration from config.js
 // This import is typically used for local development outside the Canvas environment.
@@ -14,15 +14,19 @@ import CONFIG from './config.js';
 // import CONFIG from './config.js'; // Make sure config.js is in the same directory
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Use Firebase configuration from config.js
+    // Use Firebase configuration from config.js as requested
     const firebaseConfig = CONFIG.firebaseConfig;
+
+    // Use global variables provided by the Canvas environment for APP_ID and initialAuthToken,
+    // falling back to defaults or values from config.js if not defined by Canvas.
+    const APP_ID = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
 
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    // Use the projectId as the APP_ID for consistent Firestore collection paths and rules
-    const APP_ID = firebaseConfig.projectId;
 
     // Initialize Auth Provider for Google
     const googleProvider = new GoogleAuthProvider();
@@ -2194,14 +2198,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentUser = user;
             try {
                 // Attempt to sign in with custom token if available (Canvas environment)
-                if (initialAuthToken && user.uid === 'anonymous_user_id') { // Check if it's an anonymous user that might need token upgrade
+                // This check needs to be conditional and careful to not re-authenticate already authenticated users.
+                // The `user.uid === 'anonymous_user_id'` check is a placeholder; a more robust check might be needed
+                // depending on how anonymous users are handled in your specific Canvas setup.
+                if (initialAuthToken && user.isAnonymous) { // More reliably check for anonymous user
                      try {
                         await signInWithCustomToken(auth, initialAuthToken);
                         // After custom token sign-in, the onAuthStateChanged will fire again with the authenticated user
                         // So we can return here and let the next event handle the rest.
                         return;
                     } catch (error) {
-                        console.error("Error signing in with custom token on auth state change:", error);
+                        console.error("Error signing in with custom token on auth state change (anonymous user):", error);
                         // Fallback: If custom token fails, proceed with the existing user (could be anonymous)
                     }
                 }
