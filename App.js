@@ -5,7 +5,7 @@
 // Import Firebase functions
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js"; // Added deleteField
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 // Import configuration from config.js
 import CONFIG from './config.js'; // Make sure config.js is in the same directory
@@ -28,13 +28,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // DOM Elements
     const contentArea = document.getElementById('content-area');
-    const navLinks = document.getElementById('nav-links');
-    const mobileMenu = document.getElementById('mobile-menu');
+    const navLinks = document.getElementById('nav-links'); // Desktop nav links
+    const sideDrawerMenu = document.getElementById('side-drawer-menu'); // New: Side drawer menu container
+    const overlayBackdrop = document.getElementById('overlay-backdrop'); // New: Overlay for side drawer
     const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
     const mobileMenuIconOpen = document.getElementById('mobile-menu-icon-open');
     const mobileMenuIconClose = document.getElementById('mobile-menu-icon-close');
     const navHomeButton = document.getElementById('nav-home');
-    const navAboutButton = document.getElementById('nav-about');
+    const navAboutButton = document.getElementById('nav-about'); // Desktop about button reference
+    const mobileDrawerHomeButton = document.getElementById('mobile-drawer-home'); // New: Home button in side drawer
+    const mobileDrawerAboutButton = document.getElementById('mobile-drawer-about'); // New: About button in side drawer
 
     // Global State Variables
     let currentUser = null; // Firebase Auth user object
@@ -328,7 +331,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<Array<object>>} - List of all users.
      */
     async function fetchAllUsersFirestore() {
-        if (!currentUser || userData.role !== 'admin') {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             throw new Error("Not authorized to view users list.");
         }
 
@@ -360,17 +363,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Updates a user's role by an admin in Firestore.
+     * Updates a user's role by an admin/founder in Firestore.
      * @param {string} userId - ID of the user to update.
-     * @param {string} newRole - The new role ('member' or 'admin').
+     * @param {string} newRole - The new role ('member', 'admin', or 'founder').
      * @returns {Promise<boolean>} - True on success.
      */
     async function updateUserRoleFirestore(userId, newRole) {
-        if (!currentUser || userData.role !== 'admin') {
+        // Only admins can change roles, but founders can change any role.
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             throw new Error("Not authorized to change roles.");
         }
+        
+        // Prevent admins from setting founder role (only founders can do this)
+        if (newRole === 'founder' && userData.role !== 'founder') {
+            throw new Error("Only a founder can assign the 'founder' role.");
+        }
+
+        // Prevent self-demotion from founder/admin, or self-deletion from any role via the panel.
         if (userId === currentUser.uid) {
-            throw new Error("You cannot change your own role from the admin panel.");
+            showMessageModal("You cannot change your own role or delete your own account from the admin panel. Please manage your own profile in the 'Profile' section.", 'info');
+            return false; // Indicate operation was not performed due to safety check
         }
 
         showLoadingSpinner();
@@ -387,18 +399,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Deletes a user's data from Firestore by an admin.
+     * Deletes a user's data from Firestore by an admin/founder.
      * Note: This does NOT delete the user from Firebase Authentication.
      * For full deletion, server-side code (e.g., using Firebase Admin SDK) is required.
      * @param {string} userId - ID of the user to delete.
      * @returns {Promise<boolean>} - True on success.
      */
     async function deleteUserFirestore(userId) {
-        if (!currentUser || userData.role !== 'admin') {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             throw new Error("Not authorized to delete users.");
         }
         if (userId === currentUser.uid) {
-            throw new Error("You cannot delete your own account from the admin panel.");
+            showMessageModal("You cannot delete your own account from the admin panel.", 'info');
+            return false;
         }
 
         showLoadingSpinner();
@@ -416,14 +429,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Creates a new post in Firestore.
-     * Only callable by admins.
+     * Only callable by admins and founders.
      * @param {string} title - The title of the post.
      * @param {string} content - The content of the post.
      * @returns {Promise<void>}
      */
     async function createPostFirestore(title, content) {
-        if (!currentUser || userData.role !== 'admin') {
-            throw new Error("Only admins can create posts.");
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can create posts.");
         }
         showLoadingSpinner();
         try {
@@ -448,15 +461,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Updates an existing post in Firestore.
-     * Only callable by admins.
+     * Only callable by admins and founders.
      * @param {string} postId - The ID of the post to update.
      * @param {string} title - The new title.
      * @param {string} content - The new content.
      * @returns {Promise<void>}
      */
     async function updatePostFirestore(postId, title, content) {
-        if (!currentUser || userData.role !== 'admin') {
-            throw new Error("Only admins can edit posts.");
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can edit posts.");
         }
         showLoadingSpinner();
         try {
@@ -477,13 +490,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Deletes a post from Firestore.
-     * Only callable by admins.
+     * Only callable by admins and founders.
      * @param {string} postId - The ID of the post to delete.
      * @returns {Promise<void>}
      */
     async function deletePostFirestore(postId) {
-        if (!currentUser || userData.role !== 'admin') {
-            throw new Error("Only admins can delete posts.");
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can delete posts.");
         }
         showLoadingSpinner();
         try {
@@ -650,55 +663,65 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Renders the Navbar links based on authentication status.
      */
     function renderNavbar() {
-        navLinks.innerHTML = '';
-        mobileMenu.innerHTML = '';
+        // Clear desktop nav links
+        if (navLinks) {
+            navLinks.innerHTML = '';
+        } else {
+            console.warn("Element with ID 'nav-links' not found. Desktop navigation may not render correctly.");
+        }
+        
+        // Clear only dynamically added items from side drawer (keeping static Home/About)
+        // Find the index of the first dynamic button (or the length if none)
+        let firstDynamicIndex = 2; // Assuming mobile-drawer-home and mobile-drawer-about are always first 2 static elements
+        if (sideDrawerMenu) {
+            while (sideDrawerMenu.children.length > firstDynamicIndex) {
+                sideDrawerMenu.removeChild(sideDrawerMenu.lastChild);
+            }
+        } else {
+            console.warn("Element with ID 'side-drawer-menu' not found. Mobile navigation may not render correctly.");
+        }
 
         // Update website title from config.js
         document.querySelector('title').textContent = CONFIG.websiteTitle;
-        document.getElementById('nav-home').textContent = CONFIG.websiteTitle; // Update home button text
+        // The navHomeButton is a static element for the main title, already in index.html
+        if (navHomeButton) {
+            navHomeButton.textContent = CONFIG.websiteTitle;
+        } else {
+            console.warn("Element with ID 'nav-home' not found. Main title may not be functional.");
+        }
 
-        const createButton = (id, text, page, iconHtml = '') => {
+
+        // Helper to create a button for a given menu (desktop or mobile)
+        const createAndAppendButton = (container, id, text, page, iconHtml = '', isMobile = false) => {
+            if (!container) return; // Defensive check
+
             const btn = document.createElement('button');
             btn.id = id;
-            btn.className = `px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}`;
+            btn.className = `
+                ${isMobile ? 'block w-full text-left px-4 py-3 text-lg font-semibold' : 'px-4 py-2'}
+                rounded-lg hover:bg-gray-700 text-white transition duration-200
+                ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : 
+                  (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : 
+                  (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : 
+                  (id.includes('founder') ? 'bg-purple-800 hover:bg-purple-900 shadow-md' : '')))}
+            `;
             btn.innerHTML = `${iconHtml}<span>${text}</span>`;
             btn.addEventListener('click', () => {
                 navigateTo(page);
-                // Hide mobile menu if open
-                if (!mobileMenu.classList.contains('hidden')) {
-                    mobileMenu.classList.add('hidden');
-                    mobileMenuIconOpen.classList.remove('hidden');
-                    mobileMenuIconClose.classList.add('hidden');
-                }
+                // Close side drawer after navigation
+                closeSideDrawer();
             });
-            return btn;
-        };
-
-        const createMobileButton = (id, text, page) => {
-            const btn = document.createElement('button');
-            btn.id = id;
-            btn.className = `block w-full text-left px-4 py-2 hover:bg-gray-700 text-white transition duration-200 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700' : (id.includes('auth') ? 'bg-green-600 hover:bg-green-700' : (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700' : ''))}`;
-            btn.textContent = text;
-            btn.addEventListener('click', () => {
-                navigateTo(page);
-                // Hide mobile menu if open
-                if (!mobileMenu.classList.contains('hidden')) {
-                    mobileMenu.classList.add('hidden');
-                    mobileMenuIconOpen.classList.remove('hidden');
-                    mobileMenuIconClose.classList.add('hidden');
-                }
-            });
-            return btn;
+            container.appendChild(btn);
         };
 
         if (currentUser && userData) {
-            // Logged in user
-            navLinks.appendChild(createButton('nav-forum', 'Forum', 'forum')); // Forum for all authenticated users
-            mobileMenu.appendChild(createMobileButton('mobile-nav-forum', 'Forum', 'forum'));
-
-            if (userData.role === 'admin') {
-                navLinks.appendChild(createButton('nav-admin', 'Admin Panel', 'admin'));
-                mobileMenu.appendChild(createMobileButton('mobile-nav-admin', 'Admin Panel', 'admin'));
+            // Logged in user - Desktop Links
+            createAndAppendButton(navLinks, 'nav-forum', 'Forum', 'forum');
+            if (userData.role === 'admin' || userData.role === 'founder') {
+                createAndAppendButton(navLinks, 'nav-admin', 'Admin Panel', 'admin');
+            }
+            if (userData.role === 'founder') { // New: Founder Panel for desktop
+                createAndAppendButton(navLinks, 'nav-founder', 'Founder Panel', 'admin');
             }
 
             const profileIconSrc = userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`;
@@ -706,22 +729,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <img src="${profileIconSrc}" alt="Profile" class="w-8 h-8 rounded-full object-cover border-2 border-gray-400"
                      onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}'">`;
 
-            const profileBtn = document.createElement('button');
-            profileBtn.id = 'nav-profile';
-            profileBtn.className = 'px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 flex items-center space-x-2';
-            profileBtn.innerHTML = `${profileIconHtml}<span>${userData.username || currentUser.email}</span>`;
-            profileBtn.addEventListener('click', () => navigateTo('profile'));
-            navLinks.appendChild(profileBtn);
+            createAndAppendButton(navLinks, 'nav-profile', userData.username || currentUser.email, 'profile', profileIconHtml);
+            createAndAppendButton(navLinks, 'nav-sign-out', 'Sign Out', 'logout');
 
-            navLinks.appendChild(createButton('nav-sign-out', 'Sign Out', 'logout'));
-            mobileMenu.appendChild(createMobileButton('mobile-nav-profile', 'Profile', 'profile'));
-            mobileMenu.appendChild(createMobileButton('mobile-nav-sign-out', 'Sign Out', 'logout'));
+
+            // Logged in user - Mobile Drawer Links
+            createAndAppendButton(sideDrawerMenu, 'mobile-nav-forum', 'Forum', 'forum', '', true);
+            if (userData.role === 'admin' || userData.role === 'founder') {
+                createAndAppendButton(sideDrawerMenu, 'mobile-nav-admin', 'Admin Panel', 'admin', '', true);
+            }
+            if (userData.role === 'founder') { // New: Founder Panel for mobile
+                createAndAppendButton(sideDrawerMenu, 'mobile-nav-founder', 'Founder Panel', 'admin', '', true);
+            }
+            createAndAppendButton(sideDrawerMenu, 'mobile-nav-profile', 'Profile', 'profile', '', true);
+            createAndAppendButton(sideDrawerMenu, 'mobile-nav-sign-out', 'Sign Out', 'logout', '', true);
+
         } else {
-            // Not logged in
-            navLinks.appendChild(createButton('nav-auth', 'Sign In / Up', 'auth'));
-            mobileMenu.appendChild(createMobileButton('mobile-nav-auth', 'Sign In / Up', 'auth'));
+            // Not logged in - Desktop Links
+            createAndAppendButton(navLinks, 'nav-auth', 'Sign In / Up', 'auth');
+
+            // Not logged in - Mobile Drawer Links
+            createAndAppendButton(sideDrawerMenu, 'mobile-nav-auth', 'Sign In / Up', 'auth', '', true);
         }
-        mobileMenu.appendChild(createMobileButton('mobile-nav-about', 'About', 'about')); // About always in mobile
     }
 
     /**
@@ -748,7 +777,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button id="go-to-forum-btn" class="py-3 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Visit Forum
                         </button>
-                        ${userData.role === 'admin' ? `
+                        ${userData.role === 'admin' || userData.role === 'founder' ? `
                         <button id="go-to-admin-btn" class="py-3 px-6 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Admin Panel
                         </button>` : ''}
@@ -767,7 +796,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (currentUser && userData) {
             document.getElementById('go-to-profile-btn').addEventListener('click', () => navigateTo('profile'));
             document.getElementById('go-to-forum-btn').addEventListener('click', () => navigateTo('forum'));
-            if (userData.role === 'admin') {
+            if (userData.role === 'admin' || userData.role === 'founder') {
                 document.getElementById('go-to-admin-btn').addEventListener('click', () => navigateTo('admin'));
             }
         } else {
@@ -1032,7 +1061,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Renders the Admin Panel page.
      */
     async function renderAdminPanelPage() {
-        if (!currentUser || !userData || userData.role !== 'admin') {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -1106,7 +1135,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Ensure the content is reset before mapping new users to avoid duplication on re-render
             usersTableBody.innerHTML = usersList.map(user => {
                 const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
-                const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; // Use currentUser.uid
+                // Disable controls for the current user to prevent self-demotion/deletion via UI
+                const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; 
+                // Only founders can assign the 'founder' role
+                const canAssignFounder = userData.role === 'founder';
+                const showFounderOption = canAssignFounder || user.role === 'founder'; // Show founder option if current user is founder or if target user is already a founder
 
                 return `
                     <tr data-user-id="${user.id}" class="hover:bg-gray-50">
@@ -1127,6 +1160,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             >
                                 <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
                                 <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                ${showFounderOption ? `<option value="founder" ${user.role === 'founder' ? 'selected' : ''}>Founder</option>` : ''}
                             </select>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1149,9 +1183,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const newRole = e.target.value;
                     showMessageModal(`Are you sure you want to change this user's role to "${newRole}"?`, 'confirm', async () => {
                         try {
-                            await updateUserRoleFirestore(userId, newRole);
-                            showMessageModal(`User role updated to "${newRole}" successfully!`);
-                            renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                            const success = await updateUserRoleFirestore(userId, newRole);
+                            if (success) { // Only show success if the operation actually proceeded (not blocked by self-check)
+                                showMessageModal(`User role updated to "${newRole}" successfully!`);
+                                renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                            }
                         }
                         catch (error) {
                             showMessageModal(error.message, 'error');
@@ -1167,9 +1203,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const username = e.target.dataset.username;
                     showMessageModal(`Are you sure you want to delete user "${username}"? This action cannot be undone and will only remove their data from Firestore.`, 'confirm', async () => {
                         try {
-                            await deleteUserFirestore(userId);
-                            showMessageModal(`User "${username}" data deleted successfully!`);
-                            renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                            const success = await deleteUserFirestore(userId);
+                            if (success) { // Only show success if the operation actually proceeded
+                                showMessageModal(`User "${username}" data deleted successfully!`);
+                                renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                            }
                         } catch (error) {
                             showMessageModal(error.message, 'error');
                         }
@@ -1178,14 +1216,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         document.getElementById('create-post-btn').addEventListener('click', () => navigateTo('create-post'));
-        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins can manage from forum view
+        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins/Founders can manage from forum view
     }
 
     /**
-     * Renders the Create Post page for admins.
+     * Renders the Create Post page for admins/founders.
      */
     function renderCreatePostPage() {
-        if (!currentUser || userData.role !== 'admin') {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -1233,11 +1271,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Renders the Edit Post page for admins.
+     * Renders the Edit Post page for admins/founders.
      * @param {string} postId - The ID of the post to edit.
      */
     async function renderEditPostPage(postId) {
-        if (!currentUser || userData.role !== 'admin') {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -1360,7 +1398,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         </div>
 
                                         <!-- Admin Actions (Edit/Delete) -->
-                                        ${userData.role === 'admin' ? `
+                                        ${userData.role === 'admin' || userData.role === 'founder' ? `
                                             <div class="ml-auto space-x-2">
                                                 <button class="text-blue-600 hover:text-blue-800 font-semibold" data-post-id="${post.id}" data-action="edit">Edit</button>
                                                 <button class="text-red-600 hover:text-red-800 font-semibold" data-post-id="${post.id}" data-action="delete">Delete</button>
@@ -1447,6 +1485,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Navigation and Initialization ---
 
     /**
+     * Closes the side drawer menu.
+     */
+    function closeSideDrawer() {
+        if (sideDrawerMenu) sideDrawerMenu.classList.remove('open');
+        if (overlayBackdrop) overlayBackdrop.classList.remove('visible');
+        if (mobileMenuIconOpen) mobileMenuIconOpen.classList.remove('hidden');
+        if (mobileMenuIconClose) mobileMenuIconClose.classList.add('hidden');
+    }
+
+    /**
      * Navigates to a specific page and renders its content.
      * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout').
      * @param {string} [postId=null] - Optional: postId for edit-post route.
@@ -1510,14 +1558,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderNavbar(); // Always re-render navbar after page change to update login/logout state
     }
 
-    // Mobile menu toggle
-    mobileMenuToggle.addEventListener('click', () => {
-        const isHidden = mobileMenu.classList.contains('hidden');
-        mobileMenu.classList.toggle('hidden', !isHidden);
-        mobileMenuIconOpen.classList.toggle('hidden', isHidden); // Show open icon when hidden, hide when not hidden
-        mobileMenuIconClose.classList.toggle('hidden', !isHidden); // Show close icon when not hidden, hide when hidden
-    });
+    // Mobile menu toggle (for side drawer)
+    if (mobileMenuToggle) { // Defensive check
+        mobileMenuToggle.addEventListener('click', () => {
+            // Check if sideDrawerMenu exists before trying to access its classList
+            const isOpen = sideDrawerMenu && sideDrawerMenu.classList.contains('open');
+            if (isOpen) {
+                closeSideDrawer();
+            } else {
+                if (sideDrawerMenu) sideDrawerMenu.classList.add('open');
+                if (overlayBackdrop) overlayBackdrop.classList.add('visible');
+                if (mobileMenuIconOpen) mobileMenuIconOpen.classList.add('hidden');
+                if (mobileMenuIconClose) mobileMenuIconClose.classList.remove('hidden');
+            }
+        });
+    } else {
+        console.warn("Element with ID 'mobile-menu-toggle' not found. Mobile menu functionality may be broken.");
+    }
 
+
+    // Close side drawer when clicking on the overlay backdrop
+    if (overlayBackdrop) { // Defensive check
+        overlayBackdrop.addEventListener('click', closeSideDrawer);
+    } else {
+        console.warn("Element with ID 'overlay-backdrop' not found. Mobile menu overlay may not close correctly.");
+    }
 
     // Firebase Auth State Listener
     // This is the most critical part for initial load and ongoing authentication state changes
@@ -1597,6 +1662,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     // Event listeners for static navbar buttons (ensure these are attached AFTER initial DOM render)
-    navHomeButton.addEventListener('click', () => navigateTo('home'));
-    navAboutButton.addEventListener('click', () => navigateTo('about'));
+    // The home and about buttons in the main navbar are static in index.html, so their event listeners
+    // are attached here, but they are *not* added dynamically by renderNavbar
+    if (navHomeButton) { // Defensive check
+        navHomeButton.addEventListener('click', () => navigateTo('home'));
+    } else {
+        console.warn("Element with ID 'nav-home' not found. Home button may not be functional.");
+    }
+    if (navAboutButton) { // Defensive check
+        navAboutButton.addEventListener('click', () => navigateTo('about'));
+    } else {
+        console.warn("Element with ID 'nav-about' not found. About button may not be functional.");
+    }
+    // Event listeners for static mobile drawer buttons (also ensure attached once)
+    if (mobileDrawerHomeButton) { // Defensive check
+        mobileDrawerHomeButton.addEventListener('click', () => navigateTo('home'));
+    }
+    if (mobileDrawerAboutButton) { // Defensive check
+        mobileDrawerAboutButton.addEventListener('click', () => navigateTo('about'));
+    }
 });
