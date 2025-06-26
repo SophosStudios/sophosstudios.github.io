@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SophosWRLD</title> <!-- This title will be updated by config.js -->
+    <title>SophosWRLD - Community</title> <!-- This title will be updated by config.js -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -62,12 +62,12 @@
             visibility: visible;
         }
 
-        /* Hide desktop nav links when mobile menu is open */
-        @media (max-width: 767px) { /* Tailind's md breakpoint is 768px */
+        /* Hide desktop nav links when mobile menu is open - no longer needed as side drawer handles all mobile nav */
+        /* @media (max-width: 767px) {
             #nav-links.hidden-on-mobile-menu-open {
                 display: none;
             }
-        }
+        } */
     </style>
 </head>
 <body class="bg-gradient-to-r from-blue-400 to-purple-600 min-h-screen font-inter">
@@ -86,8 +86,11 @@
             <button id="nav-home" class="text-2xl font-bold hover:text-gray-300 transition duration-200">
                 SophosWRLD
             </button>
+            
+            <!-- Desktop Nav Links -->
             <div class="hidden md:flex space-x-4" id="nav-links">
-                <!-- Desktop Nav links will be dynamically loaded here by App.js -->
+                <button id="nav-about" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200">About</button>
+                <!-- Dynamic links (Forum, Admin, Profile, Sign Out/In) will be loaded here by App.js -->
             </div>
             
         </div>
@@ -95,10 +98,10 @@
 
     <!-- Side Drawer Menu -->
     <div id="side-drawer-menu">
-        <!-- Mobile Nav links will be dynamically loaded here by App.js -->
+        <!-- Static Home and About buttons for the side drawer -->
         <button id="mobile-drawer-home" class="block w-full text-left px-4 py-3 hover:bg-gray-700 text-white transition duration-200 text-lg font-semibold">Home</button>
         <button id="mobile-drawer-about" class="block w-full text-left px-4 py-3 hover:bg-gray-700 text-white transition duration-200 text-lg font-semibold">About</button>
-        <!-- Dynamic links will be appended here -->
+        <!-- Dynamic mobile links (Forum, Admin, Profile, Sign Out/In) will be appended here by App.js -->
     </div>
 
     <main id="content-area" class="flex-grow p-4">
