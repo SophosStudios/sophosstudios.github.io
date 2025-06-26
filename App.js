@@ -720,9 +720,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (userData.role === 'admin' || userData.role === 'founder') {
                 createAndAppendButton(navLinks, 'nav-admin', 'Admin Panel', 'admin');
             }
-            if (userData.role === 'founder') { // New: Founder Panel for desktop
-                createAndAppendButton(navLinks, 'nav-founder', 'Founder Panel', 'admin');
-            }
 
             const profileIconSrc = userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`;
             const profileIconHtml = `
@@ -737,9 +734,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             createAndAppendButton(sideDrawerMenu, 'mobile-nav-forum', 'Forum', 'forum', '', true);
             if (userData.role === 'admin' || userData.role === 'founder') {
                 createAndAppendButton(sideDrawerMenu, 'mobile-nav-admin', 'Admin Panel', 'admin', '', true);
-            }
-            if (userData.role === 'founder') { // New: Founder Panel for mobile
-                createAndAppendButton(sideDrawerMenu, 'mobile-nav-founder', 'Founder Panel', 'admin', '', true);
             }
             createAndAppendButton(sideDrawerMenu, 'mobile-nav-profile', 'Profile', 'profile', '', true);
             createAndAppendButton(sideDrawerMenu, 'mobile-nav-sign-out', 'Sign Out', 'logout', '', true);
