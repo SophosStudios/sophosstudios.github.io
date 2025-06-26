@@ -1,1267 +1,1602 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { initializeApp } from 'firebase/app';
-import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  sendPasswordResetEmail,
-  signInWithCustomToken, // Added this import
-} from 'firebase/auth';
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  onSnapshot,
-  doc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  getDocs,
-  setDoc,
-  serverTimestamp,
-  getDoc,
-  runTransaction
-} from 'firebase/firestore';
+// App.js
+// This script contains the entire application logic, including Firebase initialization
+// and new features like forum, post management, reactions, comments, and enhanced backgrounds.
 
-// Tailwind CSS is loaded via script tag in the return statement
+// Import Firebase functions
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js"; // Added deleteField
 
-// --- Reusable Modal Components ---
-const Modal = ({ show, title, message, onClose, children }) => {
-  if (!show) return null;
-  return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex justify-center items-center z-50 p-4">
-      <div className="bg-white p-6 rounded-lg shadow-2xl max-w-lg w-full flex flex-col max-h-[90vh] overflow-hidden">
-        <h3 className="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">{title}</h3>
-        <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar">
-          {message && <p className="mb-4 text-gray-700">{message}</p>}
-          {children}
-        </div>
-        <div className="flex justify-end mt-4 pt-2 border-t">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+// Import configuration from config.js
+import CONFIG from './config.js'; // Make sure config.js is in the same directory
 
-const ConfirmationModal = ({ show, title, message, onConfirm, onCancel }) => {
-  if (!show) return null;
-  return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex justify-center items-center z-50 p-4">
-      <div className="bg-white p-6 rounded-lg shadow-2xl max-w-sm w-full">
-        <h3 className="text-xl font-bold mb-4 text-gray-800">{title}</h3>
-        <p className="mb-6 text-gray-700">{message}</p>
-        <div className="flex justify-end space-x-3">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75"
-          >
-            Confirm
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+document.addEventListener('DOMContentLoaded', async () => {
+    // Use Firebase configuration from config.js
+    const firebaseConfig = CONFIG.firebaseConfig;
 
-const ErrorModal = ({ show, message, onClose }) => (
-  <Modal show={show} title="Error!" message={message} onClose={onClose} />
-);
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    // Use the projectId as the APP_ID for consistent Firestore collection paths and rules
+    const APP_ID = firebaseConfig.projectId;
 
-const SuccessModal = ({ show, message, onClose }) => (
-  <Modal show={show} title="Success!" message={message} onClose={onClose} />
-);
+    // Initialize Auth Provider for Google
+    const googleProvider = new GoogleAuthProvider();
+    googleProvider.addScope('profile'); // Request profile access
+    googleProvider.addScope('email'); // Request email access
 
-// --- Utility Functions ---
-// Provides a fallback image URL for profile icons that fail to load
-const getProfileIconFallback = (url) => (e) => {
-  e.target.onerror = null;
-  e.target.src = "https://placehold.co/40x40/cccccc/ffffff?text=User"; // Generic placeholder
-  e.target.className += " border border-gray-300"; // Add a subtle border to fallbacks
-};
+    // DOM Elements
+    const contentArea = document.getElementById('content-area');
+    const navLinks = document.getElementById('nav-links');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const mobileMenuIconOpen = document.getElementById('mobile-menu-icon-open');
+    const mobileMenuIconClose = document.getElementById('mobile-menu-icon-close');
+    const navHomeButton = document.getElementById('nav-home');
+    const navAboutButton = document.getElementById('nav-about');
 
-// --- App Component ---
-export default function App() {
-  const [firebaseApp, setFirebaseApp] = useState(null);
-  const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null); // Firebase Auth user object
-  const [userProfile, setUserProfile] = useState(null); // Firestore profile data
-  const [currentPage, setCurrentPage] = useState('home'); // Current view: 'login', 'signup', 'home', 'admin', 'profile'
-  const [loading, setLoading] = useState(true);
-  const [showError, setShowError] = useState({ show: false, message: '' });
-  const [showSuccess, setShowSuccess] = useState({ show: false, message: '' });
+    // Global State Variables
+    let currentUser = null; // Firebase Auth user object
+    let userData = null; // Firestore user document data (role, background, etc.)
+    let usersList = []; // List of all users for admin panel
+    let currentModal = null; // To manage active message modal
 
-  // Initialize Firebase
-  useEffect(() => {
-    try {
-      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-      const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+    // --- Utility Functions ---
 
-      const app = initializeApp(firebaseConfig);
-      const firestore = getFirestore(app);
-      const authentication = getAuth(app);
+    /**
+     * Shows a loading spinner.
+     */
+    function showLoadingSpinner() {
+        let spinner = document.getElementById('loading-spinner');
+        if (!spinner) {
+            spinner = document.createElement('div');
+            spinner.id = 'loading-spinner';
+            spinner.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50';
+            spinner.innerHTML = `<div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-white"></div>`;
+            document.body.appendChild(spinner);
+        }
+    }
 
-      setFirebaseApp(app);
-      setDb(firestore);
-      setAuth(authentication);
+    /**
+     * Hides the loading spinner.
+     */
+    function hideLoadingSpinner() {
+        const spinner = document.getElementById('loading-spinner');
+        if (spinner) {
+            spinner.remove();
+        }
+    }
 
-      // Authenticate with custom token or anonymously
-      onAuthStateChanged(authentication, async (user) => {
-        if (user) {
-          setCurrentUser(user);
-          // Fetch user profile from Firestore
-          const userDocRef = doc(firestore, `artifacts/${appId}/public/data/users`, user.uid);
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            setUserProfile({ id: userDocSnap.id, ...userDocSnap.data() });
-            console.log("User profile loaded:", userDocSnap.data());
-          } else {
-            console.warn("User profile not found in Firestore for UID:", user.uid);
-            // This might happen if a user is created via Auth but their profile document isn't set yet.
-            // Force user to profile setup or create a basic one.
-            setUserProfile(null);
-          }
-          setLoading(false);
+    /**
+     * Displays a message modal.
+     * @param {string} message - The message to display.
+     * @param {string} type - 'info', 'error', or 'confirm'.
+     * @param {function} onConfirm - Callback for 'confirm' type (only for 'confirm' type).
+     */
+    function showMessageModal(message, type = 'info', onConfirm = null) {
+        if (currentModal) {
+            currentModal.remove(); // Remove any existing modal
+        }
+
+        const modal = document.createElement('div');
+        modal.id = 'message-modal';
+        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+
+        let buttonHtml = '';
+        if (type === 'confirm') {
+            buttonHtml = `
+                <div class="flex justify-center space-x-4">
+                    <button id="modal-confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 transform hover:scale-105">
+                        Confirm
+                    </button>
+                    <button id="modal-cancel-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-full transition duration-300 transform hover:scale-105">
+                        Cancel
+                    </button>
+                </div>
+            `;
         } else {
-          setCurrentUser(null);
-          setUserProfile(null);
-          // Try to sign in with custom token provided by the environment
-          try {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-              await signInWithCustomToken(authentication, __initial_auth_token);
-              console.log("Signed in with custom token.");
-            } else {
-              await signInAnonymously(authentication);
-              console.log("Signed in anonymously.");
+            buttonHtml = `
+                <button id="modal-ok-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 transform hover:scale-105">
+                    OK
+                </button>
+            `;
+        }
+
+        modal.innerHTML = `
+            <div class="bg-white p-8 rounded-lg shadow-xl text-center max-w-sm w-full">
+                <p class="text-xl mb-6 ${type === 'error' ? 'text-red-600' : 'text-gray-800'}">${message}</p>
+                ${buttonHtml}
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        currentModal = modal; // Set the current modal reference
+
+        const closeModal = () => {
+            if (currentModal) {
+                currentModal.remove();
+                currentModal = null;
             }
-          } catch (error) {
-            console.error("Error during initial sign-in:", error);
-            setShowError({ show: true, message: `Authentication error: ${error.message}` });
-          }
-          setLoading(false);
+        };
+
+        if (type === 'confirm') {
+            document.getElementById('modal-confirm-btn').onclick = () => {
+                closeModal();
+                if (onConfirm) onConfirm();
+            };
+            document.getElementById('modal-cancel-btn').onclick = closeModal;
+        } else {
+            document.getElementById('modal-ok-btn').onclick = closeModal;
         }
-        setLoading(false);
-      });
-
-    } catch (error) {
-      console.error("Error initializing Firebase:", error);
-      setShowError({ show: true, message: `Firebase initialization failed: ${error.message}` });
-      setLoading(false);
     }
-  }, []);
 
-  // --- Authentication Handlers ---
-  const handleSignUp = async (email, password, username, confirmPassword) => {
-    if (password !== confirmPassword) {
-      setShowError({ show: true, message: "Passwords do not match." });
-      return;
-    }
-    setLoading(true);
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      const userDocRef = doc(db, `artifacts/${__app_id}/public/data/users`, user.uid);
+    /**
+     * Updates the body's background. Can be a Tailwind class string or a direct image URL.
+     */
+    function updateBodyBackground() {
+        // Clear all previous body classes and inline styles to avoid conflicts
+        document.body.className = ''; 
+        document.body.style.backgroundImage = '';
+        document.body.style.backgroundSize = '';
+        document.body.style.backgroundPosition = '';
+        document.body.style.backgroundRepeat = '';
+        document.body.style.backgroundAttachment = '';
 
-      // Check if this is the very first user (potential founder)
-      const usersCollectionRef = collection(db, `artifacts/${__app_id}/public/data/users`);
-      const existingUsers = await getDocs(usersCollectionRef);
-      const isFounder = existingUsers.empty; // If no users exist, this is the founder
-
-      await setDoc(userDocRef, {
-        username: username,
-        email: email,
-        role: isFounder ? 'founder' : 'member', // Assign founder role if first user
-        profileIcon: "https://placehold.co/40x40/cccccc/ffffff?text=User", // Default icon
-        background: "bg-gradient-to-br from-indigo-50 to-blue-100", // Default background
-        createdAt: serverTimestamp(),
-        lastLoginAt: serverTimestamp(),
-      });
-      setUserProfile({
-        id: user.uid,
-        username,
-        email,
-        role: isFounder ? 'founder' : 'member',
-        profileIcon: "https://placehold.co/40x40/cccccc/ffffff?text=User",
-        background: "bg-gradient-to-br from-indigo-50 to-blue-100",
-      });
-      setCurrentUser(user); // Ensure current user state is updated
-      setShowSuccess({ show: true, message: "Account created successfully! Welcome!" });
-      setCurrentPage('home');
-    } catch (error) {
-      console.error("Error signing up:", error);
-      setShowError({ show: true, message: `Sign up failed: ${error.message}` });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignIn = async (email, password) => {
-    setLoading(true);
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      const userDocRef = doc(db, `artifacts/${__app_id}/public/data/users`, user.uid);
-      await updateDoc(userDocRef, {
-        lastLoginAt: serverTimestamp(),
-      });
-      const userDocSnap = await getDoc(userDocRef);
-      if (userDocSnap.exists()) {
-        setUserProfile({ id: userDocSnap.id, ...userDocSnap.data() });
-      } else {
-        // This case should ideally not happen if signup creates the profile,
-        // but as a fallback, create a basic one if missing.
-        await setDoc(userDocRef, {
-          username: `User-${user.uid.substring(0, 5)}`,
-          email: user.email,
-          role: 'member',
-          profileIcon: "https://placehold.co/40x40/cccccc/ffffff?text=User",
-          background: "bg-gradient-to-br from-indigo-50 to-blue-100",
-          createdAt: serverTimestamp(),
-          lastLoginAt: serverTimestamp(),
-        });
-        const newUserDocSnap = await getDoc(userDocRef);
-        setUserProfile({ id: newUserDocSnap.id, ...newUserDocSnap.data() });
-      }
-      setCurrentUser(user); // Ensure current user state is updated
-      setShowSuccess({ show: true, message: "Signed in successfully!" });
-      setCurrentPage('home');
-    } catch (error) {
-      console.error("Error signing in:", error);
-      setShowError({ show: true, message: `Sign in failed: ${error.message}` });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    setLoading(true);
-    try {
-      await signOut(auth);
-      setCurrentUser(null);
-      setUserProfile(null);
-      setShowSuccess({ show: true, message: "Signed out successfully." });
-      setCurrentPage('login');
-    } catch (error) {
-      console.error("Error signing out:", error);
-      setShowError({ show: true, message: `Sign out failed: ${error.message}` });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- Auth & Profile Management Page ---
-  const AuthPage = ({ type, onSignIn, onSignUp, onNavigate }) => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [username, setUsername] = useState('');
-
-    const handleSubmit = (e) => {
-      e.preventDefault();
-      if (type === 'login') {
-        onSignIn(email, password);
-      } else {
-        onSignUp(email, password, username, confirmPassword);
-      }
-    };
-
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 p-4">
-        <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
-          <h2 className="text-4xl font-bold mb-8 text-center text-gray-800">
-            {type === 'login' ? 'Welcome Back!' : 'Join Us!'}
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-200"
-                placeholder="you@example.com"
-              />
-            </div>
-            {type === 'signup' && (
-              <div>
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                <input
-                  type="text"
-                  id="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-200"
-                  placeholder="Your display name"
-                />
-              </div>
-            )}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-200"
-                placeholder="Strong password"
-              />
-            </div>
-            {type === 'signup' && (
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-                <input
-                  type="password"
-                  id="confirmPassword"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-200"
-                  placeholder="Re-enter password"
-                />
-              </div>
-            )}
-            <button
-              type="submit"
-              className="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75"
-            >
-              {type === 'login' ? 'Sign In' : 'Sign Up'}
-            </button>
-          </form>
-          <div className="mt-8 text-center text-gray-600">
-            {type === 'login' ? (
-              <p>Don't have an account? <button onClick={() => onNavigate('signup')} className="text-indigo-600 hover:underline font-medium">Sign Up</button></p>
-            ) : (
-              <p>Already have an account? <button onClick={() => onNavigate('login')} className="text-indigo-600 hover:underline font-medium">Sign In</button></p>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // --- Header Navigation ---
-  const Header = ({ userProfile, onSignOut, onNavigate }) => {
-    return (
-      <header className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-lg p-4 flex flex-col sm:flex-row justify-between items-center sticky top-0 z-40">
-        <div className="flex items-center mb-4 sm:mb-0">
-          <img
-            src={userProfile?.profileIcon || "https://placehold.co/40x40/cccccc/ffffff?text=User"}
-            alt="Profile Icon"
-            className="w-10 h-10 rounded-full mr-3 border-2 border-white object-cover"
-            onError={getProfileIconFallback()}
-          />
-          <h1 className="text-3xl font-extrabold tracking-tight">CodeShare</h1>
-        </div>
-        <nav className="flex flex-wrap justify-center sm:justify-end gap-x-6 gap-y-2 text-lg font-medium">
-          <button onClick={() => onNavigate('home')} className="hover:text-blue-200 transition duration-200">Home</button>
-          {userProfile?.role === 'admin' || userProfile?.role === 'founder' ? (
-            <button onClick={() => onNavigate('admin')} className="hover:text-blue-200 transition duration-200">Admin Panel</button>
-          ) : null}
-          {currentUser && (
-            <button onClick={() => onNavigate('profile')} className="hover:text-blue-200 transition duration-200">Profile</button>
-          )}
-          <button onClick={onSignOut} className="hover:text-blue-200 transition duration-200">Sign Out</button>
-        </nav>
-      </header>
-    );
-  };
-
-  // --- Home Page (Code Feed) ---
-  const HomePage = ({ db, currentUser, userProfile, setShowError, setShowSuccess }) => {
-    const [codePosts, setCodePosts] = useState([]);
-    const [sections, setSections] = useState([]);
-    const [newPostTitle, setNewPostTitle] = useState('');
-    const [newPostCode, setNewPostCode] = useState('');
-    const [newPostLanguage, setNewPostLanguage] = useState('javascript');
-    const [newPostSectionId, setNewPostSectionId] = useState('');
-    const [filterSectionId, setFilterSectionId] = useState('');
-
-    const CODE_LANGUAGES = ['javascript', 'python', 'html', 'css', 'react', 'java', 'c++', 'other'];
-
-    // Fetch sections
-    useEffect(() => {
-      if (!db) return;
-      const sectionsCollectionRef = collection(db, `artifacts/${__app_id}/public/data/sections`);
-      const unsubscribe = onSnapshot(sectionsCollectionRef, (snapshot) => {
-        const fetchedSections = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setSections(fetchedSections.sort((a, b) => a.name.localeCompare(b.name)));
-        if (!newPostSectionId && fetchedSections.length > 0) {
-          setNewPostSectionId(fetchedSections[0].id); // Set default section for new posts
+        if (userData && userData.backgroundUrl) {
+            // Check if it's a direct URL (http or https)
+            if (userData.backgroundUrl.startsWith('http://') || userData.backgroundUrl.startsWith('https://')) {
+                document.body.style.backgroundImage = `url('${userData.backgroundUrl}')`;
+                document.body.style.backgroundSize = 'cover';
+                document.body.style.backgroundPosition = 'center';
+                document.body.style.backgroundRepeat = 'no-repeat';
+                document.body.style.backgroundAttachment = 'fixed'; // Makes background fixed on scroll
+            } else {
+                // Assume it's a Tailwind CSS class string
+                const backgroundClasses = userData.backgroundUrl.split(' ');
+                document.body.classList.add(...backgroundClasses);
+            }
+        } else {
+            // Default fallback if no user data or backgroundUrl
+            document.body.classList.add('bg-gradient-to-r', 'from-blue-400', 'to-purple-600');
         }
-      }, (error) => {
-        console.error("Error fetching sections:", error);
-        setShowError({ show: true, message: `Failed to load sections: ${error.message}` });
-      });
-      return () => unsubscribe();
-    }, [db, newPostSectionId, setShowError]);
+        // Always add core classes for consistent styling
+        document.body.classList.add('min-h-screen', 'font-inter');
+    }
 
-    // Fetch approved code posts
-    useEffect(() => {
-      if (!db) return;
-      const codePostsCollectionRef = collection(db, `artifacts/${__app_id}/public/data/codePosts`);
-      let q = query(codePostsCollectionRef, where('status', '==', 'approved'));
+    // --- Firebase Integration Functions ---
 
-      if (filterSectionId) {
-        q = query(q, where('sectionId', '==', filterSectionId));
-      }
-      // Firestore does not allow orderBy on fields not used in where clause without an index.
-      // We will sort client-side by timestamp for simplicity.
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const fetchedPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // Sort by timestamp descending (latest first)
-        fetchedPosts.sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
-        setCodePosts(fetchedPosts);
-      }, (error) => {
-        console.error("Error fetching code posts:", error);
-        setShowError({ show: true, message: `Failed to load code posts: ${error.message}` });
-      });
-      return () => unsubscribe();
-    }, [db, filterSectionId, setShowError]);
+    /**
+     * Authenticates a user (login or signup) with Firebase Auth and stores user data in Firestore.
+     * Handles Email/Password and Google authentication.
+     * @param {string} type - 'login', 'signup', or 'google'.
+     * @param {object} formData - { email, password, username (for signup) }.
+     * @returns {Promise<object>} - User data or throws error.
+     */
+    async function authenticateUser(type, formData) {
+        showLoadingSpinner();
+        try {
+            let userCredential;
+            let user;
+
+            if (type === 'google') {
+                userCredential = await signInWithPopup(auth, googleProvider);
+                user = userCredential.user;
+            } else if (type === 'signup') {
+                userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+                user = userCredential.user;
+            } else { // login
+                userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+                user = userCredential.user;
+            }
+
+            // After authentication, ensure user data exists in Firestore
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+            const docSnap = await getDoc(userDocRef);
+
+            let fetchedUserData;
+            if (docSnap.exists()) {
+                fetchedUserData = docSnap.data();
+            } else {
+                // Create user document if it doesn't exist (e.g., new Google user)
+                const usernameToUse = user.displayName || user.email?.split('@')[0] || 'User';
+                // Prioritize user.photoURL from auth provider, fallback to placeholder
+                const profilePicToUse = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
+
+                await setDoc(userDocRef, {
+                    email: user.email,
+                    username: usernameToUse,
+                    role: 'member', // Default role for new users
+                    profilePicUrl: profilePicToUse,
+                    backgroundUrl: 'bg-gradient-to-r from-blue-400 to-purple-600' // Default background
+                });
+                const newDocSnap = await getDoc(userDocRef);
+                fetchedUserData = newDocSnap.data();
+            }
+            return fetchedUserData;
+
+        } catch (error) {
+            console.error("Firebase Auth error:", error.message);
+            let errorMessage = "An unknown error occurred.";
+            if (error.code === 'auth/email-already-in-use') {
+                errorMessage = 'This email is already in use.';
+            } else if (error.code === 'auth/invalid-email') {
+                errorMessage = 'Invalid email address.';
+            } else if (error.code === 'auth/weak-password') {
+                errorMessage = 'Password should be at least 6 characters.';
+            } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                errorMessage = 'Invalid email or password.';
+            } else if (error.code === 'auth/popup-closed-by-user') {
+                errorMessage = 'Authentication popup closed.';
+            } else if (error.code === 'auth/cancelled-popup-request') {
+                errorMessage = 'Authentication request cancelled.';
+            } else if (error.code === 'auth/unauthorized-domain') {
+                errorMessage = 'Unauthorized domain. Add your website URL to Firebase Authentication Authorized Domains.';
+            } else if (error.code === 'auth/invalid-api-key') {
+                errorMessage = 'Invalid Firebase API Key. Please check your firebaseConfig.';
+            } else if (error.code === 'auth/account-exists-with-different-credential') {
+                errorMessage = 'Account already exists with a different login method. Try signing in with that method.';
+            }
+            throw new Error(errorMessage); // Re-throw with a user-friendly message
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Sends a password reset email.
+     * @param {string} email - User's email for password reset.
+     * @returns {Promise<void>}
+     */
+    async function sendPasswordReset(email) {
+        showLoadingSpinner();
+        try {
+            await sendPasswordResetEmail(auth, email);
+        } catch (error) {
+            console.error("Password reset error:", error.message);
+            let errorMessage = "Failed to send password reset email. Please try again.";
+            if (error.code === 'auth/user-not-found') {
+                errorMessage = "No account found with that email address.";
+            } else if (error.code === 'auth/invalid-email') {
+                errorMessage = "Invalid email format.";
+            }
+            throw new Error(errorMessage);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Fetches the current user's data from Firestore.
+     * @returns {Promise<object|null>} - User data or null if not authenticated/found.
+     */
+    async function fetchCurrentUserFirestoreData() {
+        if (!currentUser) return null;
+
+        showLoadingSpinner();
+        try {
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
+            const docSnap = await getDoc(userDocRef);
+            if (docSnap.exists()) {
+                return docSnap.data();
+            }
+            console.log("Firestore document for user not found.");
+            return null;
+        } catch (error) {
+            console.error("Error fetching user data from Firestore:", error.message);
+            return null;
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Updates the current user's profile data in Firestore.
+     * @param {object} newUserData - Data to update (username, profilePicUrl, backgroundUrl).
+     * @returns {Promise<object>} - Updated user data.
+     */
+    async function updateProfileData(newUserData) {
+        if (!currentUser) {
+            throw new Error("You must be logged in to update your profile.");
+        }
+
+        showLoadingSpinner();
+        try {
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
+
+            // Update Firebase Auth display name if username changed
+            if (auth.currentUser && auth.currentUser.displayName !== newUserData.username) {
+                await updateProfile(auth.currentUser, { displayName: newUserData.username });
+            }
+
+            // Update Firestore document
+            await updateDoc(userDocRef, newUserData);
+
+            // Fetch the updated document to return the latest state
+            const docSnap = await getDoc(userDocRef);
+            return docSnap.exists() ? docSnap.data() : null;
+        } catch (error) {
+            console.error("Error updating profile in Firestore:", error.message);
+            throw new Error("Failed to update profile. Please try again: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Fetches all users for the admin panel from Firestore.
+     * @returns {Promise<Array<object>>} - List of all users.
+     */
+    async function fetchAllUsersFirestore() {
+        if (!currentUser || userData.role !== 'admin') {
+            throw new Error("Not authorized to view users list.");
+        }
+
+        showLoadingSpinner();
+        try {
+            const usersCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
+            const q = query(usersCollectionRef); // No orderBy() for simplicity with security rules
+
+            const querySnapshot = await new Promise((resolve, reject) => {
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    unsubscribe(); // Unsubscribe immediately after first fetch
+                    resolve(snapshot);
+                }, (error) => {
+                    reject(error);
+                });
+            });
+
+            const usersData = [];
+            querySnapshot.forEach((doc) => {
+                usersData.push({ id: doc.id, ...doc.data() });
+            });
+            return usersData;
+        } catch (error) {
+            console.error("Error fetching all users:", error.message);
+            throw new Error("Failed to fetch users list: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Updates a user's role by an admin in Firestore.
+     * @param {string} userId - ID of the user to update.
+     * @param {string} newRole - The new role ('member' or 'admin').
+     * @returns {Promise<boolean>} - True on success.
+     */
+    async function updateUserRoleFirestore(userId, newRole) {
+        if (!currentUser || userData.role !== 'admin') {
+            throw new Error("Not authorized to change roles.");
+        }
+        if (userId === currentUser.uid) {
+            throw new Error("You cannot change your own role from the admin panel.");
+        }
+
+        showLoadingSpinner();
+        try {
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
+            await updateDoc(userDocRef, { role: newRole });
+            return true;
+        } catch (error) {
+            console.error("Error updating user role in Firestore:", error.message);
+            throw new Error("Failed to update user role: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Deletes a user's data from Firestore by an admin.
+     * Note: This does NOT delete the user from Firebase Authentication.
+     * For full deletion, server-side code (e.g., using Firebase Admin SDK) is required.
+     * @param {string} userId - ID of the user to delete.
+     * @returns {Promise<boolean>} - True on success.
+     */
+    async function deleteUserFirestore(userId) {
+        if (!currentUser || userData.role !== 'admin') {
+            throw new Error("Not authorized to delete users.");
+        }
+        if (userId === currentUser.uid) {
+            throw new Error("You cannot delete your own account from the admin panel.");
+        }
+
+        showLoadingSpinner();
+        try {
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
+            await deleteDoc(userDocRef);
+            return true;
+        } catch (error) {
+            console.error("Error deleting user from Firestore:", error.message);
+            throw new Error("Failed to delete user: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Creates a new post in Firestore.
+     * Only callable by admins.
+     * @param {string} title - The title of the post.
+     * @param {string} content - The content of the post.
+     * @returns {Promise<void>}
+     */
+    async function createPostFirestore(title, content) {
+        if (!currentUser || userData.role !== 'admin') {
+            throw new Error("Only admins can create posts.");
+        }
+        showLoadingSpinner();
+        try {
+            const postsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
+            await setDoc(doc(postsCollectionRef), { // Use setDoc with an auto-generated ID for new doc
+                title: title,
+                content: content,
+                authorId: currentUser.uid,
+                authorUsername: userData.username || currentUser.displayName || currentUser.email,
+                timestamp: serverTimestamp(), // Use server timestamp for consistency
+                reactions: {}, // Initialize empty reactions map
+                comments: [] // Initialize empty comments array
+            });
+            showMessageModal('Post created successfully!');
+        } catch (error) {
+            console.error("Error creating post:", error.message);
+            throw new Error("Failed to create post: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Updates an existing post in Firestore.
+     * Only callable by admins.
+     * @param {string} postId - The ID of the post to update.
+     * @param {string} title - The new title.
+     * @param {string} content - The new content.
+     * @returns {Promise<void>}
+     */
+    async function updatePostFirestore(postId, title, content) {
+        if (!currentUser || userData.role !== 'admin') {
+            throw new Error("Only admins can edit posts.");
+        }
+        showLoadingSpinner();
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            await updateDoc(postDocRef, {
+                title: title,
+                content: content,
+                // Do not update author or timestamp here, only content
+            });
+            showMessageModal('Post updated successfully!');
+        } catch (error) {
+            console.error("Error updating post:", error.message);
+            throw new Error("Failed to update post: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Deletes a post from Firestore.
+     * Only callable by admins.
+     * @param {string} postId - The ID of the post to delete.
+     * @returns {Promise<void>}
+     */
+    async function deletePostFirestore(postId) {
+        if (!currentUser || userData.role !== 'admin') {
+            throw new Error("Only admins can delete posts.");
+        }
+        showLoadingSpinner();
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            await deleteDoc(postDocRef);
+            showMessageModal('Post deleted successfully!');
+        } catch (error) {
+            console.error("Error deleting post:", error.message);
+            throw new Error("Failed to delete post: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Adds/updates a reaction to a post.
+     * Any authenticated user can react.
+     * @param {string} postId - The ID of the post.
+     * @param {string} emoji - The emoji character (e.g., '👍', '❤️').
+     * @returns {Promise<void>}
+     */
+    async function addReactionToPost(postId, emoji) {
+        if (!currentUser) {
+            showMessageModal("You must be logged in to react to posts.", 'info');
+            return;
+        }
+        showLoadingSpinner();
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            const postSnap = await getDoc(postDocRef);
+
+            if (postSnap.exists()) {
+                const postData = postSnap.data();
+                const currentReactions = postData.reactions || {};
+                
+                // Get the user's previously reacted emoji for this post, if any
+                const userPreviousReaction = postData.userReactions ? postData.userReactions[currentUser.uid] : null;
+
+                // Prepare updates object
+                const updates = {};
+
+                // If user previously reacted with a different emoji, decrement its count
+                if (userPreviousReaction && userPreviousReaction !== emoji) {
+                    updates[`reactions.${userPreviousReaction}`] = Math.max(0, (currentReactions[userPreviousReaction] || 0) - 1);
+                    if (updates[`reactions.${userPreviousReaction}`] <= 0) {
+                        updates[`reactions.${userPreviousReaction}`] = deleteField(); // Correctly use deleteField
+                    }
+                }
+
+                // If user reacted with the same emoji, toggle it off (decrement)
+                // If user reacted with a different emoji or no emoji, toggle it on (increment)
+                if (userPreviousReaction === emoji) {
+                    updates[`reactions.${emoji}`] = Math.max(0, (currentReactions[emoji] || 0) - 1);
+                    if (updates[`reactions.${emoji}`] <= 0) {
+                        updates[`reactions.${emoji}`] = deleteField(); // Correctly use deleteField
+                    }
+                    updates[`userReactions.${currentUser.uid}`] = deleteField(); // Remove user's specific reaction
+                } else {
+                    updates[`reactions.${emoji}`] = (currentReactions[emoji] || 0) + 1;
+                    updates[`userReactions.${currentUser.uid}`] = emoji; // Store user's new reaction
+                }
+                
+                // Perform the update
+                await updateDoc(postDocRef, updates);
+            }
+        } catch (error) {
+            console.error("Error adding reaction:", error.message);
+            showMessageModal("Failed to add reaction: " + error.message, 'error');
+        } finally {
+            hideLoadingSpinner();
+            // Re-render forum page to show updated reactions
+            renderForumPage(); 
+        }
+    }
 
 
-    const handlePostCode = async () => {
-      if (!currentUser || !userProfile) {
-        setShowError({ show: true, message: "You must be signed in to post code." });
-        return;
-      }
-      if (!newPostTitle.trim() || !newPostCode.trim() || !newPostSectionId) {
-        setShowError({ show: true, message: "Please fill in all fields (Title, Code, Section)." });
-        return;
-      }
+    /**
+     * Adds a comment to a post.
+     * Any authenticated user can comment.
+     * @param {string} postId - The ID of the post.
+     * @param {string} commentText - The comment content.
+     * @returns {Promise<void>}
+     */
+    async function addCommentToPost(postId, commentText) {
+        if (!currentUser) {
+            showMessageModal("You must be logged in to comment on posts.", 'info');
+            return;
+        }
+        if (!commentText.trim()) {
+            showMessageModal("Comment cannot be empty.", 'info');
+            return;
+        }
 
-      setLoading(true);
-      try {
-        await addDoc(collection(db, `artifacts/${__app_id}/public/data/codePosts`), {
-          title: newPostTitle.trim(),
-          codeContent: newPostCode.trim(),
-          language: newPostLanguage,
-          sectionId: newPostSectionId,
-          authorId: currentUser.uid,
-          authorName: userProfile.username,
-          timestamp: serverTimestamp(),
-          status: 'pending', // Requires admin approval
-        });
-        setNewPostTitle('');
-        setNewPostCode('');
-        setNewPostLanguage('javascript');
-        setShowSuccess({ show: true, message: "Code submitted for approval! It will appear once an admin approves it." });
-      } catch (error) {
-        console.error("Error posting code:", error);
-        setShowError({ show: true, message: `Failed to post code: ${error.message}` });
-      } finally {
-        setLoading(false);
-      }
-    };
+        showLoadingSpinner();
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            const newComment = {
+                authorId: currentUser.uid,
+                authorUsername: userData.username || currentUser.displayName || currentUser.email,
+                text: commentText,
+                timestamp: new Date().toISOString() // Use ISO string for client-side timestamp
+            };
+            await updateDoc(postDocRef, {
+                comments: arrayUnion(newComment) // Add the new comment to the array
+            });
+            showMessageModal('Comment added successfully!');
+        } catch (error) {
+            console.error("Error adding comment:", error.message);
+            showMessageModal("Failed to add comment: " + error.message, 'error');
+        } finally {
+            hideLoadingSpinner();
+            // Re-render forum page to show updated comments
+            renderForumPage(); 
+        }
+    }
 
-    return (
-      <div className="min-h-screen bg-gray-100 p-6 flex flex-col items-center">
-        <h2 className="text-4xl font-extrabold text-gray-800 mb-8 text-center">Community Code Snippets</h2>
 
-        {currentUser && userProfile && (
-          <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-3xl mb-8 border-t-4 border-indigo-500">
-            <h3 className="text-2xl font-bold text-indigo-700 mb-4">Submit Your Code</h3>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="postTitle" className="block text-sm font-medium text-gray-700">Title</label>
-                <input
-                  type="text"
-                  id="postTitle"
-                  value={newPostTitle}
-                  onChange={(e) => setNewPostTitle(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="e.g., Simple JavaScript Debounce Function"
-                />
-              </div>
-              <div>
-                <label htmlFor="postCode" className="block text-sm font-medium text-gray-700">Code</label>
-                <textarea
-                  id="postCode"
-                  value={newPostCode}
-                  onChange={(e) => setNewPostCode(e.target.value)}
-                  rows="10"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm resize-y"
-                  placeholder="Paste your code here..."
-                ></textarea>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <label htmlFor="postLanguage" className="block text-sm font-medium text-gray-700">Language</label>
-                  <select
-                    id="postLanguage"
-                    value={newPostLanguage}
-                    onChange={(e) => setNewPostLanguage(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    {CODE_LANGUAGES.map(lang => (
-                      <option key={lang} value={lang}>{lang.charAt(0).toUpperCase() + lang.slice(1)}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label htmlFor="postSection" className="block text-sm font-medium text-gray-700">Section</label>
-                  <select
-                    id="postSection"
-                    value={newPostSectionId}
-                    onChange={(e) => setNewPostSectionId(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    {sections.length === 0 ? (
-                      <option value="">No sections available</option>
-                    ) : (
-                      sections.map(section => (
-                        <option key={section.id} value={section.id}>{section.name}</option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              </div>
-              <button
-                onClick={handlePostCode}
-                className="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-300 ease-in-out transform hover:scale-105"
-              >
-                Submit Code
-              </button>
-            </div>
-          </div>
-        )}
+    /**
+     * Fetches all posts from Firestore, ordered by timestamp.
+     * @returns {Promise<Array<object>>} - List of all posts.
+     */
+    async function fetchAllPostsFirestore() {
+        showLoadingSpinner();
+        try {
+            const postsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
+            const q = query(postsCollectionRef, orderBy('timestamp', 'desc')); // Order by newest first
 
-        <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-3xl mb-8 border-t-4 border-purple-500">
-          <h3 className="text-2xl font-bold text-purple-700 mb-4">Browse Code</h3>
-          <div className="mb-4">
-            <label htmlFor="filterSection" className="block text-sm font-medium text-gray-700 mb-1">Filter by Section:</label>
-            <select
-              id="filterSection"
-              value={filterSectionId}
-              onChange={(e) => setFilterSectionId(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-            >
-              <option value="">All Sections</option>
-              {sections.map(section => (
-                <option key={section.id} value={section.id}>{section.name}</option>
-              ))}
-            </select>
-          </div>
-          {codePosts.length === 0 ? (
-            <p className="text-gray-600 text-center py-4">No approved code snippets yet or none in this section. Be the first to post!</p>
-          ) : (
-            <div className="space-y-6">
-              {codePosts.map(post => {
-                const sectionName = sections.find(s => s.id === post.sectionId)?.name || 'Uncategorized';
-                return (
-                  <div key={post.id} className="p-5 bg-gray-50 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center mb-3">
-                      <img
-                        src={post.authorProfileIcon || "https://placehold.co/30x30/dddddd/333333?text=A"} // Placeholder for author's icon
-                        alt="Author Icon"
-                        className="w-8 h-8 rounded-full mr-2 border border-gray-300 object-cover"
-                        onError={getProfileIconFallback()}
-                      />
-                      <p className="text-sm text-gray-600 font-medium">
-                        {post.authorName || 'Anonymous'} in <span className="font-semibold text-purple-700">{sectionName}</span>
-                        <span className="ml-2 text-gray-500">
-                          {post.timestamp ? ` on ${new Date(post.timestamp.toDate()).toLocaleString()}` : ''}
-                        </span>
-                      </p>
+            const querySnapshot = await new Promise((resolve, reject) => {
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    unsubscribe(); // Unsubscribe immediately after first fetch
+                    resolve(snapshot);
+                }, (error) => {
+                    reject(error);
+                });
+            });
+
+            const postsData = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                postsData.push({
+                    id: doc.id,
+                    title: data.title,
+                    content: data.content,
+                    authorUsername: data.authorUsername,
+                    // Format timestamp for display (handle ISO string or Firestore Timestamp)
+                    timestamp: data.timestamp ? (typeof data.timestamp === 'string' ? new Date(data.timestamp).toLocaleString() : data.timestamp.toDate().toLocaleString()) : 'N/A',
+                    reactions: data.reactions || {}, // Ensure reactions is an object
+                    comments: data.comments || [] // Ensure comments is an array
+                });
+            });
+            return postsData;
+        } catch (error) {
+            console.error("Error fetching posts:", error.message);
+            throw new Error("Failed to fetch posts: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+
+    // --- UI Rendering Functions ---
+
+    /**
+     * Renders the Navbar links based on authentication status.
+     */
+    function renderNavbar() {
+        navLinks.innerHTML = '';
+        mobileMenu.innerHTML = '';
+
+        // Update website title from config.js
+        document.querySelector('title').textContent = CONFIG.websiteTitle;
+        document.getElementById('nav-home').textContent = CONFIG.websiteTitle; // Update home button text
+
+        const createButton = (id, text, page, iconHtml = '') => {
+            const btn = document.createElement('button');
+            btn.id = id;
+            btn.className = `px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}`;
+            btn.innerHTML = `${iconHtml}<span>${text}</span>`;
+            btn.addEventListener('click', () => {
+                navigateTo(page);
+                // Hide mobile menu if open
+                if (!mobileMenu.classList.contains('hidden')) {
+                    mobileMenu.classList.add('hidden');
+                    mobileMenuIconOpen.classList.remove('hidden');
+                    mobileMenuIconClose.classList.add('hidden');
+                }
+            });
+            return btn;
+        };
+
+        const createMobileButton = (id, text, page) => {
+            const btn = document.createElement('button');
+            btn.id = id;
+            btn.className = `block w-full text-left px-4 py-2 hover:bg-gray-700 text-white transition duration-200 ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700' : (id.includes('auth') ? 'bg-green-600 hover:bg-green-700' : (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700' : ''))}`;
+            btn.textContent = text;
+            btn.addEventListener('click', () => {
+                navigateTo(page);
+                // Hide mobile menu if open
+                if (!mobileMenu.classList.contains('hidden')) {
+                    mobileMenu.classList.add('hidden');
+                    mobileMenuIconOpen.classList.remove('hidden');
+                    mobileMenuIconClose.classList.add('hidden');
+                }
+            });
+            return btn;
+        };
+
+        if (currentUser && userData) {
+            // Logged in user
+            navLinks.appendChild(createButton('nav-forum', 'Forum', 'forum')); // Forum for all authenticated users
+            mobileMenu.appendChild(createMobileButton('mobile-nav-forum', 'Forum', 'forum'));
+
+            if (userData.role === 'admin') {
+                navLinks.appendChild(createButton('nav-admin', 'Admin Panel', 'admin'));
+                mobileMenu.appendChild(createMobileButton('mobile-nav-admin', 'Admin Panel', 'admin'));
+            }
+
+            const profileIconSrc = userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`;
+            const profileIconHtml = `
+                <img src="${profileIconSrc}" alt="Profile" class="w-8 h-8 rounded-full object-cover border-2 border-gray-400"
+                     onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}'">`;
+
+            const profileBtn = document.createElement('button');
+            profileBtn.id = 'nav-profile';
+            profileBtn.className = 'px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 flex items-center space-x-2';
+            profileBtn.innerHTML = `${profileIconHtml}<span>${userData.username || currentUser.email}</span>`;
+            profileBtn.addEventListener('click', () => navigateTo('profile'));
+            navLinks.appendChild(profileBtn);
+
+            navLinks.appendChild(createButton('nav-sign-out', 'Sign Out', 'logout'));
+            mobileMenu.appendChild(createMobileButton('mobile-nav-profile', 'Profile', 'profile'));
+            mobileMenu.appendChild(createMobileButton('mobile-nav-sign-out', 'Sign Out', 'logout'));
+        } else {
+            // Not logged in
+            navLinks.appendChild(createButton('nav-auth', 'Sign In / Up', 'auth'));
+            mobileMenu.appendChild(createMobileButton('mobile-nav-auth', 'Sign In / Up', 'auth'));
+        }
+        mobileMenu.appendChild(createMobileButton('mobile-nav-about', 'About', 'about')); // About always in mobile
+    }
+
+    /**
+     * Renders the Home page content.
+     */
+    function renderHomePage() {
+        contentArea.innerHTML = `
+            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-green-600 mb-6">
+                    Welcome to ${CONFIG.websiteTitle}!
+                </h1>
+                ${currentUser && userData ? `
+                    <p class="text-xl text-gray-700 mb-4">
+                        Hello, <span class="font-semibold text-blue-600">${userData.username || currentUser.email}</span>!
+                        You are logged in as a <span class="font-semibold text-purple-600">${userData.role}</span>.
+                    </p>
+                    <p class="text-lg text-gray-600 mb-6">
+                        Explore your profile settings, check out the forum, or visit the admin panel if you have the permissions.
+                    </p>
+                    <div class="flex flex-col sm:flex-row justify-center gap-4">
+                        <button id="go-to-profile-btn" class="py-3 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Go to Profile
+                        </button>
+                        <button id="go-to-forum-btn" class="py-3 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Visit Forum
+                        </button>
+                        ${userData.role === 'admin' ? `
+                        <button id="go-to-admin-btn" class="py-3 px-6 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Admin Panel
+                        </button>` : ''}
                     </div>
-                    <h4 className="text-xl font-bold text-gray-800 mb-2">{post.title}</h4>
-                    <pre className="bg-gray-800 text-white p-4 rounded-md overflow-x-auto text-sm font-mono">
-                      <code>{post.codeContent}</code>
-                    </pre>
-                    <p className="text-right text-xs text-gray-400 mt-2">Language: {post.language.toUpperCase()}</p>
-                  </div>
-                );
-              })}
+                ` : `
+                    <p class="text-lg text-gray-700 mb-6">
+                        Sign in or create an account to unlock full features and personalize your experience.
+                    </p>
+                    <button id="go-to-auth-btn" class="py-3 px-8 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                        Sign In / Sign Up
+                    </button>
+                `}
             </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+        `;
 
-  // --- Profile Page ---
-  const ProfilePage = ({ db, currentUser, userProfile, setUserProfile, setShowError, setShowSuccess }) => {
-    const [editUsername, setEditUsername] = useState(userProfile?.username || '');
-    const [editProfileIcon, setEditProfileIcon] = useState(userProfile?.profileIcon || '');
-    const [editBackground, setEditBackground] = useState(userProfile?.background || '');
-
-    useEffect(() => {
-      if (userProfile) {
-        setEditUsername(userProfile.username);
-        setEditProfileIcon(userProfile.profileIcon);
-        setEditBackground(userProfile.background);
-      }
-    }, [userProfile]);
-
-    const handleUpdateProfile = async () => {
-      if (!currentUser || !db) return;
-
-      setLoading(true);
-      try {
-        const userDocRef = doc(db, `artifacts/${__app_id}/public/data/users`, currentUser.uid);
-        await updateDoc(userDocRef, {
-          username: editUsername.trim(),
-          profileIcon: editProfileIcon.trim(),
-          background: editBackground.trim(),
-        });
-        setUserProfile(prev => ({
-          ...prev,
-          username: editUsername.trim(),
-          profileIcon: editProfileIcon.trim(),
-          background: editBackground.trim(),
-        }));
-        setShowSuccess({ show: true, message: "Profile updated successfully!" });
-      } catch (error) {
-        console.error("Error updating profile:", error);
-        setShowError({ show: true, message: `Failed to update profile: ${error.message}` });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const BACKGROUND_OPTIONS = [
-      { name: "Indigo Gradient", value: "bg-gradient-to-br from-indigo-50 to-blue-100" },
-      { name: "Gray Pattern", value: "bg-gray-200 bg-pattern-grid" }, // Example: requires custom CSS pattern
-      { name: "Sunset Gradient", value: "bg-gradient-to-br from-red-100 to-yellow-200" },
-      { name: "Ocean Waves", value: "https://images.unsplash.com/photo-1517976192994-e537463f25c7?auto=format&fit=crop&q=80&w=2070&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" },
-    ];
-
-    const PROFILE_ICON_OPTIONS = [
-      { name: "Default User", value: "https://placehold.co/40x40/cccccc/ffffff?text=User" },
-      { name: "Gear Icon", value: "https://cdn-icons-png.flaticon.com/512/1057/1057093.png" },
-      { name: "Code Icon", value: "https://cdn-icons-png.flaticon.com/512/2920/2920251.png" },
-      { name: "Robot Icon", value: "https://cdn-icons-png.flaticon.com/512/8662/8662366.png" },
-    ];
-
-
-    return (
-      <div className={`min-h-screen p-6 flex flex-col items-center ${userProfile?.background || 'bg-gray-100'}`}>
-        <style>
-          {`
-          /* Custom pattern for "Gray Pattern" background option */
-          .bg-pattern-grid {
-              background-image: linear-gradient(to right, lightgray 1px, transparent 1px),
-                                linear-gradient(to bottom, lightgray 1px, transparent 1px);
-              background-size: 20px 20px;
-          }
-          `}
-        </style>
-        <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl border-t-4 border-green-500">
-          <h2 className="text-4xl font-extrabold text-gray-800 mb-8 text-center">Your Profile</h2>
-
-          <div className="flex flex-col items-center mb-8">
-            <img
-              src={editProfileIcon || "https://placehold.co/100x100/cccccc/ffffff?text=User"}
-              alt="Profile Icon"
-              className="w-24 h-24 rounded-full object-cover mb-4 border-4 border-indigo-400 shadow-md"
-              onError={getProfileIconFallback("https://placehold.co/100x100/cccccc/ffffff?text=User")}
-            />
-            <p className="text-xl font-semibold text-gray-800">{userProfile?.username || 'Loading...'}</p>
-            <p className="text-sm text-gray-500 mb-2">{userProfile?.email}</p>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold ${userProfile?.role === 'founder' ? 'bg-yellow-500 text-white' : userProfile?.role === 'admin' ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-800'}`}>
-              {userProfile?.role?.toUpperCase()}
-            </span>
-            <p className="text-sm text-gray-600 mt-2">Your User ID: <span className="font-mono text-gray-700 break-all">{currentUser?.uid}</span></p>
-          </div>
-
-          <div className="space-y-6">
-            <div>
-              <label htmlFor="editUsername" className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-              <input
-                type="text"
-                id="editUsername"
-                value={editUsername}
-                onChange={(e) => setEditUsername(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-              />
-            </div>
-            <div>
-              <label htmlFor="editProfileIcon" className="block text-sm font-medium text-gray-700 mb-1">Profile Icon URL</label>
-              <input
-                type="text"
-                id="editProfileIcon"
-                value={editProfileIcon}
-                onChange={(e) => setEditProfileIcon(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                placeholder="e.g., https://example.com/icon.png"
-              />
-              <select
-                className="mt-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                onChange={(e) => setEditProfileIcon(e.target.value)}
-                value={editProfileIcon}
-              >
-                <option value="">Select a predefined icon</option>
-                {PROFILE_ICON_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="editBackground" className="block text-sm font-medium text-gray-700 mb-1">Background Style/URL</label>
-              <input
-                type="text"
-                id="editBackground"
-                value={editBackground}
-                onChange={(e) => setEditBackground(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                placeholder="e.g., bg-red-100 or https://example.com/bg.jpg"
-              />
-              <select
-                className="mt-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                onChange={(e) => setEditBackground(e.target.value)}
-                value={editBackground}
-              >
-                <option value="">Select a predefined background</option>
-                {BACKGROUND_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.name}</option>
-                ))}
-              </select>
-            </div>
-            <button
-              onClick={handleUpdateProfile}
-              className="w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-300 ease-in-out transform hover:scale-105"
-            >
-              Update Profile
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // --- Admin Panel ---
-  const AdminPanel = ({ db, currentUser, userProfile, setShowError, setShowSuccess }) => {
-    const [allUsers, setAllUsers] = useState([]);
-    const [sections, setSections] = useState([]);
-    const [pendingCodePosts, setPendingCodePosts] = useState([]);
-    const [newSectionName, setNewSectionName] = useState('');
-    const [showDeleteUserConfirm, setShowDeleteUserConfirm] = useState(false);
-    const [userToDelete, setUserToDelete] = useState(null);
-    const [showDeleteSectionConfirm, setShowDeleteSectionConfirm] = useState(false);
-    const [sectionToDelete, setSectionToDelete] = useState(null);
-
-    // Fetch all users
-    useEffect(() => {
-      if (!db || !currentUser) return;
-      const usersCollectionRef = collection(db, `artifacts/${__app_id}/public/data/users`);
-      const unsubscribe = onSnapshot(usersCollectionRef, (snapshot) => {
-        const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // Filter out the current user from the list if not founder, or allow founder to see all
-        setAllUsers(fetchedUsers.filter(u => u.id !== currentUser.uid)); // Filter out self for role changes
-      }, (error) => {
-        console.error("Error fetching all users:", error);
-        setShowError({ show: true, message: `Failed to load users: ${error.message}` });
-      });
-      return () => unsubscribe();
-    }, [db, currentUser, setShowError]);
-
-    // Fetch sections
-    useEffect(() => {
-      if (!db) return;
-      const sectionsCollectionRef = collection(db, `artifacts/${__app_id}/public/data/sections`);
-      const unsubscribe = onSnapshot(sectionsCollectionRef, (snapshot) => {
-        const fetchedSections = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setSections(fetchedSections.sort((a, b) => a.name.localeCompare(b.name)));
-      }, (error) => {
-        console.error("Error fetching sections:", error);
-        setShowError({ show: true, message: `Failed to load sections: ${error.message}` });
-      });
-      return () => unsubscribe();
-    }, [db, setShowError]);
-
-    // Fetch pending code posts
-    useEffect(() => {
-      if (!db) return;
-      const codePostsCollectionRef = collection(db, `artifacts/${__app_id}/public/data/codePosts`);
-      const q = query(codePostsCollectionRef, where('status', '==', 'pending'));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const fetchedPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setPendingCodePosts(fetchedPosts.sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0)));
-      }, (error) => {
-        console.error("Error fetching pending code posts:", error);
-        setShowError({ show: true, message: `Failed to load pending posts: ${error.message}` });
-      });
-      return () => unsubscribe();
-    }, [db, setShowError]);
-
-    const handleChangeUserRole = async (targetUserId, newRole) => {
-      if (!db || !currentUser || !userProfile) return;
-
-      // Founder can change anyone's role, including making others admin.
-      // Admin can change member roles, but not other admins or founder.
-      if (userProfile.role === 'admin' && (newRole === 'founder' || newRole === 'admin')) {
-        setShowError({ show: true, message: "Admins cannot assign 'founder' or 'admin' roles, or change other admins." });
-        return;
-      }
-      const targetUser = allUsers.find(u => u.id === targetUserId);
-      if (userProfile.role === 'admin' && targetUser?.role === 'admin') {
-         setShowError({ show: true, message: "Admins cannot change another admin's role." });
-         return;
-      }
-      if (userProfile.role === 'admin' && targetUser?.role === 'founder') {
-         setShowError({ show: true, message: "Admins cannot change the founder's role." });
-         return;
-      }
-
-
-      setLoading(true);
-      try {
-        const userDocRef = doc(db, `artifacts/${__app_id}/public/data/users`, targetUserId);
-        await updateDoc(userDocRef, { role: newRole });
-        setShowSuccess({ show: true, message: `User role for ${targetUserId} updated to ${newRole}.` });
-      } catch (error) {
-        console.error("Error changing user role:", error);
-        setShowError({ show: true, message: `Failed to change role: ${error.message}` });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const handleSendPasswordReset = async (email) => {
-      if (!auth || !currentUser || (userProfile.role !== 'admin' && userProfile.role !== 'founder')) {
-        setShowError({ show: true, message: "You don't have permission to do this." });
-        return;
-      }
-      setLoading(true);
-      try {
-        await sendPasswordResetEmail(auth, email);
-        setShowSuccess({ show: true, message: `Password reset email sent to ${email}.` });
-      } catch (error) {
-        console.error("Error sending password reset:", error);
-        setShowError({ show: true, message: `Failed to send reset email: ${error.message}` });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const confirmDeleteUser = (user) => {
-      setUserToDelete(user);
-      setShowDeleteUserConfirm(true);
-    };
-
-    const handleDeleteUser = async () => {
-      if (!db || !userToDelete) return;
-      if (userToDelete.role === 'founder') {
-        setShowError({ show: true, message: "Cannot delete the founder." });
-        return;
-      }
-      if (userToDelete.role === 'admin' && userProfile.role !== 'founder') {
-        setShowError({ show: true, message: "Only a founder can delete another admin." });
-        return;
-      }
-
-      setLoading(true);
-      setShowDeleteUserConfirm(false); // Close confirmation modal
-      try {
-        // Run as a transaction to ensure atomicity
-        await runTransaction(db, async (transaction) => {
-          // Delete user's profile document
-          const userDocRef = doc(db, `artifacts/${__app_id}/public/data/users`, userToDelete.id);
-          transaction.delete(userDocRef);
-
-          // Find and delete all code posts by this user
-          const postsByUserQuery = query(
-            collection(db, `artifacts/${__app_id}/public/data/codePosts`),
-            where('authorId', '==', userToDelete.id)
-          );
-          const postsSnapshot = await getDocs(postsByUserQuery);
-          postsSnapshot.forEach(postDoc => {
-            transaction.delete(postDoc.ref);
-          });
-          // Note: Actual Firebase Auth user deletion requires a server (Cloud Functions)
-          // This client-side code only deletes Firestore data.
-          // For a real app, integrate with Firebase Admin SDK on a backend.
-        });
-
-        setShowSuccess({ show: true, message: `User ${userToDelete.username} and their posts deleted successfully.` });
-        setUserToDelete(null);
-      } catch (error) {
-        console.error("Error deleting user and posts:", error);
-        setShowError({ show: true, message: `Failed to delete user: ${error.message}` });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const handleCreateSection = async () => {
-      if (!db || !newSectionName.trim()) {
-        setShowError({ show: true, message: "Section name cannot be empty." });
-        return;
-      }
-      if (!userProfile || (userProfile.role !== 'admin' && userProfile.role !== 'founder')) {
-        setShowError({ show: true, message: "You don't have permission to create sections." });
-        return;
-      }
-      setLoading(true);
-      try {
-        await addDoc(collection(db, `artifacts/${__app_id}/public/data/sections`), {
-          name: newSectionName.trim(),
-          createdAt: serverTimestamp(),
-          createdBy: currentUser.uid,
-        });
-        setNewSectionName('');
-        setShowSuccess({ show: true, message: `Section "${newSectionName}" created.` });
-      } catch (error) {
-        console.error("Error creating section:", error);
-        setShowError({ show: true, message: `Failed to create section: ${error.message}` });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const confirmDeleteSection = (section) => {
-      setSectionToDelete(section);
-      setShowDeleteSectionConfirm(true);
-    };
-
-    const handleDeleteSection = async () => {
-      if (!db || !sectionToDelete) return;
-      if (!userProfile || (userProfile.role !== 'admin' && userProfile.role !== 'founder')) {
-        setShowError({ show: true, message: "You don't have permission to delete sections." });
-        return;
-      }
-
-      setLoading(true);
-      setShowDeleteSectionConfirm(false);
-      try {
-        await runTransaction(db, async (transaction) => {
-          // Delete the section document
-          const sectionDocRef = doc(db, `artifacts/${__app_id}/public/data/sections`, sectionToDelete.id);
-          transaction.delete(sectionDocRef);
-
-          // Update any code posts that belonged to this section to 'uncategorized' or similar
-          // For simplicity, we'll just set their sectionId to empty string.
-          const postsInSectionQuery = query(
-            collection(db, `artifacts/${__app_id}/public/data/codePosts`),
-            where('sectionId', '==', sectionToDelete.id)
-          );
-          const postsSnapshot = await getDocs(postsInSectionQuery);
-          postsSnapshot.forEach(postDoc => {
-            transaction.update(postDoc.ref, { sectionId: '' }); // Or delete them, depending on desired behavior
-          });
-        });
-        setShowSuccess({ show: true, message: `Section "${sectionToDelete.name}" and associated posts updated successfully.` });
-        setSectionToDelete(null);
-      } catch (error) {
-        console.error("Error deleting section:", error);
-        setShowError({ show: true, message: `Failed to delete section: ${error.message}` });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const handleApproveRejectCode = async (postId, status) => {
-      if (!db || !currentUser || (userProfile.role !== 'admin' && userProfile.role !== 'founder')) {
-        setShowError({ show: true, message: "You don't have permission to approve/reject code." });
-        return;
-      }
-      setLoading(true);
-      try {
-        const postDocRef = doc(db, `artifacts/${__app_id}/public/data/codePosts`, postId);
-        await updateDoc(postDocRef, {
-          status: status,
-          approvedBy: currentUser.uid,
-          approvedAt: serverTimestamp(),
-        });
-        setShowSuccess({ show: true, message: `Code post ${status} successfully.` });
-      } catch (error) {
-        console.error(`Error ${status}ing code post:`, error);
-        setShowError({ show: true, message: `Failed to ${status} code post: ${error.message}` });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (userProfile?.role !== 'admin' && userProfile?.role !== 'founder') {
-      return (
-        <div className="flex justify-center items-center min-h-screen bg-red-50 p-4">
-          <div className="bg-white p-8 rounded-xl shadow-2xl text-center border-l-4 border-red-500">
-            <h2 className="text-3xl font-bold text-red-700 mb-4">Access Denied!</h2>
-            <p className="text-gray-700 text-lg">You do not have administrative privileges to view this page.</p>
-            <button
-              onClick={() => setCurrentPage('home')}
-              className="mt-6 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition duration-300"
-            >
-              Go to Home Page
-            </button>
-          </div>
-        </div>
-      );
+        if (currentUser && userData) {
+            document.getElementById('go-to-profile-btn').addEventListener('click', () => navigateTo('profile'));
+            document.getElementById('go-to-forum-btn').addEventListener('click', () => navigateTo('forum'));
+            if (userData.role === 'admin') {
+                document.getElementById('go-to-admin-btn').addEventListener('click', () => navigateTo('admin'));
+            }
+        } else {
+            document.getElementById('go-to-auth-btn').addEventListener('click', () => navigateTo('auth'));
+        }
     }
 
-    return (
-      <div className="min-h-screen bg-gray-100 p-6 flex flex-col items-center">
-        <h2 className="text-4xl font-extrabold text-gray-800 mb-8 text-center">Admin Panel</h2>
-
-        {/* Current User Role Info */}
-        <div className="bg-white p-4 rounded-lg shadow-md mb-8 w-full max-w-4xl text-center text-sm text-gray-600 border-l-4 border-blue-400">
-            <p>Your Role: <span className={`font-bold ${userProfile?.role === 'founder' ? 'text-yellow-700' : 'text-blue-700'}`}>{userProfile?.role?.toUpperCase()}</span></p>
-            <p className="mt-1">Your User ID: <span className="font-mono text-gray-700 break-all">{currentUser?.uid}</span></p>
-        </div>
-
-
-        {/* Manage Users Section */}
-        <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-4xl mb-8 border-t-4 border-blue-600">
-          <h3 className="text-2xl font-bold text-blue-700 mb-4">Manage Users</h3>
-          {allUsers.length === 0 ? (
-            <p className="text-gray-600 text-center py-4">No other users registered.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white rounded-lg overflow-hidden">
-                <thead className="bg-blue-100">
-                  <tr>
-                    <th className="py-3 px-4 text-left text-sm font-semibold text-blue-800 uppercase tracking-wider">Username</th>
-                    <th className="py-3 px-4 text-left text-sm font-semibold text-blue-800 uppercase tracking-wider">Email</th>
-                    <th className="py-3 px-4 text-left text-sm font-semibold text-blue-800 uppercase tracking-wider">Role</th>
-                    <th className="py-3 px-4 text-left text-sm font-semibold text-blue-800 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allUsers.map(user => (
-                    <tr key={user.id} className="border-b last:border-b-0 hover:bg-gray-50 transition duration-150">
-                      <td className="py-3 px-4 text-gray-900 font-medium flex items-center">
-                        <img
-                          src={user.profileIcon || "https://placehold.co/24x24/cccccc/ffffff?text=U"}
-                          alt="User Icon"
-                          className="w-6 h-6 rounded-full mr-2 object-cover"
-                          onError={getProfileIconFallback()}
-                        />
-                        {user.username}
-                      </td>
-                      <td className="py-3 px-4 text-gray-700">{user.email}</td>
-                      <td className="py-3 px-4">
-                        <select
-                          value={user.role}
-                          onChange={(e) => handleChangeUserRole(user.id, e.target.value)}
-                          className="px-2 py-1 rounded-md border border-gray-300 bg-white text-sm"
-                          disabled={
-                            userProfile.role !== 'founder' && (user.role === 'admin' || user.role === 'founder') // Admins can't change other admins/founders
-                            || userProfile.role === 'admin' && (user.id === currentUser.uid) // Admin can't change self
-                            || userProfile.role === 'founder' && user.id === currentUser.uid // Founder can't change own role from here (for safety)
-                          }
-                        >
-                          <option value="member">Member</option>
-                          <option value="admin" disabled={userProfile.role !== 'founder'}>Admin</option>
-                          <option value="founder" disabled={true}>Founder</option> {/* Founder role can only be assigned once */}
-                        </select>
-                      </td>
-                      <td className="py-3 px-4 space-x-2">
-                        <button
-                          onClick={() => handleSendPasswordReset(user.email)}
-                          className="px-3 py-1 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 text-xs shadow-sm transition"
-                          disabled={userProfile.role !== 'admin' && userProfile.role !== 'founder'}
-                        >
-                          Reset Pass
+    /**
+     * Renders the Auth (Sign In / Sign Up) page.
+     */
+    function renderAuthPage() {
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 id="auth-title" class="text-3xl font-extrabold text-center text-gray-800 mb-8">Sign In</h2>
+                    <form id="auth-form" class="space-y-6">
+                        <div>
+                            <label for="email" class="block text-gray-700 text-sm font-semibold mb-2">Email</label>
+                            <input type="email" id="email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="your@example.com" required>
+                        </div>
+                        <div id="username-field" class="hidden">
+                            <label for="username" class="block text-gray-700 text-sm font-semibold mb-2">Username</label>
+                            <input type="text" id="username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Choose a username">
+                        </div>
+                        <div>
+                            <label for="password" class="block text-gray-700 text-sm font-semibold mb-2">Password</label>
+                            <input type="password" id="password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Minimum 6 characters" required>
+                        </div>
+                        <button type="submit" id="auth-submit-btn" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Sign In
                         </button>
-                        <button
-                          onClick={() => confirmDeleteUser(user)}
-                          className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 text-xs shadow-sm transition"
-                          disabled={user.role === 'founder' || (user.role === 'admin' && userProfile.role !== 'founder') || user.id === currentUser.uid}
-                        >
-                          Delete
+                    </form>
+                    <div class="mt-6 text-center">
+                        <button id="toggle-auth-mode" class="text-blue-600 hover:underline text-sm font-medium">
+                            Need an account? Sign Up
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Manage Sections Section */}
-        <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-4xl mb-8 border-t-4 border-green-600">
-          <h3 className="text-2xl font-bold text-green-700 mb-4">Manage Sections</h3>
-          <div className="flex flex-col sm:flex-row gap-4 mb-4">
-            <input
-              type="text"
-              value={newSectionName}
-              onChange={(e) => setNewSectionName(e.target.value)}
-              className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-              placeholder="New section name (e.g., Python Web Dev)"
-            />
-            <button
-              onClick={handleCreateSection}
-              className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-300"
-              disabled={userProfile.role !== 'admin' && userProfile.role !== 'founder'}
-            >
-              Create Section
-            </button>
-          </div>
-          {sections.length === 0 ? (
-            <p className="text-gray-600 text-center py-4">No sections created yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {sections.map(section => (
-                <li key={section.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-md shadow-sm">
-                  <span className="font-medium text-gray-800">{section.name}</span>
-                  <button
-                    onClick={() => confirmDeleteSection(section)}
-                    className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600 text-xs shadow-sm transition"
-                    disabled={userProfile.role !== 'admin' && userProfile.role !== 'founder'}
-                  >
-                    Delete
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Pending Code Approvals Section */}
-        <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-4xl mb-8 border-t-4 border-purple-600">
-          <h3 className="text-2xl font-bold text-purple-700 mb-4">Pending Code Approvals ({pendingCodePosts.length})</h3>
-          {pendingCodePosts.length === 0 ? (
-            <p className="text-gray-600 text-center py-4">No code snippets pending approval.</p>
-          ) : (
-            <div className="space-y-6">
-              {pendingCodePosts.map(post => (
-                <div key={post.id} className="p-5 bg-yellow-50 rounded-lg shadow-sm border border-yellow-200">
-                  <h4 className="text-xl font-bold text-gray-800 mb-2">{post.title}</h4>
-                  <p className="text-sm text-gray-600 mb-3">
-                    By <span className="font-semibold">{post.authorName || 'Anonymous'}</span>
-                    {' '} in {sections.find(s => s.id === post.sectionId)?.name || 'Uncategorized'}
-                    {post.timestamp ? ` on ${new Date(post.timestamp.toDate()).toLocaleString()}` : ''}
-                  </p>
-                  <pre className="bg-gray-800 text-white p-4 rounded-md overflow-x-auto text-sm font-mono mb-4">
-                    <code>{post.codeContent}</code>
-                  </pre>
-                  <p className="text-right text-xs text-gray-400 mb-4">Language: {post.language.toUpperCase()}</p>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button
-                      onClick={() => handleApproveRejectCode(post.id, 'approved')}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition shadow-md"
-                      disabled={userProfile.role !== 'admin' && userProfile.role !== 'founder'}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => handleApproveRejectCode(post.id, 'rejected')}
-                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition shadow-md"
-                      disabled={userProfile.role !== 'admin' && userProfile.role !== 'founder'}
-                    >
-                      Reject
-                    </button>
-                  </div>
+                        <button id="forgot-password-btn" class="block mt-2 text-blue-600 hover:underline text-sm font-medium mx-auto">
+                            Forgot Password?
+                        </button>
+                    </div>
+                    <div class="mt-6">
+                        <button id="google-auth-btn" class="w-full py-3 rounded-full bg-red-500 text-white font-bold text-lg hover:bg-red-600 transition duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12.24 10.26v3.29h6.14c-.26 1.63-1.4 3.01-3.23 3.91l-.01.01-2.58 2.02c-1.52 1.19-3.4 1.83-5.32 1.83-4.8 0-8.72-3.86-8.72-8.62s3.92-8.62 8.72-8.62c2.81 0 4.67 1.19 5.86 2.36L18.42 5c-.71-.69-2.09-1.83-5.46-1.83-3.69 0-6.73 2.97-6.73 6.64s3.04 6.64 6.73 6.64c2.86 0 4.69-1.22 5.56-2.26l.01-.01-4.73-3.71z" fill="#FFFFFF"></path>
+                            </svg>
+                            <span>Sign in with Google</span>
+                        </button>
+                    </div>
                 </div>
-              ))}
             </div>
-          )}
-        </div>
+        `;
 
-        {/* Confirmation Modals */}
-        <ConfirmationModal
-          show={showDeleteUserConfirm}
-          title="Delete User Confirmation"
-          message={`Are you sure you want to delete user "${userToDelete?.username}"? This will also delete all their code posts and cannot be undone.`}
-          onConfirm={handleDeleteUser}
-          onCancel={() => setShowDeleteUserConfirm(false)}
-        />
-        <ConfirmationModal
-          show={showDeleteSectionConfirm}
-          title="Delete Section Confirmation"
-          message={`Are you sure you want to delete section "${sectionToDelete?.name}"? Code posts in this section will become uncategorized.`}
-          onConfirm={handleDeleteSection}
-          onCancel={() => setShowDeleteSectionConfirm(false)}
-        />
-      </div>
-    );
-  };
+        const authForm = document.getElementById('auth-form');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const usernameField = document.getElementById('username-field');
+        const usernameInput = document.getElementById('username');
+        const authTitle = document.getElementById('auth-title');
+        const authSubmitBtn = document.getElementById('auth-submit-btn');
+        const toggleAuthModeBtn = document.getElementById('toggle-auth-mode');
+        const forgotPasswordBtn = document.getElementById('forgot-password-btn');
+        const googleAuthBtn = document.getElementById('google-auth-btn'); // Get the Google button
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-100">
-        <div className="animate-spin rounded-full h-20 w-20 border-t-2 border-b-2 border-indigo-500"></div>
-        <p className="ml-4 text-lg text-gray-700">Loading application...</p>
-      </div>
-    );
-  }
+        let isSignUpMode = false;
 
-  // Main application routing logic
-  const renderPage = () => {
-    if (!currentUser) {
-      if (currentPage === 'signup') {
-        return <AuthPage type="signup" onSignUp={handleSignUp} onNavigate={setCurrentPage} />;
-      }
-      return <AuthPage type="login" onSignIn={handleSignIn} onNavigate={setCurrentPage} />;
+        toggleAuthModeBtn.addEventListener('click', () => {
+            isSignUpMode = !isSignUpMode;
+            authTitle.textContent = isSignUpMode ? 'Create Account' : 'Sign In';
+            authSubmitBtn.textContent = isSignUpMode ? 'Sign Up' : 'Sign In';
+            toggleAuthModeBtn.textContent = isSignUpMode ? 'Already have an account? Sign In' : 'Need an account? Sign Up';
+            usernameField.classList.toggle('hidden', !isSignUpMode);
+            usernameInput.required = isSignUpMode;
+            forgotPasswordBtn.classList.toggle('hidden', isSignUpMode);
+        });
+
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = emailInput.value;
+            const password = passwordInput.value;
+            const username = usernameInput.value;
+
+            try {
+                await authenticateUser(isSignUpMode ? 'signup' : 'login', { email, password, username });
+                // onAuthStateChanged listener will handle redirection after successful auth
+                if (isSignUpMode) {
+                    showMessageModal('Account created successfully! You are now signed in.');
+                } else {
+                    showMessageModal('Signed in successfully!');
+                }
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+
+        forgotPasswordBtn.addEventListener('click', async () => {
+            const email = emailInput.value;
+            if (!email) {
+                showMessageModal("Please enter your email to reset password.", 'info');
+                return;
+            }
+            try {
+                await sendPasswordReset(email);
+                showMessageModal("Password reset email sent! Check your inbox.");
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+
+        // Add event listener for Google button
+        googleAuthBtn.addEventListener('click', async () => {
+            try {
+                await authenticateUser('google');
+                showMessageModal('Signed in with Google successfully!');
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
     }
 
-    switch (currentPage) {
-      case 'home':
-        return <HomePage db={db} currentUser={currentUser} userProfile={userProfile} setShowError={setShowError} setShowSuccess={setShowSuccess} />;
-      case 'admin':
-        return <AdminPanel db={db} currentUser={currentUser} userProfile={userProfile} setShowError={setShowError} setShowSuccess={setShowSuccess} />;
-      case 'profile':
-        return <ProfilePage db={db} currentUser={currentUser} userProfile={userProfile} setUserProfile={setUserProfile} setShowError={setShowError} setShowSuccess={setShowSuccess} />;
-      default:
-        return <HomePage db={db} currentUser={currentUser} userProfile={userProfile} setShowError={setShowError} setShowSuccess={setShowSuccess} />;
+    /**
+     * Renders the Profile (Settings) page.
+     */
+    function renderProfilePage() {
+        if (!currentUser || !userData) {
+            navigateTo('auth'); // Redirect to auth if not logged in
+            return;
+        }
+
+        const backgroundOptions = [
+            { name: 'Blue-Purple Gradient (Default)', class: 'bg-gradient-to-r from-blue-400 to-purple-600' },
+            { name: 'Green-Cyan Gradient', class: 'bg-gradient-to-r from-green-400 to-cyan-600' },
+            { name: 'Red-Black Gradient', class: 'bg-gradient-to-r from-red-800 to-black' }, // New
+            { name: 'Orange-Red Gradient', class: 'bg-gradient-to-r from-orange-600 to-red-600' }, // New
+            // Note: Custom URL for images/GIFs is handled by the input field directly below
+        ];
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Your Profile Settings</h2>
+
+                    <div class="flex flex-col items-center mb-6">
+                        <img id="profile-pic-display" src="${userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`}" alt="Profile" class="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-md">
+                        <p class="text-gray-600 mt-4 text-sm">To change profile picture, provide a direct image URL below.</p>
+                    </div>
+
+                    <form id="profile-form" class="space-y-6">
+                        <div>
+                            <label for="profile-username" class="block text-gray-700 text-sm font-semibold mb-2">Username</label>
+                            <input type="text" id="profile-username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="${userData.username || ''}" required>
+                        </div>
+                        <div>
+                            <label for="profile-email" class="block text-gray-700 text-sm font-semibold mb-2">Email</label>
+                            <input type="email" id="profile-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed" value="${currentUser.email}" disabled>
+                        </div>
+                        <div>
+                            <label for="profile-pic-url" class="block text-gray-700 text-sm font-semibold mb-2">Profile Picture URL</label>
+                            <input type="url" id="profile-pic-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., https://example.com/your-image.jpg" value="${userData.profilePicUrl || ''}">
+                        </div>
+                        <div>
+                            <label for="profile-background-select" class="block text-gray-700 text-sm font-semibold mb-2">Website Background Theme</label>
+                            <select id="profile-background-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
+                                ${backgroundOptions.map(option => `
+                                    <option value="${option.class}" ${userData.backgroundUrl === option.class ? 'selected' : ''}>
+                                        ${option.name}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label for="custom-background-url" class="block text-gray-700 text-sm font-semibold mb-2">Custom Background Image/GIF URL (Overrides Theme)</label>
+                            <input type="url" id="custom-background-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., https://example.com/your-animated.gif" value="${(userData.backgroundUrl && (userData.backgroundUrl.startsWith('http') || userData.backgroundUrl.startsWith('https'))) ? userData.backgroundUrl : ''}">
+                            <p class="text-xs text-gray-500 mt-1">For GIFs, choose a subtle or abstract one for a formal look. This will override the theme selection above.</p>
+                        </div>
+                        <button type="submit" id="save-profile-btn" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Save Changes
+                        </button>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        const profileForm = document.getElementById('profile-form');
+        const usernameInput = document.getElementById('profile-username');
+        const profilePicUrlInput = document.getElementById('profile-pic-url');
+        const backgroundSelect = document.getElementById('profile-background-select'); // Changed ID
+        const customBackgroundUrlInput = document.getElementById('custom-background-url'); // New input
+        const profilePicDisplay = document.getElementById('profile-pic-display');
+
+        // Update profile picture preview as URL changes
+        profilePicUrlInput.addEventListener('input', () => {
+          profilePicDisplay.src = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(usernameInput.value || 'U').charAt(0).toUpperCase()}`;
+        });
+        profilePicDisplay.onerror = () => { // Fallback for broken image URLs
+            profilePicDisplay.src = `https://placehold.co/100x100/F0F0F0/000000?text=${(usernameInput.value || 'U').charAt(0).toUpperCase()}`;
+        };
+
+
+        profileForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newUsername = usernameInput.value;
+            const newProfilePicUrl = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(newUsername || 'U').charAt(0).toUpperCase()}`;
+            
+            let newBackgroundUrl;
+            // If custom URL is provided, use it. Otherwise, use the selected theme.
+            if (customBackgroundUrlInput.value) {
+                newBackgroundUrl = customBackgroundUrlInput.value;
+            } else {
+                newBackgroundUrl = backgroundSelect.value;
+            }
+
+            try {
+                const updatedData = await updateProfileData({
+                    username: newUsername,
+                    profilePicUrl: newProfilePicUrl,
+                    backgroundUrl: newBackgroundUrl // This can now be a class string or a URL
+                });
+                if (updatedData) {
+                    userData = updatedData; // Update global userData
+                    updateBodyBackground(); // Apply new background immediately
+                    showMessageModal('Profile updated successfully!');
+                    renderNavbar(); // Re-render navbar to update name/pic
+                }
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
     }
-  };
 
-  return (
-    <>
-      {/* Tailwind CSS CDN */}
-      <script src="https://cdn.tailwindcss.com"></script>
-      {/* Inter Font */}
-      <style>
-        {`
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-          body {
-            font-family: 'Inter', sans-serif;
-          }
-          /* Custom scrollbar for better UX in modals and code blocks */
-          .custom-scrollbar::-webkit-scrollbar {
-              width: 8px;
-              height: 8px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-track {
-              background: #f1f1f1;
-              border-radius: 10px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb {
-              background: #a8a8a8;
-              border-radius: 10px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-              background: #888;
-          }
-        `}
-      </style>
+    /**
+     * Renders the About page content.
+     */
+    function renderAboutPage() {
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-600 mb-6">About ${CONFIG.websiteTitle}</h2>
+                    <p class="text-lg text-gray-700 mb-4">
+                        Welcome to a secure and user-friendly platform designed to streamline your online experience. We offer robust user authentication, allowing you to sign up and sign in with ease, keeping your data safe.
+                    </p>
+                    <p class="text-lg text-gray-700 mb-4">
+                        Our platform is built with a focus on personalization. You can update your profile information, choose a custom background theme, and manage your personal details within a dedicated settings section.
+                    </p>
+                    <p class="text-lg text-gray-700 mb-4">
+                        For administrators, we provide a powerful admin panel. This feature allows designated users to oversee all registered accounts, view user details, and manage roles (assigning 'admin' or 'member' status) to ensure smooth operation and access control. Admins can also create and manage forum posts.
+                    </p>
+                    <p class="text-lg text-gray-700 mb-4">
+                        Members can engage with forum posts by adding reactions and comments, fostering a dynamic community environment.
+                    </p>
+                    <p class="text-lg text-gray-700 mb-4">
+                        We prioritize responsive design, ensuring that our website looks great and functions perfectly on any device, from desktops to mobile phones. Our clean, modern interface is powered by efficient technologies to provide a seamless browsing experience.
+                    </p>
+                    <p class="text-lg text-gray-700">
+                        Thank you for choosing our platform. We're committed to providing a reliable and enjoyable service.
+                    </p>
+                </div>
+            </div>
+        `;
+    }
 
-      {currentUser && userProfile && (
-        <Header userProfile={userProfile} onSignOut={handleSignOut} onNavigate={setCurrentPage} />
-      )}
+    /**
+     * Renders the Admin Panel page.
+     */
+    async function renderAdminPanelPage() {
+        if (!currentUser || !userData || userData.role !== 'admin') {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">You do not have administrative privileges to access this page.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
 
-      {renderPage()}
+        try {
+            usersList = await fetchAllUsersFirestore();
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+            usersList = []; // Clear list if fetch fails
+        }
 
-      <ErrorModal
-        show={showError.show}
-        message={showError.message}
-        onClose={() => setShowError({ show: false, message: '' })}
-      />
-      <SuccessModal
-        show={showSuccess.show}
-        message={showSuccess.message}
-        onClose={() => setShowSuccess({ show: false, message: '' })}
-      />
-    </>
-  );
-}
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Admin Panel</h2>
+                    <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts, and create forum posts.</p>
+                    <div class="mb-6 text-center space-x-4">
+                        <button id="create-post-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Create New Post
+                        </button>
+                        <button id="view-forum-admin-btn" class="py-2 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Manage Posts (Forum)
+                        </button>
+                    </div>
+
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Manage Users</h3>
+                    ${usersList.length === 0 ? `
+                        <p class="text-center text-gray-600">No users found.</p>
+                    ` : `
+                        <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Icon
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Username
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Email
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Role
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200" id="users-table-body">
+                                    <!-- Users will be populated here by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+
+        if (usersList.length > 0) {
+            const usersTableBody = document.getElementById('users-table-body');
+            // Ensure the content is reset before mapping new users to avoid duplication on re-render
+            usersTableBody.innerHTML = usersList.map(user => {
+                const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
+                const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; // Use currentUser.uid
+
+                return `
+                    <tr data-user-id="${user.id}" class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <img src="${profileIconSrc}" alt="User Icon" class="w-10 h-10 rounded-full object-cover border-2 border-gray-300" onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}'">
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            ${user.username}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${user.email}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <select
+                                class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                ${isDisabled}
+                                data-role-select-id="${user.id}"
+                            >
+                                <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
+                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                            </select>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                                class="text-red-600 hover:text-red-900 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                                ${isDisabled}
+                                data-delete-user-id="${user.id}" data-username="${user.username}"
+                            >
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Add event listeners for role change and delete buttons
+            usersTableBody.querySelectorAll('[data-role-select-id]').forEach(selectElement => {
+                selectElement.addEventListener('change', async (e) => {
+                    const userId = e.target.dataset.roleSelectId;
+                    const newRole = e.target.value;
+                    showMessageModal(`Are you sure you want to change this user's role to "${newRole}"?`, 'confirm', async () => {
+                        try {
+                            await updateUserRoleFirestore(userId, newRole);
+                            showMessageModal(`User role updated to "${newRole}" successfully!`);
+                            renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                        }
+                        catch (error) {
+                            showMessageModal(error.message, 'error');
+                            renderAdminPanelPage(); // Re-render to revert dropdown if failed
+                        }
+                    });
+                });
+            });
+
+            usersTableBody.querySelectorAll('[data-delete-user-id]').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const userId = e.target.dataset.deleteUserId;
+                    const username = e.target.dataset.username;
+                    showMessageModal(`Are you sure you want to delete user "${username}"? This action cannot be undone and will only remove their data from Firestore.`, 'confirm', async () => {
+                        try {
+                            await deleteUserFirestore(userId);
+                            showMessageModal(`User "${username}" data deleted successfully!`);
+                            renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                        } catch (error) {
+                            showMessageModal(error.message, 'error');
+                        }
+                    });
+                });
+            });
+        }
+        document.getElementById('create-post-btn').addEventListener('click', () => navigateTo('create-post'));
+        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins can manage from forum view
+    }
+
+    /**
+     * Renders the Create Post page for admins.
+     */
+    function renderCreatePostPage() {
+        if (!currentUser || userData.role !== 'admin') {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">You do not have administrative privileges to create posts.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Create New Post</h2>
+                    <form id="create-post-form" class="space-y-6">
+                        <div>
+                            <label for="post-title" class="block text-gray-700 text-sm font-semibold mb-2">Post Title</label>
+                            <input type="text" id="post-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter post title" required>
+                        </div>
+                        <div>
+                            <label for="post-content" class="block text-gray-700 text-sm font-semibold mb-2">Post Content</label>
+                            <textarea id="post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Write your post content here..." required></textarea>
+                        </div>
+                        <button type="submit" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Publish Post
+                        </button>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('create-post-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('post-title').value;
+            const content = document.getElementById('post-content').value;
+
+            try {
+                await createPostFirestore(title, content);
+                navigateTo('forum'); // Redirect to forum after posting
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+    }
+
+    /**
+     * Renders the Edit Post page for admins.
+     * @param {string} postId - The ID of the post to edit.
+     */
+    async function renderEditPostPage(postId) {
+        if (!currentUser || userData.role !== 'admin') {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">You do not have administrative privileges to edit posts.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        showLoadingSpinner();
+        let postData;
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            const docSnap = await getDoc(postDocRef);
+            if (docSnap.exists()) {
+                postData = docSnap.data();
+            } else {
+                showMessageModal('Post not found.', 'error');
+                navigateTo('forum');
+                return;
+            }
+        } catch (error) {
+            showMessageModal('Error fetching post for editing: ' + error.message, 'error');
+            navigateTo('forum');
+            return;
+        } finally {
+            hideLoadingSpinner();
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Edit Post</h2>
+                    <form id="edit-post-form" class="space-y-6">
+                        <div>
+                            <label for="post-title" class="block text-gray-700 text-sm font-semibold mb-2">Post Title</label>
+                            <input type="text" id="post-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="${postData.title}" required>
+                        </div>
+                        <div>
+                            <label for="post-content" class="block text-gray-700 text-sm font-semibold mb-2">Post Content</label>
+                            <textarea id="post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>${postData.content}</textarea>
+                        </div>
+                        <button type="submit" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Save Changes
+                        </button>
+                        <button type="button" id="cancel-edit-btn" class="w-full py-3 rounded-full bg-gray-500 text-white font-bold text-lg hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg mt-2">
+                            Cancel
+                        </button>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('edit-post-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('post-title').value;
+            const content = document.getElementById('post-content').value;
+
+            try {
+                await updatePostFirestore(postId, title, content);
+                navigateTo('forum'); // Redirect to forum after editing
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+
+        document.getElementById('cancel-edit-btn').addEventListener('click', () => navigateTo('forum'));
+    }
+
+    /**
+     * Renders the Forum page, displaying all posts.
+     */
+    async function renderForumPage() {
+        if (!currentUser) {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">Please sign in to view the forum posts.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let posts = [];
+        try {
+            posts = await fetchAllPostsFirestore();
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+            posts = [];
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Forum & Announcements</h2>
+                    ${posts.length === 0 ? `
+                        <p class="text-center text-gray-600">No posts yet. Check back later!</p>
+                    ` : `
+                        <div id="posts-list" class="space-y-6">
+                            ${posts.map(post => `
+                                <div class="bg-gray-50 p-6 rounded-lg shadow-md border border-gray-200">
+                                    <h3 class="text-2xl font-bold text-gray-800 mb-2">${post.title}</h3>
+                                    <p class="text-gray-700 whitespace-pre-wrap">${post.content}</p>
+                                    <p class="text-sm text-gray-500 mt-4">
+                                        Posted by <span class="font-semibold">${post.authorUsername}</span> on ${post.timestamp}
+                                    </p>
+                                    
+                                    <div class="flex items-center space-x-4 mt-4 border-t pt-4 border-gray-300">
+                                        <!-- Reactions Section -->
+                                        <div class="flex items-center space-x-2">
+                                            ${['👍', '❤️', '😂', '🔥'].map(emoji => `
+                                                <button class="text-xl p-1 rounded-full hover:bg-gray-200 transition duration-200" data-post-id="${post.id}" data-emoji="${emoji}">
+                                                    ${emoji} <span class="text-sm text-gray-600">${post.reactions[emoji] || 0}</span>
+                                                </button>
+                                            `).join('')}
+                                        </div>
+
+                                        <!-- Admin Actions (Edit/Delete) -->
+                                        ${userData.role === 'admin' ? `
+                                            <div class="ml-auto space-x-2">
+                                                <button class="text-blue-600 hover:text-blue-800 font-semibold" data-post-id="${post.id}" data-action="edit">Edit</button>
+                                                <button class="text-red-600 hover:text-red-800 font-semibold" data-post-id="${post.id}" data-action="delete">Delete</button>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+
+                                    <!-- Comments Section -->
+                                    <div class="mt-6 border-t pt-4 border-gray-300">
+                                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Comments (${post.comments.length})</h4>
+                                        <div class="space-y-3 mb-4">
+                                            ${post.comments.length === 0 ? `
+                                                <p class="text-sm text-gray-500">No comments yet. Be the first to comment!</p>
+                                            ` : `
+                                                ${post.comments.map(comment => `
+                                                    <div class="bg-white p-3 rounded-lg border border-gray-200">
+                                                        <p class="text-sm text-gray-700">${comment.text}</p>
+                                                        <p class="text-xs text-gray-500 mt-1">by <span class="font-medium">${comment.authorUsername}</span> on ${comment.timestamp ? new Date(comment.timestamp).toLocaleString() : 'N/A'}</p>
+                                                    </div>
+                                                `).join('')}
+                                            `}
+                                        </div>
+                                        <form class="comment-form" data-post-id="${post.id}">
+                                            <textarea class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" rows="2" placeholder="Add a comment..." required></textarea>
+                                            <button type="submit" class="mt-2 py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-200 text-sm">
+                                                Post Comment
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+
+        // Add event listeners for reactions
+        contentArea.querySelectorAll('[data-emoji]').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const postId = e.target.closest('[data-post-id]').dataset.postId;
+                const emoji = e.target.dataset.emoji || e.target.parentElement.dataset.emoji; // Handles click on span inside button
+                if (postId && emoji) {
+                    await addReactionToPost(postId, emoji);
+                }
+            });
+        });
+
+        // Add event listeners for admin actions (Edit/Delete)
+        contentArea.querySelectorAll('[data-action="edit"]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const postId = e.target.dataset.postId;
+                navigateTo('edit-post', postId); // Pass postId to navigateTo
+            });
+        });
+
+        contentArea.querySelectorAll('[data-action="delete"]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const postId = e.target.dataset.postId;
+                showMessageModal('Are you sure you want to delete this post? This action cannot be undone.', 'confirm', async () => {
+                    try {
+                        await deletePostFirestore(postId);
+                        renderForumPage(); // Re-render to show updated list
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
+                });
+            });
+        });
+
+        // Add event listeners for comments
+        contentArea.querySelectorAll('.comment-form').forEach(form => {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const postId = form.dataset.postId;
+                const textarea = form.querySelector('textarea');
+                const commentText = textarea.value;
+                await addCommentToPost(postId, commentText);
+                textarea.value = ''; // Clear textarea after posting
+            });
+        });
+    }
+
+    // --- Navigation and Initialization ---
+
+    /**
+     * Navigates to a specific page and renders its content.
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout').
+     * @param {string} [postId=null] - Optional: postId for edit-post route.
+     */
+    async function navigateTo(page, postId = null) {
+        // Store the current page in a data attribute on the content area for tracking
+        contentArea.dataset.currentPage = page;
+        contentArea.dataset.currentPostId = postId; // Store postId if applicable
+
+        if (page === 'logout') {
+            showLoadingSpinner();
+            try {
+                await signOut(auth);
+                currentUser = null;
+                userData = null;
+                showMessageModal('You have been signed out.');
+                page = 'home'; // Redirect to home after logout
+            } catch (error) {
+                console.error("Error signing out:", error.message);
+                showMessageModal("Failed to sign out. Please try again.", 'error');
+                hideLoadingSpinner();
+                return; // Prevent navigating away if sign out fails
+            } finally {
+                hideLoadingSpinner();
+            }
+        }
+
+        switch (page) {
+            case 'home':
+                renderHomePage();
+                break;
+            case 'auth':
+                renderAuthPage();
+                break;
+            case 'profile':
+                renderProfilePage();
+                break;
+            case 'about':
+                renderAboutPage();
+                break;
+            case 'admin':
+                renderAdminPanelPage();
+                break;
+            case 'create-post': // New case
+                renderCreatePostPage();
+                break;
+            case 'edit-post': // New case for editing
+                if (postId) {
+                    renderEditPostPage(postId);
+                } else {
+                    showMessageModal("Invalid post ID for editing.", 'error');
+                    navigateTo('forum');
+                }
+                break;
+            case 'forum': // New case
+                renderForumPage();
+                break;
+            default:
+                renderHomePage();
+        }
+        renderNavbar(); // Always re-render navbar after page change to update login/logout state
+    }
+
+    // Mobile menu toggle
+    mobileMenuToggle.addEventListener('click', () => {
+        const isHidden = mobileMenu.classList.contains('hidden');
+        mobileMenu.classList.toggle('hidden', !isHidden);
+        mobileMenuIconOpen.classList.toggle('hidden', isHidden); // Show open icon when hidden, hide when not hidden
+        mobileMenuIconClose.classList.toggle('hidden', !isHidden); // Show close icon when not hidden, hide when hidden
+    });
+
+
+    // Firebase Auth State Listener
+    // This is the most critical part for initial load and ongoing authentication state changes
+    onAuthStateChanged(auth, async (user) => {
+        showLoadingSpinner();
+        if (user) {
+            currentUser = user;
+            try {
+                const fetchedUserData = await fetchCurrentUserFirestoreData();
+                if (fetchedUserData) {
+                    userData = fetchedUserData;
+                } else {
+                    // This scenario should be rare if signup works correctly, but handles edge cases
+                    // where a user exists in Auth but not Firestore.
+                    console.warn("User exists in Auth but not Firestore. Creating default entry.");
+                    const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+                    // Prioritize photoURL from auth provider, fallback to placeholder
+                    const defaultProfilePic = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.displayName || user.email || 'U').charAt(0).toUpperCase()}`;
+                    const defaultBackground = 'bg-gradient-to-r from-blue-400 to-purple-600';
+                    await setDoc(userDocRef, {
+                        email: user.email,
+                        username: user.displayName || user.email?.split('@')[0],
+                        role: 'member',
+                        profilePicUrl: defaultProfilePic,
+                        backgroundUrl: defaultBackground
+                    });
+                    userData = {
+                        email: user.email,
+                        username: user.displayName || user.email?.split('@')[0],
+                        role: 'member',
+                        profilePicUrl: defaultProfilePic,
+                        backgroundUrl: defaultBackground
+                    };
+                }
+                updateBodyBackground(); // Apply user's saved background
+                renderNavbar(); // Update navbar with user info
+                // Determine which page to render based on current state or previous navigation
+                let pageToRender = contentArea.dataset.currentPage || 'home';
+                let postIdToRender = contentArea.dataset.currentPostId || null;
+
+                if (pageToRender === 'auth' || pageToRender === 'logout') {
+                    pageToRender = 'home'; // Always redirect to home if coming from auth/logout
+                }
+                navigateTo(pageToRender, postIdToRender); // Navigate to the appropriate page
+
+            } catch (error) {
+                console.error("Error setting up user data after auth state change:", error);
+                // Attempt to sign out if data fetching fails critically
+                await signOut(auth);
+                currentUser = null;
+                userData = null;
+                showMessageModal("Failed to load user data. Please try signing in again.", 'error');
+                navigateTo('auth');
+            }
+        } else {
+            currentUser = null;
+            userData = null;
+            updateBodyBackground(); // Reset to default background
+            renderNavbar(); // Update navbar to logged out state
+            // Only redirect if current page is not home or about, or if it was a protected page
+            if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about') {
+                 navigateTo('home'); // Redirect to home if logged out from a protected page
+            }
+        }
+        hideLoadingSpinner();
+    });
+
+
+    // Initial render call moved inside the DOMContentLoaded listener but outside onAuthStateChanged,
+    // to ensure elements are present for the very first render.
+    // The onAuthStateChanged listener will then handle subsequent renders based on auth state.
+    // It is important that this is called *after* onAuthStateChanged has been set up,
+    // to ensure initial user state can be reacted to.
+    if (!contentArea.dataset.currentPage) { // Only render if no page has been set yet
+        navigateTo('home');
+    }
+
+
+    // Event listeners for static navbar buttons (ensure these are attached AFTER initial DOM render)
+    navHomeButton.addEventListener('click', () => navigateTo('home'));
+    navAboutButton.addEventListener('click', () => navigateTo('about'));
+});
