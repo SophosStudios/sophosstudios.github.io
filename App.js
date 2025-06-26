@@ -14,10 +14,15 @@ import CONFIG from './config.js';
 // import CONFIG from './config.js'; // Make sure config.js is in the same directory
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Use Firebase configuration from config.js
+    const firebaseConfig = CONFIG.firebaseConfig;
+
     // Initialize Firebase
-    const app = initializeApp(CONFIG.firebaseConfig);
+    const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    // Use the projectId as the APP_ID for consistent Firestore collection paths and rules
+    const APP_ID = firebaseConfig.projectId;
 
     // Initialize Auth Provider for Google
     const googleProvider = new GoogleAuthProvider();
