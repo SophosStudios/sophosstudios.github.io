@@ -7,6 +7,7 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  signInWithCustomToken, // Added this import
 } from 'firebase/auth';
 import {
   getFirestore,
