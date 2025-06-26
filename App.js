@@ -6,6 +6,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+import CONFIG from './config.js';
 
 // Import configuration from config.js
 // This import is typically used for local development outside the Canvas environment.
@@ -13,15 +14,8 @@ import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, 
 // import CONFIG from './config.js'; // Make sure config.js is in the same directory
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Use Firebase configuration from global variables provided by the Canvas environment
-    // If running locally without Canvas, you would typically get this from a config.js file.
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-    const APP_ID = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId; // Use projectId as fallback APP_ID
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-
     // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
+    const app = initializeApp(CONFIG);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
