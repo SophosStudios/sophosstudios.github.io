@@ -6,22 +6,16 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
-import CONFIG from './config.js'; // Retained as per user request
 
-// Import configuration from config.js
-// This import is typically used for local development outside the Canvas environment.
-// In Canvas, __app_id, __firebase_config, __initial_auth_token are provided globally.
-// import CONFIG from './config.js'; // Make sure config.js is in the same directory
+// IMPORTANT: In the Canvas environment, __app_id, __firebase_config, and __initial_auth_token
+// are provided globally. Do NOT import a local config.js file as it will be ignored.
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Use Firebase configuration from config.js as requested
-    const firebaseConfig = CONFIG.firebaseConfig;
-
-    // Use global variables provided by the Canvas environment for APP_ID and initialAuthToken,
-    // falling back to defaults or values from config.js if not defined by Canvas.
-    const APP_ID = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
+    // Retrieve Firebase configuration and initial auth token from global Canvas variables
+    // These variables are guaranteed to be present in the Canvas runtime.
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+    const APP_ID = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId; // Fallback to projectId if __app_id is unexpectedly missing
     const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
 
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
@@ -806,10 +800,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.warn("Element with ID 'side-drawer-menu' not found. Mobile navigation may not render correctly.");
         }
 
-        // Update website title (assuming CONFIG is available, otherwise default)
-        document.querySelector('title').textContent = firebaseConfig.projectId || 'MyWebsite'; // Fallback to projectId or generic
+        // Update website title (assuming APP_ID is available, otherwise default)
+        document.querySelector('title').textContent = APP_ID || 'MyWebsite'; // Fallback to APP_ID or generic
         if (navHomeButton) {
-            navHomeButton.textContent = firebaseConfig.projectId || 'MyWebsite';
+            navHomeButton.textContent = APP_ID || 'MyWebsite';
         } else {
             console.warn("Element with ID 'nav-home' not found. Main title may not be functional.");
         }
@@ -2197,28 +2191,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (user) {
             currentUser = user;
             try {
-                // Attempt to sign in with custom token if available (Canvas environment)
-                // This check needs to be conditional and careful to not re-authenticate already authenticated users.
-                // The `user.uid === 'anonymous_user_id'` check is a placeholder; a more robust check might be needed
-                // depending on how anonymous users are handled in your specific Canvas setup.
-                if (initialAuthToken && user.isAnonymous) { // More reliably check for anonymous user
+                // IMPORTANT: If __initial_auth_token is provided and the current user is anonymous,
+                // attempt to sign in with the custom token to establish a persistent session.
+                // This typically happens once on page load in the Canvas environment.
+                if (initialAuthToken && user.isAnonymous) {
                      try {
                         await signInWithCustomToken(auth, initialAuthToken);
-                        // After custom token sign-in, the onAuthStateChanged will fire again with the authenticated user
-                        // So we can return here and let the next event handle the rest.
+                        // After custom token sign-in, the onAuthStateChanged will fire again with the authenticated user.
+                        // We return here to let that subsequent event handle the rest of the UI updates
+                        // with the correctly authenticated user.
                         return;
                     } catch (error) {
                         console.error("Error signing in with custom token on auth state change (anonymous user):", error);
-                        // Fallback: If custom token fails, proceed with the existing user (could be anonymous)
+                        // If custom token sign-in fails, proceed with the existing anonymous user for now,
+                        // but they might face permission issues for Firestore operations.
+                        showMessageModal("Failed to authenticate with provided token. You may have limited access.", 'error');
                     }
                 }
 
+                // Fetch user data from Firestore regardless of initial auth method
                 const fetchedUserData = await fetchCurrentUserFirestoreData();
                 if (fetchedUserData) {
                     userData = fetchedUserData;
                 } else {
                     // This scenario should be rare if signup works correctly, but handles edge cases
-                    // where a user exists in Auth but not Firestore.
+                    // where a user exists in Auth but not Firestore (e.g., deleted Firestore doc manually).
                     console.warn("User exists in Auth but not Firestore. Creating default entry.");
                     const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
                     // Prioritize photoURL from auth provider, fallback to placeholder
@@ -2261,6 +2258,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 navigateTo('auth');
             }
         } else {
+            // User is signed out or anonymous
             currentUser = null;
             userData = null;
             updateBodyBackground(); // Reset to default background
@@ -2307,8 +2305,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Attempt to sign in with custom token first, then anonymously if no token or token fails.
-    // This is generally handled by onAuthStateChanged but a direct call here ensures
-    // the very first auth state is handled.
+    // This initial sign-in attempt happens once on page load to establish the session.
+    // The onAuthStateChanged listener will then react to the result of this sign-in.
     if (initialAuthToken) {
         try {
             await signInWithCustomToken(auth, initialAuthToken);
