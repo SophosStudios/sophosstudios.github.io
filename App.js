@@ -1,12 +1,11 @@
 // App.js
 // This script contains the entire application logic, including Firebase initialization
-// and new features like forum, post management, reactions, comments, enhanced backgrounds,
-// and robust authentication state management for proper rendering, now with integrated chat rooms.
+// and new features like forum, post management, reactions, comments, and enhanced backgrounds.
 
 // Import Firebase functions
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js"; // Added getDocs here
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 // Import configuration from config.js
 import CONFIG from './config.js'; // Make sure config.js is in the same directory
@@ -44,17 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentUser = null; // Firebase Auth user object
     let userData = null; // Firestore user document data (role, background, etc.)
     let usersList = []; // List of all users for admin panel
-    let roomsList = []; // List of all rooms for admin panel and rooms page
     let currentModal = null; // To manage active message modal
-    let isAuthReady = false; // Flag to indicate if Firebase Auth state has been initialized
-
-    // Room-specific global state variables for chat functionality
-    let currentRoomId = null;
-    let currentRoomTitle = '';
-    let presenceInterval = null; // Interval for presence updates
-    let messagesUnsubscribe = null; // Unsubscribe function for messages listener
-    let presenceUnsubscribe = null; // Unsubscribe function for presence listener
-    let isInCall = false; // New state variable: tracks if the current user is in a simulated call
 
     // --- Utility Functions ---
 
@@ -70,7 +59,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             spinner.innerHTML = `<div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-white"></div>`;
             document.body.appendChild(spinner);
         }
-        spinner.classList.remove('hidden'); // Ensure it's visible
     }
 
     /**
@@ -79,7 +67,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function hideLoadingSpinner() {
         const spinner = document.getElementById('loading-spinner');
         if (spinner) {
-            spinner.classList.add('hidden'); // Hide it
+            spinner.remove();
         }
     }
 
@@ -151,7 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     function updateBodyBackground() {
         // Clear all previous body classes and inline styles to avoid conflicts
-        document.body.className = '';
+        document.body.className = ''; 
         document.body.style.backgroundImage = '';
         document.body.style.backgroundSize = '';
         document.body.style.backgroundPosition = '';
@@ -286,49 +274,20 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<object|null>} - User data or null if not authenticated/found.
      */
     async function fetchCurrentUserFirestoreData() {
-        if (!currentUser) {
-            console.log("No current user to fetch Firestore data for.");
-            return null;
-        }
+        if (!currentUser) return null;
 
-        console.log("Attempting to fetch Firestore data for user:", currentUser.uid);
         showLoadingSpinner();
         try {
             const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
             const docSnap = await getDoc(userDocRef);
-            let fetchedUserData;
             if (docSnap.exists()) {
-                fetchedUserData = docSnap.data();
-                console.log("Firestore user data fetched successfully:", fetchedUserData);
-            } else {
-                console.log("Firestore document for user not found. This might be a new user or a data inconsistency.");
-                // If user exists in Auth but not Firestore, create a default entry
-                const usernameToUse = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
-                const profilePicToUse = currentUser.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
-                const defaultBackground = 'bg-gradient-to-r from-blue-400 to-purple-600';
-
-                const newUserData = {
-                    email: currentUser.email,
-                    username: usernameToUse,
-                    role: 'member', // Default role for new users
-                    profilePicUrl: profilePicToUse,
-                    backgroundUrl: defaultBackground
-                };
-                await setDoc(userDocRef, newUserData);
-                console.log("Default user document created in Firestore.");
-                fetchedUserData = newUserData;
+                return docSnap.data();
             }
-            // Store user data in localStorage for persistence across refreshes
-            localStorage.setItem('currentUserUid', currentUser.uid);
-            localStorage.setItem('userData', JSON.stringify(fetchedUserData));
-            localStorage.setItem('userBackgroundUrl', fetchedUserData.backgroundUrl);
-
-            return fetchedUserData;
-
+            console.log("Firestore document for user not found.");
+            return null;
         } catch (error) {
-            console.error("Error fetching or creating user data from Firestore:", error.message);
-            // Propagate the error so onAuthStateChanged can handle a critical failure
-            throw new Error("Failed to load user profile: " + error.message);
+            console.error("Error fetching user data from Firestore:", error.message);
+            return null;
         } finally {
             hideLoadingSpinner();
         }
@@ -358,13 +317,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Fetch the updated document to return the latest state
             const docSnap = await getDoc(userDocRef);
-            const updatedFetchedData = docSnap.exists() ? docSnap.data() : null;
-            // Update localStorage with the latest user data
-            if (updatedFetchedData) {
-                localStorage.setItem('userData', JSON.stringify(updatedFetchedData));
-                localStorage.setItem('userBackgroundUrl', updatedFetchedData.backgroundUrl); // Update background URL in localStorage
-            }
-            return updatedFetchedData;
+            return docSnap.exists() ? docSnap.data() : null;
         } catch (error) {
             console.error("Error updating profile in Firestore:", error.message);
             throw new Error("Failed to update profile. Please try again: " + error.message);
@@ -379,7 +332,6 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function fetchAllUsersFirestore() {
         if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
-            console.warn("Attempted to fetch all users without sufficient privileges.");
             throw new Error("Not authorized to view users list.");
         }
 
@@ -401,7 +353,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             querySnapshot.forEach((doc) => {
                 usersData.push({ id: doc.id, ...doc.data() });
             });
-            console.log("Fetched all users successfully:", usersData.length);
             return usersData;
         } catch (error) {
             console.error("Error fetching all users:", error.message);
@@ -422,7 +373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             throw new Error("Not authorized to change roles.");
         }
-
+        
         // Prevent admins from setting founder role (only founders can do this)
         if (newRole === 'founder' && userData.role !== 'founder') {
             throw new Error("Only a founder can assign the 'founder' role.");
@@ -438,7 +389,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
             await updateDoc(userDocRef, { role: newRole });
-            console.log(`User ${userId} role updated to ${newRole}.`);
             return true;
         } catch (error) {
             console.error("Error updating user role in Firestore:", error.message);
@@ -467,7 +417,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
             await updateDoc(userDocRef, { isBanned: isBanned });
-            console.log(`User ${userId} ban status set to ${isBanned}.`);
             return true;
         } catch (error) {
             console.error("Error setting user ban status in Firestore:", error.message);
@@ -498,7 +447,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
             await deleteDoc(userDocRef);
-            console.log(`User ${userId} data deleted from Firestore.`);
             return true;
         } catch (error) {
             console.error("Error deleting user from Firestore:", error.message);
@@ -532,7 +480,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 comments: [] // Initialize empty comments array
             });
             showMessageModal('Post created successfully!');
-            console.log("New post created.");
         } catch (error) {
             console.error("Error creating post:", error.message);
             throw new Error("Failed to create post: " + error.message);
@@ -562,7 +509,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Do not update author or timestamp here, only content
             });
             showMessageModal('Post updated successfully!');
-            console.log(`Post ${postId} updated.`);
         } catch (error) {
             console.error("Error updating post:", error.message);
             throw new Error("Failed to update post: " + error.message);
@@ -586,7 +532,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
             await deleteDoc(postDocRef);
             showMessageModal('Post deleted successfully!');
-            console.log(`Post ${postId} deleted.`);
         } catch (error) {
             console.error("Error deleting post:", error.message);
             throw new Error("Failed to delete post: " + error.message);
@@ -615,7 +560,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (postSnap.exists()) {
                 const postData = postSnap.data();
                 const currentReactions = postData.reactions || {};
-
+                
                 // Get the user's previously reacted emoji for this post, if any
                 const userPreviousReaction = postData.userReactions ? postData.userReactions[currentUser.uid] : null;
 
@@ -642,10 +587,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updates[`reactions.${emoji}`] = (currentReactions[emoji] || 0) + 1;
                     updates[`userReactions.${currentUser.uid}`] = emoji; // Store user's new reaction
                 }
-
+                
                 // Perform the update
                 await updateDoc(postDocRef, updates);
-                console.log(`User ${currentUser.uid} reacted to post ${postId} with ${emoji}.`);
             }
         } catch (error) {
             console.error("Error adding reaction:", error.message);
@@ -653,7 +597,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
             hideLoadingSpinner();
             // Re-render forum page to show updated reactions
-            renderForumPage();
+            renderForumPage(); 
         }
     }
 
@@ -688,14 +632,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 comments: arrayUnion(newComment) // Add the new comment to the array
             });
             showMessageModal('Comment added successfully!');
-            console.log(`New comment added to post ${postId}.`);
         } catch (error) {
             console.error("Error adding comment:", error.message);
             showMessageModal("Failed to add comment: " + error.message, 'error');
         } finally {
             hideLoadingSpinner();
             // Re-render forum page to show updated comments
-            renderForumPage();
+            renderForumPage(); 
         }
     }
 
@@ -733,7 +676,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     comments: data.comments || [] // Ensure comments is an array
                 });
             });
-            console.log("Fetched all posts successfully:", postsData.length);
             return postsData;
         } catch (error) {
             console.error("Error fetching posts:", error.message);
@@ -766,7 +708,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             querySnapshot.forEach((doc) => {
                 teamMembersData.push({ id: doc.id, ...doc.data() });
             });
-            console.log("Fetched all team members successfully:", teamMembersData.length);
             return teamMembersData;
         } catch (error) {
             console.error("Error fetching team members:", error.message);
@@ -798,7 +739,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 timestamp: serverTimestamp()
             });
             showMessageModal('Team member added successfully!');
-            console.log("New team member added.");
         } catch (error) {
             console.error("Error adding team member:", error.message);
             throw new Error("Failed to add team member: " + error.message);
@@ -822,301 +762,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const teamMemberDocRef = doc(db, `/artifacts/${APP_ID}/public/data/team`, teamMemberId);
             await deleteDoc(teamMemberDocRef);
             showMessageModal('Team member deleted successfully!');
-            console.log(`Team member ${teamMemberId} deleted.`);
         } catch (error) {
             console.error("Error deleting team member:", error.message);
             throw new Error("Failed to delete team member: " + error.message);
         } finally {
             hideLoadingSpinner();
         }
-    }
-
-    /**
-     * Creates a new room in Firestore.
-     * Only callable by admins and founders.
-     * @param {string} title - The title of the room.
-     * @param {string} description - The description of the room.
-     * @returns {Promise<void>}
-     */
-    async function createRoomFirestore(title, description) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
-            throw new Error("Only admins and founders can create rooms.");
-        }
-        showLoadingSpinner();
-        try {
-            const roomsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms`);
-            await addDoc(roomsCollectionRef, { // Use addDoc for auto-generated ID
-                title: title,
-                description: description,
-                creatorId: currentUser.uid,
-                creatorUsername: userData.username || currentUser.displayName || currentUser.email,
-                timestamp: serverTimestamp(),
-            });
-            showMessageModal('Room created successfully!');
-            console.log("New room created.");
-        } catch (error) {
-            console.error("Error creating room:", error.message);
-            throw new Error("Failed to create room: " + error.message);
-        } finally {
-            hideLoadingSpinner();
-        }
-    }
-
-    /**
-     * Deletes a room from Firestore.
-     * Only callable by admins and founders.
-     * @param {string} roomId - The ID of the room to delete.
-     * @returns {Promise<void>}
-     */
-    async function deleteRoomFirestore(roomId) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
-            throw new Error("Not authorized to delete rooms.");
-        }
-        showLoadingSpinner();
-        try {
-            const roomDocRef = doc(db, `/artifacts/${APP_ID}/public/data/rooms`, roomId);
-            await deleteDoc(roomDocRef);
-            showMessageModal('Room deleted successfully!');
-            console.log(`Room ${roomId} deleted.`);
-        } catch (error) {
-            console.error("Error deleting room:", error.message);
-            throw new Error("Failed to delete room: " + error.message);
-        } finally {
-            hideLoadingSpinner();
-        }
-    }
-
-    /**
-     * Fetches all rooms from Firestore.
-     * @returns {Promise<Array<object>>} - List of all rooms.
-     */
-    async function fetchAllRoomsFirestore() {
-        showLoadingSpinner();
-        try {
-            const roomsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms`);
-            const q = query(roomsCollectionRef, orderBy('timestamp', 'desc')); // Order by newest first
-
-            const querySnapshot = await new Promise((resolve, reject) => {
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    unsubscribe(); // Unsubscribe immediately after first fetch
-                    resolve(snapshot);
-                }, (error) => {
-                    reject(error);
-                });
-            });
-
-            const roomsData = [];
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                roomsData.push({
-                    id: doc.id,
-                    title: data.title,
-                    description: data.description,
-                    creatorUsername: data.creatorUsername,
-                    timestamp: data.timestamp ? (typeof data.timestamp === 'string' ? new Date(data.timestamp).toLocaleString() : data.timestamp.toDate().toLocaleString()) : 'N/A',
-                });
-            });
-            console.log("Fetched all rooms successfully:", roomsData.length);
-            return roomsData;
-        } catch (error) {
-            console.error("Error fetching rooms:", error.message);
-            throw new Error("Failed to fetch rooms: " + error.message);
-        } finally {
-            hideLoadingSpinner();
-        }
-    }
-
-    /**
-     * Sends a new chat message to Firestore.
-     * @param {string} messageText - The content of the message.
-     */
-    async function sendMessage(messageText) {
-        if (!currentUser || !userData || !currentRoomId) {
-            showMessageModal("You must be logged in and in a room to send messages.", 'info');
-            return;
-        }
-        if (!messageText.trim()) {
-            showMessageModal("Message cannot be empty.", 'info');
-            return;
-        }
-
-        try {
-            const messagesCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms/${currentRoomId}/messages`);
-            await addDoc(messagesCollectionRef, {
-                text: messageText,
-                authorId: currentUser.uid,
-                authorUsername: userData.username || currentUser.displayName || currentUser.email,
-                profilePicUrl: userData.profilePicUrl || '', // Store sender's profile picture URL
-                timestamp: serverTimestamp()
-            });
-            // Clear input after sending, assuming the input element is accessible
-            const messageInput = document.getElementById('message-input');
-            if (messageInput) messageInput.value = '';
-        } catch (error) {
-            console.error("Error sending message:", error);
-            showMessageModal("Failed to send message: " + error.message, 'error');
-        }
-    }
-
-    /**
-     * Updates the current user's presence status in the current room.
-     * @param {boolean} inCallStatus - True if the user is in a call, false otherwise.
-     */
-    async function updateMyPresence(inCallStatus) {
-        if (!currentUser || !currentRoomId) return;
-
-        try {
-            const presenceRef = doc(db, `/artifacts/${APP_ID}/public/data/rooms/${currentRoomId}/presence`, currentUser.uid);
-            await setDoc(presenceRef, {
-                userId: currentUser.uid,
-                username: userData.username || currentUser.displayName || currentUser.email,
-                profilePicUrl: userData.profilePicUrl || '',
-                lastSeen: serverTimestamp(),
-                inCall: inCallStatus, // New field to indicate call status
-            }, { merge: true });
-        } catch (error) {
-            console.error("Error updating presence:", error);
-        }
-    }
-
-    /**
-     * Initiates a simulated call for the current user.
-     */
-    async function joinCall() {
-        if (!currentUser || !currentRoomId) return;
-        isInCall = true;
-        await updateMyPresence(true);
-        showMessageModal("You have joined the call!", 'info');
-        // Update button states immediately
-        const joinCallBtn = document.getElementById('join-call-btn');
-        const leaveCallBtn = document.getElementById('leave-call-btn');
-        if (joinCallBtn) joinCallBtn.classList.add('hidden');
-        if (leaveCallBtn) leaveCallBtn.classList.remove('hidden');
-    }
-
-    /**
-     * Ends a simulated call for the current user.
-     */
-    async function leaveCall() {
-        if (!currentUser || !currentRoomId) return;
-        isInCall = false;
-        await updateMyPresence(false);
-        showMessageModal("You have left the call.", 'info');
-        // Update button states immediately
-        const joinCallBtn = document.getElementById('join-call-btn');
-        const leaveCallBtn = document.getElementById('leave-call-btn');
-        if (joinCallBtn) joinCallBtn.classList.remove('hidden');
-        if (leaveCallBtn) leaveCallBtn.classList.add('hidden');
-    }
-
-    /**
-     * Sets up real-time presence tracking for the current user in the room.
-     */
-    async function setupPresence() {
-        if (!currentUser || !currentRoomId) return;
-
-        // Clean up previous presence listener and interval if any
-        if (presenceUnsubscribe) presenceUnsubscribe();
-        if (presenceInterval) clearInterval(presenceInterval);
-
-        // Initial presence update for the room, reflecting current isInCall status
-        updateMyPresence(isInCall);
-
-        // Set up interval for periodic presence updates (e.g., every 5 seconds)
-        presenceInterval = setInterval(() => updateMyPresence(isInCall), 5000);
-
-        // Listen for other users' presence
-        const presenceCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms/${currentRoomId}/presence`);
-        const q = query(presenceCollectionRef, orderBy('lastSeen', 'desc'));
-
-        presenceUnsubscribe = onSnapshot(q, (snapshot) => {
-            const activeUsersListDiv = document.getElementById('active-users-list');
-            if (!activeUsersListDiv) return;
-
-            activeUsersListDiv.innerHTML = '';
-            let activeUsersCount = 0;
-            const activeThreshold = new Date(Date.now() - 15 * 1000); // Users seen in last 15 seconds
-
-            snapshot.forEach((userDoc) => {
-                const presenceData = userDoc.data();
-                if (presenceData.lastSeen && presenceData.lastSeen.toDate() > activeThreshold) {
-                    activeUsersCount++;
-                    const userElement = document.createElement('div');
-                    userElement.className = 'flex items-center space-x-3 p-2 bg-gray-100 rounded-md shadow-sm';
-                    const userProfilePic = presenceData.profilePicUrl || `https://placehold.co/30x30/F0F0F0/000000?text=${(presenceData.username || 'U').charAt(0).toUpperCase()}`;
-
-                    userElement.innerHTML = `
-                        <img src="${userProfilePic}" alt="User Avatar" class="w-8 h-8 rounded-full object-cover border-2 ${presenceData.inCall ? 'border-green-500' : 'border-gray-300'}">
-                        <span class="font-semibold text-gray-800">${presenceData.username}</span>
-                        ${presenceData.userId === currentUser.uid ? '<span class="text-xs text-blue-500">(You)</span>' : ''}
-                        ${presenceData.inCall ? '<i class="fas fa-phone text-green-500 ml-2" title="In Call"></i>' : ''}
-                    `;
-                    activeUsersListDiv.appendChild(userElement);
-                }
-            });
-
-            if (activeUsersCount === 0) {
-                activeUsersListDiv.innerHTML = '<p class="text-gray-500 text-center text-sm">No one else is online.</p>';
-            }
-        }, (error) => {
-            console.error("Error fetching active users:", error);
-            const activeUsersListDiv = document.getElementById('active-users-list');
-            if (activeUsersListDiv) activeUsersListDiv.innerHTML = '<p class="text-red-500 text-center text-sm">Error loading active users.</p>';
-        });
-    }
-
-    /**
-     * Loads messages for the current room and sets up real-time listener.
-     */
-    async function loadRoomMessages() {
-        if (!currentUser || !currentRoomId) return;
-
-        // Clean up previous messages listener if any
-        if (messagesUnsubscribe) messagesUnsubscribe();
-
-        const messagesRef = collection(db, `/artifacts/${APP_ID}/public/data/rooms/${currentRoomId}/messages`);
-        const q = query(messagesRef, orderBy('timestamp', 'asc'));
-
-        messagesUnsubscribe = onSnapshot(q, async (snapshot) => {
-            const chatMessagesDiv = document.getElementById('chat-messages');
-            if (!chatMessagesDiv) return; // Ensure element exists after contentArea is rendered
-
-            chatMessagesDiv.innerHTML = ''; // Clear existing messages
-
-            // Fetch all user profiles for message display (optimize by caching if needed)
-            const usersCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
-            const usersSnapshot = await getDocs(usersCollectionRef);
-            const usersMap = {};
-            usersSnapshot.forEach(doc => {
-                usersMap[doc.id] = doc.data();
-            });
-
-            snapshot.forEach((msgDoc) => {
-                const msg = msgDoc.data();
-                const senderData = usersMap[msg.authorId] || { username: 'Unknown User', profilePicUrl: '' };
-                const profilePic = senderData.profilePicUrl || `https://placehold.co/40x40/F0F0F0/000000?text=${(senderData.username || 'U').charAt(0).toUpperCase()}`;
-
-                const messageElement = document.createElement('div');
-                messageElement.className = `
-                    flex items-start gap-3 p-3 rounded-lg shadow-sm w-full
-                    ${msg.authorId === currentUser.uid ? 'bg-blue-200 self-end ml-auto flex-row-reverse' : 'bg-gray-200 self-start mr-auto'}
-                `;
-                messageElement.innerHTML = `
-                    <img src="${profilePic}" alt="Avatar" class="w-10 h-10 rounded-full object-cover border-2 border-gray-300 flex-shrink-0" onerror="this.onerror=null; this.src='https://placehold.co/40x40/F0F0F0/000000?text=${(senderData.username || 'U').charAt(0).toUpperCase()}'">
-                    <div class="flex flex-col ${msg.authorId === currentUser.uid ? 'items-end' : 'items-start'} flex-grow">
-                        <p class="font-semibold text-sm ${msg.authorId === currentUser.uid ? 'text-blue-800' : 'text-gray-800'}">${msg.authorUsername}</p>
-                        <p class="text-gray-700 break-words">${msg.text}</p>
-                        <p class="text-xs text-gray-500 mt-1">${msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleString() : 'N/A'}</p>
-                    </div>
-                `;
-                chatMessagesDiv.appendChild(messageElement);
-            });
-            chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight; // Scroll to bottom
-        }, (error) => {
-            console.error("Error fetching messages:", error);
-            const chatMessagesDiv = document.getElementById('chat-messages');
-            if (chatMessagesDiv) chatMessagesDiv.innerHTML = '<p class="text-red-500 text-center text-sm">Error loading chat messages.</p>';
-        });
     }
 
 
@@ -1132,7 +783,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             console.warn("Element with ID 'nav-links' not found. Desktop navigation may not render correctly.");
         }
-
+        
         // Clear only dynamically added items from side drawer (keeping static Home/About)
         // Find the index of the first dynamic button (or the length if none)
         let firstDynamicIndex = 2; // Assuming mobile-drawer-home and mobile-drawer-about are always first 2 static elements
@@ -1163,30 +814,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.className = `
                 ${isMobile ? 'block w-full text-left px-4 py-3 text-lg font-semibold' : 'px-4 py-2'}
                 rounded-lg hover:bg-gray-700 text-white transition duration-200
-                ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' :
-                  (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' :
+                ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : 
+                  (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : 
                   (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}
             `; // Removed founder-specific styling, admin styling will apply if a founder is shown admin panel
             btn.innerHTML = `${iconHtml}<span>${text}</span>`;
             btn.addEventListener('click', () => {
-                if (page === 'logout') {
-                    signOut(auth).then(() => {
-                        showMessageModal('You have been signed out.');
-                        // Clear localStorage for user data on logout
-                        localStorage.removeItem('currentUserUid');
-                        localStorage.removeItem('userData');
-                        localStorage.removeItem('firebaseConfig');
-                        localStorage.removeItem('APP_ID');
-                        localStorage.removeItem('__initial_auth_token');
-                        localStorage.removeItem('userBackgroundUrl'); // Clear background too
-                        // Reload or navigate to home to clear state
-                        window.location.href = 'index.html'; // Ensure full refresh on logout
-                    }).catch(error => {
-                        showMessageModal("Failed to sign out: " + error.message, 'error');
-                    });
-                } else { // In-page navigation
-                    navigateTo(page);
-                }
+                navigateTo(page);
+                // Close side drawer after navigation
                 closeSideDrawer();
             });
             container.appendChild(btn);
@@ -1198,8 +833,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 name: 'Community',
                 items: [
                     { id: 'nav-forum', text: 'Forum', page: 'forum' },
-                    { id: 'nav-rooms', text: 'Rooms', page: 'rooms' },
-                    { id: 'nav-team', text: 'Meet the Team', page: 'team' }
+                    { id: 'nav-team', text: 'Meet the Team', page: 'team' } // New category item
                 ],
                 authRequired: true
             },
@@ -1237,23 +871,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Close all desktop dropdowns function
-        const closeAllDesktopDropdowns = (e) => {
-            // Check if the click was outside of any dropdown container or toggle button
-            let clickedInsideDropdown = false;
-            document.querySelectorAll('.desktop-dropdown-toggle, .desktop-dropdown-content').forEach(element => {
-                if (element.contains(e.target)) {
-                    clickedInsideDropdown = true;
-                }
+        const closeAllDesktopDropdowns = () => {
+            document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
+                content.classList.add('hidden');
+                content.style.maxHeight = '0px';
+                const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
+                if (icon) icon.classList.remove('rotate-180');
             });
-
-            if (!clickedInsideDropdown) {
-                document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
-                    content.classList.add('hidden');
-                    content.style.maxHeight = '0px';
-                    const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
-                    if (icon) icon.classList.remove('rotate-180');
-                });
-            }
         };
 
         // Render Desktop Navigation
@@ -1287,15 +911,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 e.stopPropagation(); // Prevent document click from immediately closing it
                 const isOpen = !dropdownContent.classList.contains('hidden');
 
-                // Close all other dropdowns, but only if they are not the one being toggled
-                document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
-                    if (content !== dropdownContent) {
-                        content.classList.add('hidden');
-                        content.style.maxHeight = '0px';
-                        const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
-                        if (icon) icon.classList.remove('rotate-180');
-                    }
-                });
+                closeAllDesktopDropdowns(); // Close all other dropdowns first
 
                 if (!isOpen) {
                     dropdownContent.classList.remove('hidden');
@@ -1311,34 +927,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Attach event listeners for dropdown items
             dropdownContent.querySelectorAll('button[id]').forEach(btn => {
-                const navItem = categories.flatMap(cat => cat.items).find(item => item.id === btn.id);
-                if (navItem) {
+                const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
+                if (page) {
                     btn.addEventListener('click', () => {
-                        if (navItem.page === 'logout') {
-                            signOut(auth).then(() => {
-                                showMessageModal('You have been signed out.');
-                                // Clear localStorage for user data on logout
-                                localStorage.removeItem('currentUserUid');
-                                localStorage.removeItem('userData');
-                                localStorage.removeItem('firebaseConfig');
-                                localStorage.removeItem('APP_ID');
-                                localStorage.removeItem('__initial_auth_token');
-                                localStorage.removeItem('userBackgroundUrl'); // Clear background too
-                                window.location.href = 'index.html'; // Full reload to clear state
-                            }).catch(error => {
-                                showMessageModal("Failed to sign out: " + error.message, 'error');
-                            });
-                        } else {
-                            navigateTo(navItem.page); // Navigate within this index.html
-                        }
-                        closeAllDesktopDropdowns({target: document.body}); // Simulate click on body to close dropdown
+                        navigateTo(page);
+                        closeAllDesktopDropdowns(); // Close dropdown after navigation
                     });
                 }
             });
         });
 
         // Close desktop dropdowns when clicking anywhere on the document
-        // This listener ensures dropdowns close when clicking outside of them
         document.removeEventListener('click', closeAllDesktopDropdowns); // Remove previous listener to prevent duplicates
         document.addEventListener('click', closeAllDesktopDropdowns);
 
@@ -1383,7 +982,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         openContent.classList.remove('open');
                         openContent.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
                     });
-
+                    
                     dropdownContent.style.maxHeight = dropdownContent.scrollHeight + 'px';
                     dropdownContent.classList.add('open');
                     dropdownIcon.classList.add('rotate-180');
@@ -1391,26 +990,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
 
             dropdownContent.querySelectorAll('button[id]').forEach(btn => {
-                const navItem = categories.flatMap(cat => cat.items).find(item => item.id === btn.id);
-                if (navItem) {
+                const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
+                if (page) {
                     btn.addEventListener('click', () => {
-                        if (navItem.page === 'logout') {
-                            signOut(auth).then(() => {
-                                showMessageModal('You have been signed out.');
-                                // Clear localStorage for user data on logout
-                                localStorage.removeItem('currentUserUid');
-                                localStorage.removeItem('userData');
-                                localStorage.removeItem('firebaseConfig');
-                                localStorage.removeItem('APP_ID');
-                                localStorage.removeItem('__initial_auth_token');
-                                localStorage.removeItem('userBackgroundUrl'); // Clear background too
-                                window.location.href = 'index.html'; // Full reload on logout
-                            }).catch(error => {
-                                showMessageModal("Failed to sign out: " + error.message, 'error');
-                            });
-                        } else { // In-page navigation
-                            navigateTo(navItem.page);
-                        }
+                        navigateTo(page);
                         closeSideDrawer(); // Close drawer after navigating
                     });
                 }
@@ -1452,7 +1035,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     colorClass = 'text-gray-800';
             }
             // Apply a subtle animation for all roles, or only privileged ones
-            const animationClass = (role === 'admin' || role === 'founder') ? 'animate-pulse' : '';
+            const animationClass = (role === 'admin' || role === 'founder') ? 'animate-pulse' : ''; 
             return `<span class="font-semibold ${colorClass} ${animationClass}">${emoji} ${role}</span>`;
         };
 
@@ -1477,7 +1060,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button id="go-to-forum-btn" class="py-3 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Visit Forum
                         </button>
-                        ${(userData.role === 'admin' || userData.role === 'founder') ? `
+                        ${userData.role === 'admin' || userData.role === 'founder' ? `
                         <button id="go-to-admin-btn" class="py-3 px-6 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Admin Panel
                         </button>` : ''}
@@ -1621,8 +1204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     function renderProfilePage() {
         if (!currentUser || !userData) {
-            console.warn("Attempted to render profile page without current user or user data.");
-            navigateTo('auth'); // Redirect to auth if not logged in or data not ready
+            navigateTo('auth'); // Redirect to auth if not logged in
             return;
         }
 
@@ -1683,11 +1265,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const profileForm = document.getElementById('profile-form');
         const usernameInput = document.getElementById('profile-username');
         const profilePicUrlInput = document.getElementById('profile-pic-url');
-        const backgroundSelect = document.getElementById('profile-background-select');
-        // CORRECTED ID: Changed from 'profile-custom-background-url' to 'custom-background-url'
-        const customBackgroundUrlInput = document.getElementById('custom-background-url');
+        const backgroundSelect = document.getElementById('profile-background-select'); // Changed ID
+        const customBackgroundUrlInput = document.getElementById('custom-background-url'); // New input
         const profilePicDisplay = document.getElementById('profile-pic-display');
-
 
         // Update profile picture preview as URL changes
         profilePicUrlInput.addEventListener('input', () => {
@@ -1702,10 +1282,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             const newUsername = usernameInput.value;
             const newProfilePicUrl = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(newUsername || 'U').charAt(0).toUpperCase()}`;
-
+            
             let newBackgroundUrl;
             // If custom URL is provided, use it. Otherwise, use the selected theme.
-            if (customBackgroundUrlInput && customBackgroundUrlInput.value) { // Added null check
+            if (customBackgroundUrlInput.value) {
                 newBackgroundUrl = customBackgroundUrlInput.value;
             } else {
                 newBackgroundUrl = backgroundSelect.value;
@@ -1764,8 +1344,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Renders the Admin Panel page.
      */
     async function renderAdminPanelPage() {
-        if (!currentUser || !userData || (userData.role !== 'admin' && userData.role !== 'founder')) {
-            console.warn("Attempted to render Admin Panel without sufficient privileges.");
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -1779,11 +1358,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         try {
             usersList = await fetchAllUsersFirestore();
-            roomsList = await fetchAllRoomsFirestore(); // Fetch rooms for display
         } catch (error) {
             showMessageModal(error.message, 'error');
             usersList = []; // Clear list if fetch fails
-            roomsList = [];
         }
 
 
@@ -1791,14 +1368,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Admin Panel</h2>
-                    <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts, forum posts, and communication rooms.</p>
-
-                    <div class="mb-8 text-center space-x-4">
+                    <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts, and create forum posts.</p>
+                    <div class="mb-6 text-center space-x-4">
                         <button id="view-forum-admin-btn" class="py-2 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Manage Posts (Forum)
-                        </button>
-                        <button id="manage-rooms-admin-btn" class="py-2 px-6 rounded-full bg-teal-600 text-white font-bold text-lg hover:bg-teal-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                            Manage Rooms
                         </button>
                     </div>
 
@@ -1806,7 +1379,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ${usersList.length === 0 ? `
                         <p class="text-center text-gray-600">No users found.</p>
                     ` : `
-                        <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200 mb-8">
+                        <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200">
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-100">
                                     <tr>
@@ -1833,53 +1406,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </table>
                         </div>
                     `}
-
-                    <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Manage Rooms</h3>
-                    <div class="mb-6 text-center">
-                        <button id="create-room-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                            Create New Room
-                        </button>
-                    </div>
-                    ${roomsList.length === 0 ? `
-                        <p class="text-center text-gray-600">No rooms created yet.</p>
-                    ` : `
-                        <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-100">
-                                    <tr>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Title
-                                        </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Description
-                                        </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Creator
-                                        </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Created On
-                                        </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200" id="rooms-table-body">
-                                    <!-- Rooms will be populated here by JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    `}
                 </div>
             </div>
         `;
 
-        // Populate Users Table
         if (usersList.length > 0) {
             const usersTableBody = document.getElementById('users-table-body');
+            // Ensure the content is reset before mapping new users to avoid duplication on re-render
             usersTableBody.innerHTML = usersList.map(user => {
                 const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
-                const isDisabled = user.id === currentUser.uid ? 'disabled' : '';
+                // Disable controls for the current user to prevent self-demotion/deletion via UI
+                const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; 
+                // Only founders can assign the 'founder' role
                 const canAssignFounder = userData.role === 'founder';
                 const showFounderOption = canAssignFounder || user.role === 'founder'; // Show founder option if current user is founder or if target user is already a founder
 
@@ -1896,7 +1434,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <select
-                                class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                 ${isDisabled}
                                 data-role-select-id="${user.id}"
                             >
@@ -1917,6 +1455,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 `;
             }).join('');
 
+            // Add event listeners for role change and "Take Action" buttons
             usersTableBody.querySelectorAll('[data-role-select-id]').forEach(selectElement => {
                 selectElement.addEventListener('change', async (e) => {
                     const userId = e.target.dataset.roleSelectId;
@@ -1947,70 +1486,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
         }
-
-        // Populate Rooms Table
-        if (roomsList.length > 0) {
-            const roomsTableBody = document.getElementById('rooms-table-body');
-            roomsTableBody.innerHTML = roomsList.map(room => `
-                <tr data-room-id="${room.id}" class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        ${room.title}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        ${room.description}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        ${room.creatorUsername}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        ${room.timestamp}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                            class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-red-600 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-red-500"
-                            data-delete-room-id="${room.id}" data-room-title="${room.title}"
-                        >
-                            Delete
-                        </button>
-                        <button
-                            class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-blue-500 ml-2"
-                            data-join-room-id="${room.id}" data-room-title="${room.title}"
-                        >
-                            Join Chat
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-
-            roomsTableBody.querySelectorAll('[data-delete-room-id]').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const roomIdToDelete = e.target.dataset.deleteRoomId;
-                    const roomTitleToDelete = e.target.dataset.roomTitle;
-                    showMessageModal(`Are you sure you want to delete room "${roomTitleToDelete}"? This action cannot be undone.`, 'confirm', async () => {
-                        try {
-                            await deleteRoomFirestore(roomIdToDelete);
-                            renderAdminPanelPage(); // Re-render admin panel to reflect changes
-                        } catch (error) {
-                            showMessageModal(error.message, 'error');
-                        }
-                    });
-                });
-            });
-
-            // Event listener for "Join Chat" buttons
-            roomsTableBody.querySelectorAll('[data-join-room-id]').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const roomIdToJoin = e.target.dataset.joinRoomId;
-                    const roomTitleToJoin = e.target.dataset.roomTitle;
-                    navigateTo('room-chat', { id: roomIdToJoin, title: roomTitleToJoin });
-                });
-            });
-        }
-
-        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum'));
-        // Clicking "Manage Rooms" just re-renders the current admin panel
-        document.getElementById('manage-rooms-admin-btn').addEventListener('click', () => renderAdminPanelPage());
-        document.getElementById('create-room-btn').addEventListener('click', () => showCreateRoomModal());
+        // Removed create-post-btn from here, as it's now on the forum page
+        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins/Founders can manage from forum view
     }
 
     /**
@@ -2033,7 +1510,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full relative">
                 <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold" id="close-take-action-modal">&times;</button>
                 <h3 class="text-2xl font-extrabold text-gray-800 mb-6">User Actions</h3>
-
+                
                 <div class="flex flex-col items-center mb-6">
                     <img src="${profileIconSrc}" alt="User Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-3">
                     <p class="text-xl font-semibold text-gray-900">${user.username}</p>
@@ -2123,71 +1600,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+
     /**
-     * Shows a modal for creating a new room.
+     * Renders the Create Post page for admins/founders.
+     * This page is now removed and creation happens directly on forum.
      */
-    function showCreateRoomModal() {
-        if (currentModal) {
-            currentModal.remove();
-        }
-
-        const modal = document.createElement('div');
-        modal.id = 'create-room-modal';
-        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
-        modal.innerHTML = `
-            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 border border-gray-200">
-                <h2 class="text-2xl font-extrabold text-center text-gray-800 mb-6">Create New Room</h2>
-                <form id="create-room-modal-form" class="space-y-4">
-                    <div>
-                        <label for="room-title" class="block text-gray-700 text-sm font-semibold mb-2">Room Title</label>
-                        <input type="text" id="room-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter room title" required>
-                    </div>
-                    <div>
-                        <label for="room-description" class="block text-gray-700 text-sm font-semibold mb-2">Description</label>
-                        <textarea id="room-description" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Describe the purpose of this room..."></textarea>
-                    </div>
-                    <div class="flex justify-end space-x-4 mt-6">
-                        <button type="button" id="cancel-create-room-modal" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
-                            Cancel
-                        </button>
-                        <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                            Create Room
-                        </button>
-                    </div>
-                </form>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        currentModal = modal;
-
-        document.getElementById('cancel-create-room-modal').addEventListener('click', () => {
-            currentModal.remove();
-            currentModal = null;
-        });
-
-        document.getElementById('create-room-modal-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const title = document.getElementById('room-title').value;
-            const description = document.getElementById('room-description').value;
-
-            try {
-                await createRoomFirestore(title, description);
-                currentModal.remove();
-                currentModal = null;
-                renderAdminPanelPage(); // Re-render admin panel to show new room
-            } catch (error) {
-                showMessageModal(error.message, 'error');
-            }
-        });
-    }
+    // function renderCreatePostPage() { /* ... removed ... */ }
 
     /**
      * Renders the Edit Post page for admins/founders.
      * @param {string} postId - The ID of the post to edit.
      */
     async function renderEditPostPage(postId) {
-        if (!currentUser || !userData || (userData.role !== 'admin' && userData.role !== 'founder')) {
-            console.warn("Attempted to render Edit Post page without sufficient privileges.");
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -2264,7 +1689,6 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function renderForumPage() {
         if (!currentUser) {
-            console.warn("Attempted to render Forum page without current user.");
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -2288,7 +1712,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Forum & Announcements</h2>
-                    ${(userData && (userData.role === 'admin' || userData.role === 'founder')) ? `
+                    ${userData.role === 'admin' || userData.role === 'founder' ? `
                         <div class="mb-6 text-center">
                             <button id="create-post-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
                                 Create New Post
@@ -2307,11 +1731,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <p class="text-sm text-gray-500 mt-4">
                                         Posted by <span class="font-semibold">${post.authorUsername}</span> on ${post.timestamp}
                                     </p>
-
+                                    
                                     <div class="flex items-center space-x-4 mt-4 border-t pt-4 border-gray-300">
                                         <!-- Reactions Section -->
                                         <div class="flex items-center space-x-2">
-                                            ${['👍', '❤️', '😂', '🔥'].map(emoji => `
+                                            ${['�', '❤️', '😂', '🔥'].map(emoji => `
                                                 <button class="text-xl p-1 rounded-full hover:bg-gray-200 transition duration-200" data-post-id="${post.id}" data-emoji="${emoji}">
                                                     ${emoji} <span class="text-sm text-gray-600">${post.reactions[emoji] || 0}</span>
                                                 </button>
@@ -2319,7 +1743,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         </div>
 
                                         <!-- Admin Actions (Edit/Delete) -->
-                                        ${(userData && (userData.role === 'admin' || userData.role === 'founder')) ? `
+                                        ${userData.role === 'admin' || userData.role === 'founder' ? `
                                             <div class="ml-auto space-x-2">
                                                 <button class="text-blue-600 hover:text-blue-800 font-semibold" data-post-id="${post.id}" data-action="edit">Edit</button>
                                                 <button class="text-red-600 hover:text-red-800 font-semibold" data-post-id="${post.id}" data-action="delete">Delete</button>
@@ -2417,10 +1841,6 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Shows a modal for creating a new post.
      */
     function showCreatePostModal() {
-        if (currentModal) {
-            currentModal.remove();
-        }
-
         const modal = document.createElement('div');
         modal.id = 'create-post-modal';
         modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
@@ -2475,18 +1895,6 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Renders the "Meet the Team" page.
      */
     async function renderTeamPage() {
-        if (!currentUser) {
-             console.warn("Attempted to render Team page without current user.");
-             contentArea.innerHTML = `
-                 <div class="flex flex-col items-center justify-center p-4">
-                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                         <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                         <p class="text-lg text-gray-700">Please sign in to view the team members.</p>
-                     </div>
-                 </div>
-             `;
-             return;
-         }
         showLoadingSpinner();
         let teamMembers = [];
         try {
@@ -2497,13 +1905,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             hideLoadingSpinner();
         }
 
-        const isAdminOrFounder = currentUser && (userData && (userData.role === 'admin' || userData.role === 'founder'));
+        const isAdminOrFounder = currentUser && (userData.role === 'admin' || userData.role === 'founder');
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Meet the Team</h2>
-
+                    
                     ${isAdminOrFounder ? `
                         <div class="mb-8 p-6 bg-gray-100 rounded-lg shadow-inner">
                             <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Add New Team Member</h3>
@@ -2567,7 +1975,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             contentArea.querySelectorAll('[data-delete-team-member-id]').forEach(button => {
                 button.addEventListener('click', async (e) => {
-                    const teamMemberId = e.target.dataset.teamMemberId;
+                    const teamMemberId = e.target.dataset.deleteTeamMemberId;
                     const username = e.target.dataset.username;
                     showMessageModal(`Are you sure you want to remove "${username}" from the team?`, 'confirm', async () => {
                         try {
@@ -2582,219 +1990,61 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    /**
-     * Renders the Rooms page, displaying available chat rooms.
-     * This function now serves as the entry point for room listings (from nav link).
-     */
-    async function renderRoomsPage() { // Renamed from loadRoomsPage and now takes no arguments
-        if (!currentUser) {
-            console.warn("Attempted to render Rooms page without current user.");
-            contentArea.innerHTML = `
-                <div class="flex flex-col items-center justify-center p-4">
-                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                        <p class="text-lg text-gray-700">Please sign in to view the chat rooms.</p>
-                    </div>
-                </div>
-            `;
-            return;
-        }
-
-        let rooms = [];
-        try {
-            rooms = await fetchAllRoomsFirestore(); // Re-using existing fetch
-        } catch (error) {
-            showMessageModal(error.message, 'error');
-            rooms = [];
-        }
-
-        contentArea.innerHTML = `
-            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Available Chat Rooms</h2>
-
-                    ${rooms.length === 0 ? `
-                        <p class="text-center text-gray-600">No rooms available yet. Admins can create new ones!</p>
-                    ` : `
-                        <div id="rooms-list" class="space-y-4">
-                            ${rooms.map(room => `
-                                <div class="bg-gray-50 p-6 rounded-lg shadow-md border border-gray-200 flex flex-col sm:flex-row justify-between items-center">
-                                    <div>
-                                        <h3 class="text-xl font-bold text-gray-800">${room.title}</h3>
-                                        <p class="text-gray-700 text-sm">${room.description}</p>
-                                        <p class="text-xs text-gray-500 mt-2">Created by ${room.creatorUsername} on ${room.timestamp}</p>
-                                    </div>
-                                    <button class="mt-4 sm:mt-0 py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-md hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg"
-                                            data-join-room-id="${room.id}" data-room-title="${room.title}">
-                                        Join Chat
-                                    </button>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `}
-                </div>
-            </div>
-        `;
-
-        // Add event listeners for "Join Chat" buttons within this page
-        contentArea.querySelectorAll('[data-join-room-id]').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const roomIdToJoin = e.target.dataset.joinRoomId;
-                const roomTitleToJoin = e.target.dataset.roomTitle;
-                navigateTo('room-chat', { id: roomIdToJoin, title: roomTitleToJoin });
-            });
-        });
-    }
-
-    /**
-     * Renders the actual chat interface for a specific room.
-     * This is the function that replaces rooms.html content.
-     * @param {string} id - The ID of the room to chat in.
-     * @param {string} title - The title of the room.
-     */
-    async function renderRoomChatPage(id, title) {
-        if (!currentUser || !userData) {
-            showMessageModal("You must be logged in to join chat rooms.", 'info');
-            navigateTo('auth');
-            return;
-        }
-
-        currentRoomId = id;
-        currentRoomTitle = title;
-        isInCall = false; // Reset call status when entering a new room
-
-        contentArea.innerHTML = `
-            <div class="flex flex-col md:flex-row items-start justify-center p-4 w-full h-full min-h-screen gap-4">
-                <!-- Main Chat Area -->
-                <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200" style="height: 80vh; max-height: 700px; display: flex; flex-direction: column;">
-                    <h2 id="room-title-chat" class="text-3xl font-extrabold text-center text-gray-800 mb-6">Chat in "${decodeURIComponent(currentRoomTitle)}"</h2>
-
-                    <!-- Call Buttons -->
-                    <div class="flex justify-center mb-4 space-x-4">
-                        <button id="join-call-btn" class="py-2 px-6 rounded-full bg-green-500 text-white font-bold text-lg hover:bg-green-600 transition duration-300 transform hover:scale-105 shadow-lg">
-                            <i class="fas fa-phone mr-2"></i> Join Call
-                        </button>
-                        <button id="leave-call-btn" class="py-2 px-6 rounded-full bg-red-500 text-white font-bold text-lg hover:bg-red-600 transition duration-300 transform hover:scale-105 shadow-lg hidden">
-                            <i class="fas fa-phone-slash mr-2"></i> Leave Call
-                        </button>
-                    </div>
-
-                    <div id="chat-messages" class="bg-gray-100 p-4 rounded-lg mb-4 space-y-3" style="flex-grow: 1; overflow-y: auto; scroll-behavior: smooth;">
-                        <!-- Chat messages will be loaded here -->
-                    </div>
-                    <form id="chat-form" class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                        <textarea id="message-input" rows="1" class="flex-grow resize-none px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700" placeholder="Type your message..." required></textarea>
-                        <button type="submit" id="send-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 transform hover:scale-105 shadow-lg">
-                            Send
-                        </button>
-                    </form>
-                    <div class="mt-4 text-center">
-                        <button id="back-to-rooms-list-btn" class="py-2 px-4 rounded-full bg-gray-500 text-white font-bold text-sm hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
-                            Back to Room List
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Active Users Panel -->
-                <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-xs backdrop-blur-sm bg-opacity-80 border border-gray-200 h-fit md:h-[80vh]">
-                    <h3 class="text-2xl font-extrabold text-center text-gray-800 mb-4">Active Users</h3>
-                    <div id="active-users-list" class="space-y-2 overflow-y-auto max-h-[calc(80vh-100px)]">
-                        <!-- Active users will be listed here -->
-                        <p class="text-gray-500 text-center text-sm">Loading active users...</p>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Set up listeners for the current room
-        loadRoomMessages();
-        setupPresence(); // This will also handle initial button state
-
-        // Add event listeners specific to this page
-        document.getElementById('chat-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const messageInput = document.getElementById('message-input');
-            sendMessage(messageInput.value);
-        });
-
-        document.getElementById('back-to-rooms-list-btn').addEventListener('click', () => {
-            navigateTo('rooms'); // Go back to the list of rooms
-        });
-
-        document.getElementById('join-call-btn').addEventListener('click', joinCall);
-        document.getElementById('leave-call-btn').addEventListener('click', leaveCall);
-    }
-
 
     // --- Navigation and Initialization ---
 
     /**
-     * Cleans up active Firebase listeners and intervals related to the chat rooms.
-     * This should be called before navigating away from a chat room.
+     * Closes the side drawer menu.
      */
-    function cleanupRoomListeners() {
-        console.log("Cleaning up room listeners...");
-        // If current user was in a call, set inCall to false when leaving the room
-        if (currentUser && currentRoomId && isInCall) {
-            updateMyPresence(false); // Update presence to indicate leaving call
-        }
-
-        if (messagesUnsubscribe) {
-            messagesUnsubscribe();
-            messagesUnsubscribe = null;
-        }
-        if (presenceUnsubscribe) {
-            presenceUnsubscribe();
-            presenceUnsubscribe = null;
-        }
-        if (presenceInterval) {
-            clearInterval(presenceInterval);
-            presenceInterval = null;
-        }
-        currentRoomId = null; // Clear current room state
-        currentRoomTitle = '';
-        isInCall = false; // Reset call status for next room entry
+    function closeSideDrawer() {
+        if (sideDrawerMenu) sideDrawerMenu.classList.remove('open');
+        if (overlayBackdrop) overlayBackdrop.classList.remove('visible');
+        if (mobileMenuIconOpen) mobileMenuIconOpen.classList.remove('hidden');
+        if (mobileMenuIconClose) mobileMenuIconClose.classList.add('hidden');
+        // Reset mobile dropdowns when closing the main drawer
+        sideDrawerMenu.querySelectorAll('.mobile-dropdown-content.open').forEach(openContent => {
+            openContent.style.maxHeight = '0px';
+            openContent.classList.remove('open');
+            openContent.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
+        });
     }
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team', 'rooms', 'room-chat').
-     * @param {string|object} [param=null] - Optional: postId for edit-post route, or {id, title} for room-chat.
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team').
+     * @param {string} [id=null] - Optional: postId for edit-post route, or any other ID.
      */
-    async function navigateTo(page, param = null) {
+    async function navigateTo(page, id = null) {
         // Store the current page in a data attribute on the content area for tracking
         contentArea.dataset.currentPage = page;
-        contentArea.dataset.currentParam = typeof param === 'object' ? JSON.stringify(param) : param;
+        contentArea.dataset.currentId = id; // Store generic ID if applicable
 
-        // Cleanup any active room listeners before navigating to a new page
-        cleanupRoomListeners();
+        // Close any open desktop dropdowns on navigation
+        document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
+            content.classList.add('hidden');
+            content.style.maxHeight = '0px';
+            const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
+            if (icon) icon.classList.remove('rotate-180');
+        });
 
-        // Handle logout outside of switch to ensure consistent sign out flow
         if (page === 'logout') {
             showLoadingSpinner();
             try {
                 await signOut(auth);
                 currentUser = null;
                 userData = null;
-                // Clear localStorage for user data on logout
-                localStorage.removeItem('currentUserUid');
-                localStorage.removeItem('userData');
-                localStorage.removeItem('firebaseConfig');
-                localStorage.removeItem('APP_ID');
-                localStorage.removeItem('__initial_auth_token');
-                localStorage.removeItem('userBackgroundUrl');
                 showMessageModal('You have been signed out.');
-                window.location.href = 'index.html'; // Full refresh to home
+                page = 'home'; // Redirect to home after logout
             } catch (error) {
                 console.error("Error signing out:", error.message);
                 showMessageModal("Failed to sign out. Please try again.", 'error');
+                hideLoadingSpinner();
+                return; // Prevent navigating away if sign out fails
             } finally {
                 hideLoadingSpinner();
             }
-            return; // Exit navigateTo
         }
 
-        // For in-page navigation (fragments)
         switch (page) {
             case 'home':
                 renderHomePage();
@@ -2811,30 +2061,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'admin':
                 renderAdminPanelPage();
                 break;
+            // Removed 'create-post' as a direct navigation target, now part of forum page actions
             case 'edit-post': // For editing existing posts
-                if (param) {
-                    renderEditPostPage(param);
+                if (id) {
+                    renderEditPostPage(id);
                 } else {
                     showMessageModal("Invalid post ID for editing.", 'error');
                     navigateTo('forum');
                 }
                 break;
-            case 'forum': // Forum page
+            case 'forum': // Forum page now includes create post functionality
                 renderForumPage();
                 break;
             case 'team': // New Team page
                 renderTeamPage();
-                break;
-            case 'rooms': // List of all chat rooms
-                renderRoomsPage();
-                break;
-            case 'room-chat': // Specific chat room
-                if (param && param.id && param.title) {
-                    renderRoomChatPage(param.id, param.title);
-                } else {
-                    showMessageModal("Invalid room details provided.", 'error');
-                    navigateTo('rooms'); // Go back to room list
-                }
                 break;
             default:
                 renderHomePage();
@@ -2871,100 +2111,83 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Firebase Auth State Listener
     // This is the most critical part for initial load and ongoing authentication state changes
     onAuthStateChanged(auth, async (user) => {
-        console.log("onAuthStateChanged triggered. User:", user ? user.uid : "null");
         showLoadingSpinner();
-        try {
-            // Store firebaseConfig and APP_ID in localStorage when auth state changes (or on app load)
-            localStorage.setItem('firebaseConfig', JSON.stringify(firebaseConfig));
-            localStorage.setItem('APP_ID', APP_ID);
-            // Check if __initial_auth_token is available from the Canvas environment
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                localStorage.setItem('__initial_auth_token', __initial_auth_token);
-            } else {
-                localStorage.removeItem('__initial_auth_token'); // Clear if not available
-            }
+        if (user) {
+            currentUser = user;
+            try {
+                const fetchedUserData = await fetchCurrentUserFirestoreData();
+                if (fetchedUserData) {
+                    userData = fetchedUserData;
+                } else {
+                    // This scenario should be rare if signup works correctly, but handles edge cases
+                    // where a user exists in Auth but not Firestore.
+                    console.warn("User exists in Auth but not Firestore. Creating default entry.");
+                    const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+                    // Prioritize photoURL from auth provider, fallback to placeholder
+                    const defaultProfilePic = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.displayName || user.email || 'U').charAt(0).toUpperCase()}`;
+                    const defaultBackground = 'bg-gradient-to-r from-blue-400 to-purple-600';
+                    await setDoc(userDocRef, {
+                        email: user.email,
+                        username: user.displayName || user.email?.split('@')[0],
+                        role: 'member',
+                        profilePicUrl: defaultProfilePic,
+                        backgroundUrl: defaultBackground
+                    });
+                    userData = {
+                        email: user.email,
+                        username: user.displayName || user.email?.split('@')[0],
+                        role: 'member',
+                        profilePicUrl: defaultProfilePic,
+                        backgroundUrl: defaultBackground
+                    };
+                }
+                updateBodyBackground(); // Apply user's saved background
+                renderNavbar(); // Update navbar with user info
+                // Determine which page to render based on current state or previous navigation
+                let pageToRender = contentArea.dataset.currentPage || 'home';
+                let currentId = contentArea.dataset.currentId || null;
 
-            if (user) {
-                currentUser = user;
-                userData = await fetchCurrentUserFirestoreData(); // This also handles creating default doc if missing
-                console.log("Auth state: Logged in. User data:", userData);
-            } else {
+                if (pageToRender === 'auth' || pageToRender === 'logout') {
+                    pageToRender = 'home'; // Always redirect to home if coming from auth/logout
+                }
+                navigateTo(pageToRender, currentId); // Navigate to the appropriate page
+
+            } catch (error) {
+                console.error("Error setting up user data after auth state change:", error);
+                // Attempt to sign out if data fetching fails critically
+                await signOut(auth);
                 currentUser = null;
                 userData = null;
-                console.log("Auth state: Logged out.");
-                // Clear localStorage for user data on logout
-                localStorage.removeItem('currentUserUid');
-                localStorage.removeItem('userData');
-                localStorage.removeItem('userBackgroundUrl');
+                showMessageModal("Failed to load user data. Please try signing in again.", 'error');
+                navigateTo('auth');
             }
-            isAuthReady = true; // Mark auth state as ready
-            updateBodyBackground(); // Apply user's saved background or default
-            renderNavbar(); // Always update navbar based on current auth state
-
-            // Determine which page to render based on current URL hash or default
-            const currentHash = window.location.hash.substring(1); // Remove '#'
-            let pageToRender = 'home';
-            let paramToPass = null;
-
-            if (currentHash) {
-                if (currentHash.startsWith('room-chat=')) {
-                    // Handle specific room navigation from URL hash
-                    try {
-                        const roomDetailsJson = decodeURIComponent(currentHash.substring('room-chat='.length));
-                        const roomDetails = JSON.parse(roomDetailsJson);
-                        if (roomDetails.id && roomDetails.title) {
-                            pageToRender = 'room-chat';
-                            paramToPass = roomDetails;
-                        } else {
-                            console.warn("Malformed room-chat hash:", roomDetailsJson);
-                            pageToRender = 'home'; // Fallback
-                        }
-                    } catch (e) {
-                        console.error("Error parsing room-chat hash:", e);
-                        pageToRender = 'home'; // Fallback
-                    }
-                } else {
-                    pageToRender = currentHash;
-                    // For pages like edit-post, the ID might be directly in the hash or from data-currentParam
-                    paramToPass = contentArea.dataset.currentParam || null;
-                    if (paramToPass && typeof paramToPass === 'string') {
-                        try { paramToPass = JSON.parse(paramToPass); } catch (e) { /* not JSON */ }
-                    }
-                }
-            }
-
-
-            // Ensure navigation to protected pages is handled after auth state is ready
-            const protectedPages = ['profile', 'admin', 'forum', 'team', 'edit-post', 'rooms', 'room-chat'];
-            const needsAuth = protectedPages.includes(pageToRender);
-
-            if (needsAuth && !currentUser) {
-                console.log(`Redirecting from protected page '${pageToRender}' to 'home' due to no current user.`);
-                navigateTo('home'); // Redirect to home if trying to access protected page while logged out
-            } else {
-                console.log(`Navigating to page: '${pageToRender}' with param:`, paramToPass);
-                navigateTo(pageToRender, paramToPass); // Proceed with rendering the page
-            }
-
-        } catch (error) {
-            console.error("Error in onAuthStateChanged:", error);
-            showMessageModal(`Critical error during authentication setup: ${error.message}. Please try again.`, 'error', () => {
-                signOut(auth); // Attempt to sign out on critical error
-                window.location.href = 'index.html'; // Force reload to clean state
-            });
+        } else {
             currentUser = null;
             userData = null;
-            isAuthReady = true; // Still set true to prevent infinite loading state
-            renderNavbar(); // Render logout state navbar
-            navigateTo('home'); // Go to home page
-        } finally {
-            hideLoadingSpinner();
+            updateBodyBackground(); // Reset to default background
+            renderNavbar(); // Update navbar to logged out state
+            // Only redirect if current page is not home or about, or if it was a protected page
+            if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about' && contentArea.dataset.currentPage !== 'team') {
+                 navigateTo('home'); // Redirect to home if logged out from a protected page
+            }
         }
+        hideLoadingSpinner();
     });
 
 
-    // Initial render call for static nav buttons.
-    // The main page content render is now handled by onAuthStateChanged after auth is ready.
+    // Initial render call moved inside the DOMContentLoaded listener but outside onAuthStateChanged,
+    // to ensure elements are present for the very first render.
+    // The onAuthStateChanged listener will then handle subsequent renders based on auth state.
+    // It is important that this is called *after* onAuthStateChanged has been set up,
+    // to ensure initial user state can be reacted to.
+    if (!contentArea.dataset.currentPage) { // Only render if no page has been set yet
+        navigateTo('home');
+    }
+
+
+    // Event listeners for static navbar buttons (ensure these are attached AFTER initial DOM render)
+    // The home and about buttons in the main navbar are static in index.html, so their event listeners
+    // are attached here, but they are *not* added dynamically by renderNavbar
     if (navHomeButton) { // Defensive check
         navHomeButton.addEventListener('click', () => navigateTo('home'));
     } else {
@@ -2981,13 +2204,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (mobileDrawerAboutButton) { // Defensive check
         mobileDrawerAboutButton.addEventListener('click', () => navigateTo('about'));
-    }
-
-    // Handle initial page load based on URL hash if no direct navigation has happened yet
-    if (!window.location.hash && !contentArea.dataset.currentPage) {
-        console.log("No hash or current page set. Navigating to home on initial load.");
-        // This initial call will trigger renderHomePage, and then onAuthStateChanged will re-render
-        // if user data changes the UI.
-        navigateTo('home');
     }
 });
