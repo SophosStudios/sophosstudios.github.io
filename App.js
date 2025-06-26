@@ -15,7 +15,7 @@ import CONFIG from './config.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Initialize Firebase
-    const app = initializeApp(CONFIG);
+    const app = initializeApp(CONFIG.firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
