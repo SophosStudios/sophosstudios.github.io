@@ -4,22 +4,26 @@
 
 // Import Firebase functions
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 // Import configuration from config.js
-import CONFIG from './config.js'; // Make sure config.js is in the same directory
+// This import is typically used for local development outside the Canvas environment.
+// In Canvas, __app_id, __firebase_config, __initial_auth_token are provided globally.
+// import CONFIG from './config.js'; // Make sure config.js is in the same directory
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Use Firebase configuration from config.js
-    const firebaseConfig = CONFIG.firebaseConfig;
+    // Use Firebase configuration from global variables provided by the Canvas environment
+    // If running locally without Canvas, you would typically get this from a config.js file.
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+    const APP_ID = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId; // Use projectId as fallback APP_ID
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
 
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    // Use the projectId as the APP_ID for consistent Firestore collection paths and rules
-    const APP_ID = firebaseConfig.projectId;
 
     // Initialize Auth Provider for Google
     const googleProvider = new GoogleAuthProvider();
@@ -43,7 +47,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentUser = null; // Firebase Auth user object
     let userData = null; // Firestore user document data (role, background, etc.)
     let usersList = []; // List of all users for admin panel
+    let postsList = []; // List of all forum posts
     let currentModal = null; // To manage active message modal
+    let isDiscordChatOpen = false; // NEW: State for Discord chat visibility
 
     // --- Utility Functions ---
 
@@ -139,7 +145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     function updateBodyBackground() {
         // Clear all previous body classes and inline styles to avoid conflicts
-        document.body.className = ''; 
+        document.body.className = '';
         document.body.style.backgroundImage = '';
         document.body.style.backgroundSize = '';
         document.body.style.backgroundPosition = '';
@@ -373,7 +379,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             throw new Error("Not authorized to change roles.");
         }
-        
+
         // Prevent admins from setting founder role (only founders can do this)
         if (newRole === 'founder' && userData.role !== 'founder') {
             throw new Error("Only a founder can assign the 'founder' role.");
@@ -470,7 +476,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showLoadingSpinner();
         try {
             const postsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
-            await setDoc(doc(postsCollectionRef), { // Use setDoc with an auto-generated ID for new doc
+            await addDoc(postsCollectionRef, { // Use addDoc to auto-generate ID
                 title: title,
                 content: content,
                 authorId: currentUser.uid,
@@ -544,7 +550,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Adds/updates a reaction to a post.
      * Any authenticated user can react.
      * @param {string} postId - The ID of the post.
-     * @param {string} emoji - The emoji character (e.g., '?', '❤️').
+     * @param {string} emoji - The emoji character (e.g., '👍', '❤️').
      * @returns {Promise<void>}
      */
     async function addReactionToPost(postId, emoji) {
@@ -560,7 +566,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (postSnap.exists()) {
                 const postData = postSnap.data();
                 const currentReactions = postData.reactions || {};
-                
+
                 // Get the user's previously reacted emoji for this post, if any
                 const userPreviousReaction = postData.userReactions ? postData.userReactions[currentUser.uid] : null;
 
@@ -587,7 +593,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updates[`reactions.${emoji}`] = (currentReactions[emoji] || 0) + 1;
                     updates[`userReactions.${currentUser.uid}`] = emoji; // Store user's new reaction
                 }
-                
+
                 // Perform the update
                 await updateDoc(postDocRef, updates);
             }
@@ -596,8 +602,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             showMessageModal("Failed to add reaction: " + error.message, 'error');
         } finally {
             hideLoadingSpinner();
-            // Re-render forum page to show updated reactions
-            renderForumPage(); 
+            // Re-render forum page to show updated reactions (might be slightly delayed by onSnapshot)
+            // For immediate visual update, one might update `postsList` directly.
+            // Current `onSnapshot` listener on `postsList` handles this.
         }
     }
 
@@ -637,8 +644,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             showMessageModal("Failed to add comment: " + error.message, 'error');
         } finally {
             hideLoadingSpinner();
-            // Re-render forum page to show updated comments
-            renderForumPage(); 
+            // Re-render forum page to show updated comments (might be slightly delayed by onSnapshot)
         }
     }
 
@@ -655,28 +661,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const querySnapshot = await new Promise((resolve, reject) => {
                 const unsubscribe = onSnapshot(q, (snapshot) => {
-                    unsubscribe(); // Unsubscribe immediately after first fetch
-                    resolve(snapshot);
+                    // Update the global postsList directly from the listener
+                    const updatedPostsData = [];
+                    snapshot.forEach((doc) => {
+                        const data = doc.data();
+                        updatedPostsData.push({
+                            id: doc.id,
+                            title: data.title,
+                            content: data.content,
+                            authorUsername: data.authorUsername,
+                            // Format timestamp for display (handle ISO string or Firestore Timestamp)
+                            timestamp: data.timestamp ? (typeof data.timestamp === 'string' ? new Date(data.timestamp).toLocaleString() : data.timestamp.toDate().toLocaleString()) : 'N/A',
+                            reactions: data.reactions || {}, // Ensure reactions is an object
+                            comments: data.comments || [] // Ensure comments is an array
+                        });
+                    });
+                    postsList = updatedPostsData; // Update global state
+                    renderForumPage(); // Re-render forum page after data update
+                    unsubscribe(); // Unsubscribe immediately after first fetch for this single call
+                    resolve(postsList);
                 }, (error) => {
                     reject(error);
                 });
             });
-
-            const postsData = [];
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                postsData.push({
-                    id: doc.id,
-                    title: data.title,
-                    content: data.content,
-                    authorUsername: data.authorUsername,
-                    // Format timestamp for display (handle ISO string or Firestore Timestamp)
-                    timestamp: data.timestamp ? (typeof data.timestamp === 'string' ? new Date(data.timestamp).toLocaleString() : data.timestamp.toDate().toLocaleString()) : 'N/A',
-                    reactions: data.reactions || {}, // Ensure reactions is an object
-                    comments: data.comments || [] // Ensure comments is an array
-                });
-            });
-            return postsData;
+            return postsList; // Return the updated global list
         } catch (error) {
             console.error("Error fetching posts:", error.message);
             throw new Error("Failed to fetch posts: " + error.message);
@@ -783,7 +791,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             console.warn("Element with ID 'nav-links' not found. Desktop navigation may not render correctly.");
         }
-        
+
         // Clear only dynamically added items from side drawer (keeping static Home/About)
         // Find the index of the first dynamic button (or the length if none)
         let firstDynamicIndex = 2; // Assuming mobile-drawer-home and mobile-drawer-about are always first 2 static elements
@@ -795,11 +803,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.warn("Element with ID 'side-drawer-menu' not found. Mobile navigation may not render correctly.");
         }
 
-        // Update website title from config.js
-        document.querySelector('title').textContent = CONFIG.websiteTitle;
-        // The navHomeButton is a static element for the main title, already in index.html
+        // Update website title (assuming CONFIG is available, otherwise default)
+        document.querySelector('title').textContent = firebaseConfig.projectId || 'MyWebsite'; // Fallback to projectId or generic
         if (navHomeButton) {
-            navHomeButton.textContent = CONFIG.websiteTitle;
+            navHomeButton.textContent = firebaseConfig.projectId || 'MyWebsite';
         } else {
             console.warn("Element with ID 'nav-home' not found. Main title may not be functional.");
         }
@@ -814,8 +821,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.className = `
                 ${isMobile ? 'block w-full text-left px-4 py-3 text-lg font-semibold' : 'px-4 py-2'}
                 rounded-lg hover:bg-gray-700 text-white transition duration-200
-                ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : 
-                  (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : 
+                ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' :
+                  (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' :
                   (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}
             `; // Removed founder-specific styling, admin styling will apply if a founder is shown admin panel
             btn.innerHTML = `${iconHtml}<span>${text}</span>`;
@@ -982,7 +989,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         openContent.classList.remove('open');
                         openContent.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
                     });
-                    
+
                     dropdownContent.style.maxHeight = dropdownContent.scrollHeight + 'px';
                     dropdownContent.classList.add('open');
                     dropdownIcon.classList.add('rotate-180');
@@ -1035,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     colorClass = 'text-gray-800';
             }
             // Apply a subtle animation for all roles, or only privileged ones
-            const animationClass = (role === 'admin' || role === 'founder') ? 'animate-pulse' : ''; 
+            const animationClass = (role === 'admin' || role === 'founder') ? 'animate-pulse' : '';
             return `<span class="font-semibold ${colorClass} ${animationClass}">${emoji} ${role}</span>`;
         };
 
@@ -1043,7 +1050,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         contentArea.innerHTML = `
             <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
                 <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-green-600 mb-6">
-                    Welcome to ${CONFIG.websiteTitle}!
+                    Welcome to ${APP_ID || 'MyWebsite'}!
                 </h1>
                 ${currentUser && userData ? `
                     <p class="text-xl text-gray-700 mb-4">
@@ -1282,7 +1289,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             const newUsername = usernameInput.value;
             const newProfilePicUrl = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(newUsername || 'U').charAt(0).toUpperCase()}`;
-            
+
             let newBackgroundUrl;
             // If custom URL is provided, use it. Otherwise, use the selected theme.
             if (customBackgroundUrlInput.value) {
@@ -1316,7 +1323,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-600 mb-6">About ${CONFIG.websiteTitle}</h2>
+                    <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-600 mb-6">About ${APP_ID || 'Our Website'}</h2>
                     <p class="text-lg text-gray-700 mb-4">
                         Welcome to a secure and user-friendly platform designed to streamline your online experience. We offer robust user authentication, allowing you to sign up and sign in with ease, keeping your data safe.
                     </p>
@@ -1416,7 +1423,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             usersTableBody.innerHTML = usersList.map(user => {
                 const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
                 // Disable controls for the current user to prevent self-demotion/deletion via UI
-                const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; 
+                const isDisabled = user.id === currentUser.uid ? 'disabled' : '';
                 // Only founders can assign the 'founder' role
                 const canAssignFounder = userData.role === 'founder';
                 const showFounderOption = canAssignFounder || user.role === 'founder'; // Show founder option if current user is founder or if target user is already a founder
@@ -1510,7 +1517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full relative">
                 <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold" id="close-take-action-modal">&times;</button>
                 <h3 class="text-2xl font-extrabold text-gray-800 mb-6">User Actions</h3>
-                
+
                 <div class="flex flex-col items-center mb-6">
                     <img src="${profileIconSrc}" alt="User Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-3">
                     <p class="text-xl font-semibold text-gray-900">${user.username}</p>
@@ -1700,19 +1707,41 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        let posts = [];
+        // Fetch posts directly here and update postsList
+        // The onSnapshot in the useEffect will keep postsList updated in the background
+        // but for the initial render, we need to ensure posts are loaded.
+        showLoadingSpinner();
         try {
-            posts = await fetchAllPostsFirestore();
+            const postsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
+            const q = query(postsCollectionRef, orderBy('timestamp', 'desc'));
+
+            // Get current posts data
+            const snapshot = await getDocs(q); // Use getDocs for a one-time fetch here
+            postsList = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    title: data.title,
+                    content: data.content,
+                    authorUsername: data.authorUsername,
+                    timestamp: data.timestamp ? (data.timestamp.toDate ? data.timestamp.toDate().toLocaleString() : new Date(data.timestamp).toLocaleString()) : 'N/A',
+                    reactions: data.reactions || {},
+                    comments: data.comments || []
+                };
+            });
         } catch (error) {
-            showMessageModal(error.message, 'error');
-            posts = [];
+            console.error("Error fetching forum posts:", error);
+            showMessageModal("Failed to load forum posts: " + error.message, 'error');
+            postsList = [];
+        } finally {
+            hideLoadingSpinner();
         }
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Forum & Announcements</h2>
-                    ${userData.role === 'admin' || userData.role === 'founder' ? `
+                    ${(userData && (userData.role === 'admin' || userData.role === 'founder')) ? `
                         <div class="mb-6 text-center">
                             <button id="create-post-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
                                 Create New Post
@@ -1720,22 +1749,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </div>
                     ` : ''}
 
-                    ${posts.length === 0 ? `
+                    ${postsList.length === 0 ? `
                         <p class="text-center text-gray-600">No posts yet. Check back later!</p>
                     ` : `
                         <div id="posts-list" class="space-y-6">
-                            ${posts.map(post => `
+                            ${postsList.map(post => `
                                 <div class="bg-gray-50 p-6 rounded-lg shadow-md border border-gray-200">
                                     <h3 class="text-2xl font-bold text-gray-800 mb-2">${post.title}</h3>
                                     <p class="text-gray-700 whitespace-pre-wrap">${post.content}</p>
                                     <p class="text-sm text-gray-500 mt-4">
                                         Posted by <span class="font-semibold">${post.authorUsername}</span> on ${post.timestamp}
                                     </p>
-                                    
+
                                     <div class="flex items-center space-x-4 mt-4 border-t pt-4 border-gray-300">
                                         <!-- Reactions Section -->
                                         <div class="flex items-center space-x-2">
-                                            ${['�', '❤️', '😂', '🔥'].map(emoji => `
+                                            ${['👍', '❤️', '😂', '🔥'].map(emoji => `
                                                 <button class="text-xl p-1 rounded-full hover:bg-gray-200 transition duration-200" data-post-id="${post.id}" data-emoji="${emoji}">
                                                     ${emoji} <span class="text-sm text-gray-600">${post.reactions[emoji] || 0}</span>
                                                 </button>
@@ -1743,7 +1772,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         </div>
 
                                         <!-- Admin Actions (Edit/Delete) -->
-                                        ${userData.role === 'admin' || userData.role === 'founder' ? `
+                                        ${(userData && (userData.role === 'admin' || userData.role === 'founder')) ? `
                                             <div class="ml-auto space-x-2">
                                                 <button class="text-blue-600 hover:text-blue-800 font-semibold" data-post-id="${post.id}" data-action="edit">Edit</button>
                                                 <button class="text-red-600 hover:text-red-800 font-semibold" data-post-id="${post.id}" data-action="delete">Delete</button>
@@ -1794,6 +1823,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Add event listeners for reactions
         contentArea.querySelectorAll('[data-emoji]').forEach(button => {
             button.addEventListener('click', async (e) => {
+                // Find the closest parent element with data-post-id to get the correct post ID
                 const postId = e.target.closest('[data-post-id]').dataset.postId;
                 const emoji = e.target.dataset.emoji || e.target.parentElement.dataset.emoji; // Handles click on span inside button
                 if (postId && emoji) {
@@ -1816,7 +1846,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showMessageModal('Are you sure you want to delete this post? This action cannot be undone.', 'confirm', async () => {
                     try {
                         await deletePostFirestore(postId);
-                        renderForumPage(); // Re-render to show updated list
+                        // No need to call renderForumPage() here, onSnapshot will handle it.
                     } catch (error) {
                         showMessageModal(error.message, 'error');
                     }
@@ -1884,7 +1914,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await createPostFirestore(title, content);
                 currentModal.remove();
                 currentModal = null;
-                renderForumPage(); // Re-render forum to show new post
+                // No need to call renderForumPage() here, onSnapshot will handle it.
             } catch (error) {
                 showMessageModal(error.message, 'error');
             }
@@ -1911,7 +1941,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Meet the Team</h2>
-                    
+
                     ${isAdminOrFounder ? `
                         <div class="mb-8 p-6 bg-gray-100 rounded-lg shadow-inner">
                             <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Add New Team Member</h3>
@@ -1991,6 +2021,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
 
+    /**
+     * Renders the Discord chat widget.
+     * It's hidden by default and toggled by a button.
+     * IMPORTANT: Replace YOUR_DISCORD_SERVER_ID, YOUR_DISCORD_CHANNEL_ID, and YOUR_DISCORD_INVITE_LINK
+     * with your actual Discord values.
+     */
+    function renderDiscordChatWidget() {
+        let discordContainer = document.getElementById('discord-chat-container');
+        const discordServerId = "1361468998000054433"; // <<< IMPORTANT: REPLACE WITH YOUR DISCORD SERVER ID
+        const discordChannelId = "1361468998658560173"; // <<< IMPORTANT: REPLACE WITH YOUR DISCORD CHANNEL ID
+        const discordInviteLink = "https://discord.gg/tu5eHwdTyN"; // <<< IMPORTANT: REPLACE WITH YOUR DISCORD INVITE LINK
+
+        // Only render Discord widget if a user is logged in
+        if (!currentUser) {
+            if (discordContainer) {
+                discordContainer.remove(); // Ensure it's removed if user logs out
+            }
+            return;
+        }
+
+        if (!discordContainer) {
+            discordContainer = document.createElement('div');
+            discordContainer.id = 'discord-chat-container';
+            discordContainer.className = 'fixed bottom-4 right-4 z-50 flex flex-col items-end space-y-2';
+            document.body.appendChild(discordContainer);
+        }
+
+        discordContainer.innerHTML = `
+            <button id="discord-chat-toggle" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 transform hover:scale-105 flex items-center justify-center space-x-2">
+                <i class="fab fa-discord text-xl"></i>
+                <span>${isDiscordChatOpen ? 'Close Discord Chat' : 'Open Discord Chat'}</span>
+            </button>
+            <div id="discord-iframe-wrapper" class="bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden ${isDiscordChatOpen ? '' : 'hidden'}" style="width: 350px; height: 500px;">
+                ${isDiscordChatOpen ? `
+                    <iframe src="https://discord.com/widget?id=${discordServerId}&channel=${discordChannelId}&theme=dark" width="100%" height="calc(100% - 40px)" allowtransparency="true" frameborder="0" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"></iframe>
+                    <div class="p-2 bg-gray-900 text-white text-center text-sm border-t border-gray-700" style="height: 40px; display: flex; align-items: center; justify-content: center;">
+                        Not in our server? <a href="${discordInviteLink}" target="_blank" class="text-blue-400 hover:underline font-semibold ml-1">Join us!</a>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+
+        // Add event listener for the toggle button
+        document.getElementById('discord-chat-toggle').addEventListener('click', () => {
+            isDiscordChatOpen = !isDiscordChatOpen;
+            renderDiscordChatWidget(); // Re-render to update visibility and button text
+        });
+    }
+
     // --- Navigation and Initialization ---
 
     /**
@@ -2011,7 +2090,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team').
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'edit-post', 'forum', 'logout', 'team').
      * @param {string} [id=null] - Optional: postId for edit-post route, or any other ID.
      */
     async function navigateTo(page, id = null) {
@@ -2061,7 +2140,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'admin':
                 renderAdminPanelPage();
                 break;
-            // Removed 'create-post' as a direct navigation target, now part of forum page actions
             case 'edit-post': // For editing existing posts
                 if (id) {
                     renderEditPostPage(id);
@@ -2080,6 +2158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderHomePage();
         }
         renderNavbar(); // Always re-render navbar after page change to update login/logout state
+        renderDiscordChatWidget(); // NEW: Render/update Discord widget visibility
     }
 
     // Mobile menu toggle (for side drawer)
@@ -2115,6 +2194,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (user) {
             currentUser = user;
             try {
+                // Attempt to sign in with custom token if available (Canvas environment)
+                if (initialAuthToken && user.uid === 'anonymous_user_id') { // Check if it's an anonymous user that might need token upgrade
+                     try {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                        // After custom token sign-in, the onAuthStateChanged will fire again with the authenticated user
+                        // So we can return here and let the next event handle the rest.
+                        return;
+                    } catch (error) {
+                        console.error("Error signing in with custom token on auth state change:", error);
+                        // Fallback: If custom token fails, proceed with the existing user (could be anonymous)
+                    }
+                }
+
                 const fetchedUserData = await fetchCurrentUserFirestoreData();
                 if (fetchedUserData) {
                     userData = fetchedUserData;
@@ -2143,6 +2235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 updateBodyBackground(); // Apply user's saved background
                 renderNavbar(); // Update navbar with user info
+                renderDiscordChatWidget(); // NEW: Render Discord widget
                 // Determine which page to render based on current state or previous navigation
                 let pageToRender = contentArea.dataset.currentPage || 'home';
                 let currentId = contentArea.dataset.currentId || null;
@@ -2166,6 +2259,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             userData = null;
             updateBodyBackground(); // Reset to default background
             renderNavbar(); // Update navbar to logged out state
+            renderDiscordChatWidget(); // NEW: Hide Discord widget when logged out
             // Only redirect if current page is not home or about, or if it was a protected page
             if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about' && contentArea.dataset.currentPage !== 'team') {
                  navigateTo('home'); // Redirect to home if logged out from a protected page
@@ -2204,5 +2298,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (mobileDrawerAboutButton) { // Defensive check
         mobileDrawerAboutButton.addEventListener('click', () => navigateTo('about'));
+    }
+
+    // Attempt to sign in with custom token first, then anonymously if no token or token fails.
+    // This is generally handled by onAuthStateChanged but a direct call here ensures
+    // the very first auth state is handled.
+    if (initialAuthToken) {
+        try {
+            await signInWithCustomToken(auth, initialAuthToken);
+            console.log("Initial sign-in with custom token successful.");
+        } catch (error) {
+            console.error("Initial sign-in with custom token failed, trying anonymous:", error);
+            try {
+                await signInAnonymously(auth);
+                console.log("Signed in anonymously.");
+            } catch (anonError) {
+                console.error("Error signing in anonymously:", anonError);
+            }
+        }
+    } else {
+        try {
+            await signInAnonymously(auth);
+            console.log("Signed in anonymously.");
+        } catch (anonError) {
+            console.error("Error signing in anonymously:", anonError);
+        }
     }
 });
