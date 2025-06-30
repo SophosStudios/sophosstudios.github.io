@@ -3,68 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coders Hub</title>
-    <!-- Tailwind CSS CDN -->
+    <title>SophosWRLD - Community</title> <!-- This title will be updated by config.js -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css">
-    <!-- Google Fonts for Cartoony/Coder Vibe -->
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Basic styling for the main content area to allow scrolling */
+        #content-area {
+            min-height: calc(100vh - 64px); /* Subtract navbar height */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding-bottom: 2rem; /* Add some padding at the bottom */
+        }
+
+        /* Styles for the side drawer menu */
+        #side-drawer-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 280px; /* Adjust width as needed */
+            background-color: #1f2937; /* Gray-800 equivalent */
+            z-index: 50; /* Above content, below modal */
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.5); /* Shadow on open */
+            overflow-y: auto; /* Allow scrolling for many menu items */
+            padding-top: 4rem; /* Space for fixed navbar/status bar */
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        #side-drawer-menu.open {
+            transform: translateX(0);
+        }
+
+        /* Overlay for when the side drawer is open */
+        #overlay-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 40; /* Below drawer, above main content */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+
+        #overlay-backdrop.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Hide desktop nav links when mobile menu is open - no longer needed as side drawer handles all mobile nav */
+        /* @media (max-width: 767px) {
+            #nav-links.hidden-on-mobile-menu-open {
+                display: none;
+            }
+        } */
+    </style>
 </head>
-<body class="bg-gradient-to-br from-gray-900 to-blue-900 text-white min-h-screen flex flex-col">
+<body class="bg-gradient-to-r from-blue-400 to-purple-600 min-h-screen font-inter">
 
-    <header class="bg-gray-800 text-white p-4 shadow-lg sticky top-0 z-50">
-        <nav class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center">
-            <div class="flex justify-between items-center w-full sm:w-auto">
-                <div class="text-3xl font-bold text-blue-400 font-pixel">
-                    Coders Hub
-                </div>
-                <!-- Hamburger menu icon for mobile -->
-                <button id="menu-toggle" class="sm:hidden text-white focus:outline-none">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                    </svg>
-                </button>
+    <!-- The overlay backdrop -->
+    <div id="overlay-backdrop"></div>
+
+    <nav class="bg-gray-800 p-4 text-white shadow-lg sticky top-0 z-40">
+        <div class="container mx-auto flex justify-between items-center">
+            <!-- Mobile Menu Toggle Button (Hamburger/X icon) -->
+            <button id="mobile-menu-toggle" class="text-white focus:outline-none p-2 rounded-md hover:bg-gray-700 md:hidden">
+                <i id="mobile-menu-icon-open" class="fas fa-bars text-xl"></i>
+                <i id="mobile-menu-icon-close" class="fas fa-times text-xl hidden"></i>
+            </button>
+
+            <button id="nav-home" class="text-2xl font-bold hover:text-gray-300 transition duration-200">
+                SophosWRLD
+            </button>
+            
+            <!-- Desktop Nav Links -->
+            <div class="hidden md:flex space-x-4" id="nav-links">
+                <button id="nav-about" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200">About</button>
+                <!-- Dynamic links (Forum, Admin, Profile, Sign Out/In) will be loaded here by App.js -->
             </div>
-
-            <!-- Navigation Links - Hidden on mobile by default -->
-            <div id="nav-links-container" class="hidden sm:flex flex-col sm:flex-row w-full sm:w-auto mt-4 sm:mt-0 items-center space-y-4 sm:space-y-0 sm:space-x-6 text-lg">
-                <ul class="flex flex-col sm:flex-row w-full sm:w-auto space-y-4 sm:space-y-0 sm:space-x-6 text-lg items-center">
-                    <li><button id="nav-home" class="nav-btn">Home</button></li>
-                    <li><button id="nav-projects" class="nav-btn">Projects</button></li>
-                    <li><button id="nav-forum" class="nav-btn">Forum</button></li>
-                    <li><button id="nav-shop" class="nav-btn">Shop</button></li>
-                    <li id="nav-admin-li" class="hidden">
-                        <button id="nav-admin" class="nav-btn text-red-400 hover:text-red-300">Admin</button>
-                    </li>
-                    <li id="nav-auth-status" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6 sm:ml-4">
-                        <!-- Content will be dynamically inserted here -->
-                    </li>
-                </ul>
-            </div>
-        </nav>
-    </header>
-
-    <main id="app-content" class="py-8 flex-grow relative overflow-hidden">
-        <!-- Page content will be dynamically loaded here -->
-        <div class="min-h-screen flex items-center justify-center text-white">
-            <p class="text-xl">Loading Coders Hub...</p>
+            
         </div>
-        <!-- Background grid pattern -->
-        <div class="absolute inset-0 z-0 opacity-10 pointer-events-none grid-pattern"></div>
+    </nav>
+
+    <!-- Side Drawer Menu -->
+    <div id="side-drawer-menu">
+        <!-- Static Home and About buttons for the side drawer -->
+        <button id="mobile-drawer-home" class="block w-full text-left px-4 py-3 hover:bg-gray-700 text-white transition duration-200 text-lg font-semibold">Home</button>
+        <button id="mobile-drawer-about" class="block w-full text-left px-4 py-3 hover:bg-gray-700 text-white transition duration-200 text-lg font-semibold">About</button>
+        <!-- Dynamic mobile links (Forum, Admin, Profile, Sign Out/In) will be appended here by App.js -->
+    </div>
+
+    <main id="content-area" class="flex-grow p-4">
+        <!-- Page content will be loaded here by App.js -->
     </main>
 
-    <footer class="bg-gray-800 text-gray-400 p-4 text-center mt-8 shadow-inner">
-        <div class="max-w-7xl mx-auto">
-            <p>&copy; <span id="current-year"></span> Coders Hub. All rights reserved.</p>
-            <p class="text-sm mt-2">Built with passion by the coding community.</p>
-        </div>
-    </footer>
+    <!-- Loading Spinner Placeholder -->
+    <div id="loading-spinner"></div>
 
-    <!-- Custom Modal Container -->
-    <div id="custom-modal-container"></div>
-
-    <!-- External JavaScript -->
-    <script type="module" src="script.js"></script>
+    <!-- Firebase and App.js script -->
+    <script type="module" src="App.js"></script>
 </body>
 </html>
