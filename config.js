@@ -1,22 +1,13 @@
-// config.js
-// This file centralizes global configurations for the website.
+// config.js - Centralized configuration for Coders Hub
 
-const CONFIG = {
-    // Website Title
-    websiteTitle: "SophosWRLD", // <-- Set your desired website title here
-
-    // Firebase Project Configuration
-    // IMPORTANT: Replace these with your actual Firebase project configuration details.
-    // You get this from your Firebase project settings -> "Project settings" -> "Your apps" -> "Web app"
-    firebaseConfig: {
-      apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
-      authDomain: "sophoswrld.firebaseapp.com",
-      projectId: "sophoswrld",
-      storageBucket: "sophoswrld.firebasestorage.app",
-      messagingSenderId: "26686142400",
-      appId: "1:26686142400:web:48f8d3ae0b097731317a25",
-      measurementId: "G-6XETC98C22"
-    }
+export const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU", // Replace with your actual API Key
+    authDomain: "sophoswrld.firebaseapp.com", // Replace with your actual Auth Domain
+    projectId: "sophoswrld", // Replace with your actual Project ID
+    storageBucket: "sophoswrld.firebasestorage.app", // Replace with your actual Storage Bucket
+    messagingSenderId: "26686142400", // Replace with your actual Messaging Sender ID
+    appId: "1:26686142400:web:48f8d3ae0b097731317a25" // Replace with your actual App ID
 };
 
-export default CONFIG;
+// If you are using custom tokens from a backend, provide it here. Otherwise, leave empty.
+export const INITIAL_AUTH_TOKEN = ""; // e.g., "YOUR_CUSTOM_AUTH_TOKEN"

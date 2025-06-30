@@ -1,0 +1,189 @@
+/* Custom CSS for Coders Hub */
+
+/* Fonts */
+.font-pixel {
+    font-family: 'Press Start 2P', cursive;
+}
+
+body {
+    font-family: 'Nunito', sans-serif;
+}
+
+/* Background grid pattern */
+.grid-pattern {
+    background-image: linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* Animations */
+@keyframes sparkle {
+  0% { opacity: 0; transform: scale(0) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
+  100% { opacity: 0; transform: scale(0) rotate(360deg); }
+}
+.animate-sparkle {
+  animation: sparkle 1s infinite ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-10px); }
+}
+
+.fade-in-page {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+.fade-out-page {
+    animation: fadeOut 0.5s ease-out forwards;
+}
+
+/* Button Styling */
+.btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 shadow-lg;
+}
+
+.btn-secondary {
+    @apply bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 shadow-lg;
+}
+
+.btn-green {
+    @apply bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 shadow-lg;
+}
+
+.btn-red {
+    @apply bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 shadow-lg;
+}
+
+.btn-gray {
+    @apply bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 shadow-lg;
+}
+
+/* Navigation Buttons */
+.nav-btn {
+    @apply text-lg font-semibold hover:text-blue-300 transition-colors duration-200;
+}
+
+/* Card Styling */
+.card {
+    @apply bg-gray-700 p-6 rounded-xl shadow-xl border border-gray-600 transition-transform duration-300 ease-in-out transform hover:scale-[1.01] hover:shadow-2xl;
+}
+
+/* Input Fields */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+    @apply shadow-inner appearance-none border border-blue-500 rounded-lg w-full py-2 px-3 text-gray-100 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-600 placeholder-gray-400;
+}
+
+/* Custom Modal */
+.custom-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8); /* Darker overlay */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease-out; /* Fade in modal */
+}
+.custom-modal-content {
+    background-color: #2d3748; /* gray-800 */
+    padding: 2.5rem; /* More padding */
+    border-radius: 1rem; /* More rounded */
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); /* Stronger shadow */
+    text-align: center;
+    max-width: 450px; /* Slightly wider */
+    width: 90%;
+    border: 2px solid #63b3ed; /* Blue border */
+    animation: fadeIn 0.3s ease-out; /* Fade in content */
+}
+.custom-modal-content h3 {
+    font-size: 1.8rem; /* Larger heading */
+    font-weight: bold;
+    margin-bottom: 1.5rem;
+    color: #63b3ed; /* blue-400 */
+    font-family: 'Press Start 2P', cursive; /* Pixel font for modal title */
+}
+.custom-modal-content p {
+    margin-bottom: 2rem; /* More space */
+    color: #cbd5e0; /* gray-300 */
+    font-size: 1.1rem;
+}
+.custom-modal-buttons {
+    display: flex;
+    justify-content: center; /* Center buttons */
+    gap: 1.5rem; /* More gap */
+}
+.custom-modal-buttons button {
+    padding: 0.8rem 2rem; /* Larger buttons */
+    border-radius: 0.75rem; /* More rounded */
+    font-weight: bold;
+    transition: all 0.3s ease; /* Smooth transition for all properties */
+    transform: translateY(0);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+.custom-modal-buttons button:hover {
+    transform: translateY(-3px); /* Pop effect on hover */
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+}
+.custom-modal-buttons .confirm-btn {
+    background-color: #e53e3e; /* red-600 */
+    color: white;
+}
+.custom-modal-buttons .confirm-btn:hover {
+    background-color: #c53030; /* red-700 */
+}
+.custom-modal-buttons .cancel-btn {
+    background-color: #4a5568; /* gray-600 */
+    color: white;
+}
+.custom-modal-buttons .cancel-btn:hover {
+    background-color: #2d3748; /* gray-700 */
+}
+
+/* Specific page styling */
+.home-feature-card {
+    @apply bg-gray-700 p-6 rounded-xl shadow-xl border border-blue-500 transition-transform duration-300 ease-in-out transform hover:scale-[1.02] hover:rotate-1 hover:shadow-2xl;
+}
+
+.home-feature-card h3 {
+    font-family: 'Press Start 2P', cursive;
+}
+
+.project-card {
+    @apply bg-gray-700 p-6 rounded-xl shadow-xl border border-green-500 flex flex-col transition-transform duration-300 ease-in-out transform hover:scale-[1.01] hover:shadow-2xl;
+}
+
+.forum-post-card {
+    @apply bg-gray-700 p-6 rounded-xl shadow-xl border border-yellow-500 transition-transform duration-300 ease-in-out transform hover:scale-[1.005] hover:shadow-2xl;
+}
+
+.shop-rank-card {
+    @apply bg-gray-700 p-6 rounded-xl shadow-xl border border-purple-500 flex flex-col transition-transform duration-300 ease-in-out transform hover:scale-[1.02] hover:rotate-1 hover:shadow-2xl;
+}
+
+/* Admin table styling */
+.admin-table-header {
+    @apply bg-gray-600;
+}
+.admin-table-row {
+    @apply bg-gray-700 divide-y divide-gray-600;
+}
+.admin-table-cell {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-200;
+}
+.admin-table-cell-header {
+    @apply px-6 py-3 text-left text-xs font-medium text-gray-200 uppercase tracking-wider rounded-tl-lg rounded-tr-lg;
+}
