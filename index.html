@@ -1,1 +1,117 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="/favicon.ico"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#2563eb"/><meta name="description" content="HostPro - Professional web hosting services for your business"/><link rel="apple-touch-icon" href="/logo192.png"/><link rel="manifest" href="/manifest.json"/><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"><title>HostPro - Web Development Agency</title><script defer="defer" src="/static/js/main.05cec3c7.js"></script><link href="/static/css/main.24affdbd.css" rel="stylesheet"></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SophosWRLD - Community</title> <!-- This title will be updated by config.js -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Basic styling for the main content area to allow scrolling */
+        #content-area {
+            min-height: calc(100vh - 64px); /* Subtract navbar height */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding-bottom: 2rem; /* Add some padding at the bottom */
+        }
+
+        /* Styles for the side drawer menu */
+        #side-drawer-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 280px; /* Adjust width as needed */
+            background-color: #1f2937; /* Gray-800 equivalent */
+            z-index: 50; /* Above content, below modal */
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.5); /* Shadow on open */
+            overflow-y: auto; /* Allow scrolling for many menu items */
+            padding-top: 4rem; /* Space for fixed navbar/status bar */
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        #side-drawer-menu.open {
+            transform: translateX(0);
+        }
+
+        /* Overlay for when the side drawer is open */
+        #overlay-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 40; /* Below drawer, above main content */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+
+        #overlay-backdrop.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Hide desktop nav links when mobile menu is open - no longer needed as side drawer handles all mobile nav */
+        /* @media (max-width: 767px) {
+            #nav-links.hidden-on-mobile-menu-open {
+                display: none;
+            }
+        } */
+    </style>
+</head>
+<body class="bg-gradient-to-r from-blue-400 to-purple-600 min-h-screen font-inter">
+
+    <!-- The overlay backdrop -->
+    <div id="overlay-backdrop"></div>
+
+    <nav class="bg-gray-800 p-4 text-white shadow-lg sticky top-0 z-40">
+        <div class="container mx-auto flex justify-between items-center">
+            <!-- Mobile Menu Toggle Button (Hamburger/X icon) -->
+            <button id="mobile-menu-toggle" class="text-white focus:outline-none p-2 rounded-md hover:bg-gray-700 md:hidden">
+                <i id="mobile-menu-icon-open" class="fas fa-bars text-xl"></i>
+                <i id="mobile-menu-icon-close" class="fas fa-times text-xl hidden"></i>
+            </button>
+
+            <button id="nav-home" class="text-2xl font-bold hover:text-gray-300 transition duration-200">
+                SophosWRLD
+            </button>
+            
+            <!-- Desktop Nav Links -->
+            <div class="hidden md:flex space-x-4" id="nav-links">
+                <button id="nav-about" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200">About</button>
+                <!-- Dynamic links (Forum, Admin, Profile, Sign Out/In) will be loaded here by App.js -->
+            </div>
+            
+        </div>
+    </nav>
+
+    <!-- Side Drawer Menu -->
+    <div id="side-drawer-menu">
+        <!-- Static Home and About buttons for the side drawer -->
+        <button id="mobile-drawer-home" class="block w-full text-left px-4 py-3 hover:bg-gray-700 text-white transition duration-200 text-lg font-semibold">Home</button>
+        <button id="mobile-drawer-about" class="block w-full text-left px-4 py-3 hover:bg-gray-700 text-white transition duration-200 text-lg font-semibold">About</button>
+        <!-- Dynamic mobile links (Forum, Admin, Profile, Sign Out/In) will be appended here by App.js -->
+    </div>
+
+    <main id="content-area" class="flex-grow p-4">
+        <!-- Page content will be loaded here by App.js -->
+    </main>
+
+    <!-- Loading Spinner Placeholder -->
+    <div id="loading-spinner"></div>
+
+    <!-- Firebase and App.js script -->
+    <script type="module" src="App.js"></script>
+</body>
+</html>
