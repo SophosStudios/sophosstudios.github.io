@@ -1,27 +1,49 @@
-document.addEventListener('DOMContentLoaded', () => {
+// App.js
+// This script contains the entire application logic, including Firebase initialization
+// and new features like forum, post management, reactions, comments, and enhanced backgrounds.
+
+// Import Firebase functions
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+// Import configuration from config.js
+import CONFIG from './config.js'; // Make sure config.js is in the same directory
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Use Firebase configuration from config.js
+    const firebaseConfig = CONFIG.firebaseConfig;
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    // Use the projectId as the APP_ID for consistent Firestore collection paths and rules
+    const APP_ID = firebaseConfig.projectId;
+
+    // Initialize Auth Provider for Google
+    const googleProvider = new GoogleAuthProvider();
+    googleProvider.addScope('profile'); // Request profile access
+    googleProvider.addScope('email'); // Request email access
+
+    // DOM Elements
     const contentArea = document.getElementById('content-area');
-    const navLinks = document.getElementById('nav-links');
-    const mobileMenu = document.getElementById('mobile-menu');
+    const navLinks = document.getElementById('nav-links'); // Desktop nav links
+    const sideDrawerMenu = document.getElementById('side-drawer-menu'); // New: Side drawer menu container
+    const overlayBackdrop = document.getElementById('overlay-backdrop'); // New: Overlay for side drawer
     const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
     const mobileMenuIconOpen = document.getElementById('mobile-menu-icon-open');
     const mobileMenuIconClose = document.getElementById('mobile-menu-icon-close');
     const navHomeButton = document.getElementById('nav-home');
-    const navAboutButton = document.getElementById('nav-about'); // Get reference for existing About button
-    const navRoomsButton = document.getElementById('nav-rooms'); // Get reference for new Rooms button
-    const APP_ID = '1:26686142400:web:48f8d3ae0b097731317a25'; // Replace with a unique identifier for your app
+    const navAboutButton = document.getElementById('nav-about'); // Desktop about button reference
+    const mobileDrawerHomeButton = document.getElementById('mobile-drawer-home'); // New: Home button in side drawer
+    const mobileDrawerAboutButton = document.getElementById('mobile-drawer-about'); // New: About button in side drawer
 
-    let currentUser = null; // Stores authenticated user data (from session or backend check)
-    let userData = null; // Stores detailed user data (from PHP/DB)
-    let usersList = []; // For admin panel
-    let currentModal = null; // To keep track of the currently open modal
-
-    // Room-specific global state variables for chat functionality
-    let currentRoomId = null;
-    let currentRoomTitle = '';
-    let presenceInterval = null; // Interval for presence updates
-    let messagesInterval = null; // Interval for message updates (simulated)
-    let isInCall = false; // New state variable: tracks if the current user is in a simulated call
-
+    // Global State Variables
+    let currentUser = null; // Firebase Auth user object
+    let userData = null; // Firestore user document data (role, background, etc.)
+    let usersList = []; // List of all users for admin panel
+    let currentModal = null; // To manage active message modal
 
     // --- Utility Functions ---
 
@@ -37,7 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
             spinner.innerHTML = `<div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-white"></div>`;
             document.body.appendChild(spinner);
         }
-        spinner.classList.remove('hidden'); // Ensure it's visible
     }
 
     /**
@@ -46,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function hideLoadingSpinner() {
         const spinner = document.getElementById('loading-spinner');
         if (spinner) {
-            spinner.classList.add('hidden'); // Hide it
+            spinner.remove();
         }
     }
 
@@ -54,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Displays a message modal.
      * @param {string} message - The message to display.
      * @param {string} type - 'info', 'error', or 'confirm'.
-     * @param {function} onConfirm - Callback for 'confirm' type.
+     * @param {function} onConfirm - Callback for 'confirm' type (only for 'confirm' type).
      */
     function showMessageModal(message, type = 'info', onConfirm = null) {
         if (currentModal) {
@@ -93,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         document.body.appendChild(modal);
-        currentModal = modal;
+        currentModal = modal; // Set the current modal reference
 
         const closeModal = () => {
             if (currentModal) {
@@ -114,125 +135,158 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Updates the body's background class based on user data.
+     * Updates the body's background. Can be a Tailwind class string or a direct image URL.
      */
     function updateBodyBackground() {
-        document.body.className = ''; // Clear existing classes
+        // Clear all previous body classes and inline styles to avoid conflicts
+        document.body.className = ''; 
+        document.body.style.backgroundImage = '';
+        document.body.style.backgroundSize = '';
+        document.body.style.backgroundPosition = '';
+        document.body.style.backgroundRepeat = '';
+        document.body.style.backgroundAttachment = '';
+
         if (userData && userData.backgroundUrl) {
-            // Check if it's a direct URL (http or https) or a Tailwind class
+            // Check if it's a direct URL (http or https)
             if (userData.backgroundUrl.startsWith('http://') || userData.backgroundUrl.startsWith('https://')) {
                 document.body.style.backgroundImage = `url('${userData.backgroundUrl}')`;
                 document.body.style.backgroundSize = 'cover';
                 document.body.style.backgroundPosition = 'center';
                 document.body.style.backgroundRepeat = 'no-repeat';
-                document.body.style.backgroundAttachment = 'fixed';
+                document.body.style.backgroundAttachment = 'fixed'; // Makes background fixed on scroll
             } else {
                 // Assume it's a Tailwind CSS class string
-                document.body.classList.add(...userData.backgroundUrl.split(' '));
-                document.body.style.backgroundImage = ''; // Clear inline image background
+                const backgroundClasses = userData.backgroundUrl.split(' ');
+                document.body.classList.add(...backgroundClasses);
             }
         } else {
-            // Default fallback
+            // Default fallback if no user data or backgroundUrl
             document.body.classList.add('bg-gradient-to-r', 'from-blue-400', 'to-purple-600');
-            document.body.style.backgroundImage = ''; // Clear inline image background
         }
         // Always add core classes for consistent styling
         document.body.classList.add('min-h-screen', 'font-inter');
     }
 
-    /**
-     * Closes the mobile side drawer menu.
-     * This function is crucial for mobile responsiveness.
-     */
-    function closeSideDrawer() {
-        // Assuming mobileMenu is the drawer itself and mobileMenuIconOpen/Close are icons
-        // Ensure these elements are correctly referenced from the DOM.
-        if (mobileMenu) mobileMenu.classList.add('hidden');
-        if (mobileMenuIconOpen) mobileMenuIconOpen.classList.remove('hidden');
-        if (mobileMenuIconClose) mobileMenuIconClose.classList.add('hidden');
-    }
-
-    // --- Backend API Simulation / Callbacks ---
-    // In a real application, these would be `fetch` calls to your PHP API.
-    // For this example, we'll simulate success and failure, and use localStorage for user tokens.
-    // ACTUAL PHP ENDPOINTS ARE EXPLAINED SEPARATELY.
+    // --- Firebase Integration Functions ---
 
     /**
-     * Authenticates a user (login or signup).
-     * @param {string} type - 'login' or 'signup'.
+     * Authenticates a user (login or signup) with Firebase Auth and stores user data in Firestore.
+     * Handles Email/Password and Google authentication.
+     * @param {string} type - 'login', 'signup', or 'google'.
      * @param {object} formData - { email, password, username (for signup) }.
-     * @returns {Promise<object>} - User data or error.
+     * @returns {Promise<object>} - User data or throws error.
      */
     async function authenticateUser(type, formData) {
         showLoadingSpinner();
         try {
-            // --- SIMULATED BACKEND RESPONSE (Replace with actual fetch) ---
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+            let userCredential;
+            let user;
 
-            if (type === 'signup') {
-                const existingUser = localStorage.getItem(`user_${formData.email}`);
-                if (existingUser) {
-                    throw new Error('This email is already registered.');
-                }
-                const newUser = {
-                    id: `user_${Date.now()}`,
-                    email: formData.email,
-                    username: formData.username,
-                    role: 'member',
-                    profilePicUrl: `https://placehold.co/100x100/F0F0F0/000000?text=${formData.username.charAt(0).toUpperCase()}`,
-                    backgroundUrl: 'bg-gradient-to-r from-blue-400 to-purple-600',
-                    token: `fake-token-${Date.now()}` // Simulated token
-                };
-                localStorage.setItem(`user_${formData.email}`, JSON.stringify(newUser));
-                localStorage.setItem('current_user_token', newUser.token); // Simulate logging in immediately
-                return newUser;
+            if (type === 'google') {
+                userCredential = await signInWithPopup(auth, googleProvider);
+                user = userCredential.user;
+            } else if (type === 'signup') {
+                userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+                user = userCredential.user;
             } else { // login
-                const storedUser = localStorage.getItem(`user_${formData.email}`);
-                if (!storedUser) {
-                    throw new Error('Invalid email or password.');
-                }
-                const userObj = JSON.parse(storedUser);
-                // Simple password check (NOT secure for real app, use password hashing in PHP)
-                if (formData.password !== 'password') { // Assuming a default password for simulation
-                    throw new Error('Invalid email or password.');
-                }
-                localStorage.setItem('current_user_token', userObj.token);
-                return userObj;
+                userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+                user = userCredential.user;
             }
-            // --- END SIMULATED BACKEND RESPONSE ---
+
+            // After authentication, ensure user data exists in Firestore
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+            const docSnap = await getDoc(userDocRef);
+
+            let fetchedUserData;
+            if (docSnap.exists()) {
+                fetchedUserData = docSnap.data();
+            } else {
+                // Create user document if it doesn't exist (e.g., new Google user)
+                const usernameToUse = user.displayName || user.email?.split('@')[0] || 'User';
+                // Prioritize user.photoURL from auth provider, fallback to placeholder
+                const profilePicToUse = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
+
+                await setDoc(userDocRef, {
+                    email: user.email,
+                    username: usernameToUse,
+                    role: 'member', // Default role for new users
+                    profilePicUrl: profilePicToUse,
+                    backgroundUrl: 'bg-gradient-to-r from-blue-400 to-purple-600' // Default background
+                });
+                const newDocSnap = await getDoc(userDocRef);
+                fetchedUserData = newDocSnap.data();
+            }
+            return fetchedUserData;
 
         } catch (error) {
-            console.error("Auth API error:", error);
-            throw error;
+            console.error("Firebase Auth error:", error.message);
+            let errorMessage = "An unknown error occurred.";
+            if (error.code === 'auth/email-already-in-use') {
+                errorMessage = 'This email is already in use.';
+            } else if (error.code === 'auth/invalid-email') {
+                errorMessage = 'Invalid email address.';
+            } else if (error.code === 'auth/weak-password') {
+                errorMessage = 'Password should be at least 6 characters.';
+            } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                errorMessage = 'Invalid email or password.';
+            } else if (error.code === 'auth/popup-closed-by-user') {
+                errorMessage = 'Authentication popup closed.';
+            } else if (error.code === 'auth/cancelled-popup-request') {
+                errorMessage = 'Authentication request cancelled.';
+            } else if (error.code === 'auth/unauthorized-domain') {
+                errorMessage = 'Unauthorized domain. Add your website URL to Firebase Authentication Authorized Domains.';
+            } else if (error.code === 'auth/invalid-api-key') {
+                errorMessage = 'Invalid Firebase API Key. Please check your firebaseConfig.';
+            } else if (error.code === 'auth/account-exists-with-different-credential') {
+                errorMessage = 'Account already exists with a different login method. Try signing in with that method.';
+            }
+            throw new Error(errorMessage); // Re-throw with a user-friendly message
         } finally {
             hideLoadingSpinner();
         }
     }
 
     /**
-     * Fetches the current user's data from the backend using a session/token.
-     * @returns {Promise<object|null>} - User data or null if not authenticated.
+     * Sends a password reset email.
+     * @param {string} email - User's email for password reset.
+     * @returns {Promise<void>}
      */
-    async function fetchCurrentUser() {
-        const token = localStorage.getItem('current_user_token');
-        if (!token) return null;
+    async function sendPasswordReset(email) {
+        showLoadingSpinner();
+        try {
+            await sendPasswordResetEmail(auth, email);
+        } catch (error) {
+            console.error("Password reset error:", error.message);
+            let errorMessage = "Failed to send password reset email. Please try again.";
+            if (error.code === 'auth/user-not-found') {
+                errorMessage = "No account found with that email address.";
+            } else if (error.code === 'auth/invalid-email') {
+                errorMessage = "Invalid email format.";
+            }
+            throw new Error(errorMessage);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Fetches the current user's data from Firestore.
+     * @returns {Promise<object|null>} - User data or null if not authenticated/found.
+     */
+    async function fetchCurrentUserFirestoreData() {
+        if (!currentUser) return null;
 
         showLoadingSpinner();
         try {
-            // --- SIMULATED BACKEND RESPONSE (Replace with actual fetch) ---
-            await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-            const allUsers = Object.keys(localStorage).filter(key => key.startsWith('user_')).map(key => JSON.parse(localStorage.getItem(key)));
-            const loggedInUser = allUsers.find(user => user.token === token);
-            if (!loggedInUser) {
-                 localStorage.removeItem('current_user_token'); // Token invalid
-                 return null;
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
+            const docSnap = await getDoc(userDocRef);
+            if (docSnap.exists()) {
+                return docSnap.data();
             }
-            return loggedInUser;
-            // --- END SIMULATED BACKEND RESPONSE ---
-
+            console.log("Firestore document for user not found.");
+            return null;
         } catch (error) {
-            console.error("Fetch current user API error:", error);
-            localStorage.removeItem('current_user_token'); // Assume token is invalid
+            console.error("Error fetching user data from Firestore:", error.message);
             return null;
         } finally {
             hideLoadingSpinner();
@@ -240,357 +294,482 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Updates the current user's profile data.
-     * @param {object} newUserData - Data to update.
+     * Updates the current user's profile data in Firestore.
+     * @param {object} newUserData - Data to update (username, profilePicUrl, backgroundUrl).
      * @returns {Promise<object>} - Updated user data.
      */
     async function updateProfileData(newUserData) {
-        const token = localStorage.getItem('current_user_token');
-        if (!token) {
-            showMessageModal("You must be logged in to update your profile.", 'error');
-            return null;
+        if (!currentUser) {
+            throw new Error("You must be logged in to update your profile.");
         }
 
         showLoadingSpinner();
         try {
-            // --- SIMULATED BACKEND RESPONSE (Replace with actual fetch) ---
-            await new Promise(resolve => setTimeout(resolve, 700)); // Simulate network delay
-            const allUsers = Object.keys(localStorage).filter(key => key.startsWith('user_')).map(key => JSON.parse(localStorage.getItem(key)));
-            const userIndex = allUsers.findIndex(user => user.token === token);
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
 
-            if (userIndex === -1) {
-                throw new Error('User not found or session expired.');
+            // Update Firebase Auth display name if username changed
+            if (auth.currentUser && auth.currentUser.displayName !== newUserData.username) {
+                await updateProfile(auth.currentUser, { displayName: newUserData.username });
             }
 
-            const updatedUser = { ...allUsers[userIndex], ...newUserData };
-            localStorage.setItem(`user_${updatedUser.email}`, JSON.stringify(updatedUser));
-            return updatedUser;
-            // --- END SIMULATED BACKEND RESPONSE ---
+            // Update Firestore document
+            await updateDoc(userDocRef, newUserData);
 
+            // Fetch the updated document to return the latest state
+            const docSnap = await getDoc(userDocRef);
+            return docSnap.exists() ? docSnap.data() : null;
         } catch (error) {
-            console.error("Update profile API error:", error);
-            throw error;
+            console.error("Error updating profile in Firestore:", error.message);
+            throw new Error("Failed to update profile. Please try again: " + error.message);
         } finally {
             hideLoadingSpinner();
         }
     }
 
     /**
-     * Fetches all users for the admin panel.
+     * Fetches all users for the admin panel from Firestore.
      * @returns {Promise<Array<object>>} - List of all users.
      */
-    async function fetchAllUsers() {
-        const token = localStorage.getItem('current_user_token');
-        if (!token) {
-            showMessageModal("Not authorized to view users list.", 'error');
-            return [];
+    async function fetchAllUsersFirestore() {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Not authorized to view users list.");
         }
 
         showLoadingSpinner();
         try {
-            // --- SIMULATED BACKEND RESPONSE (Replace with actual fetch) ---
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-            const allUsers = Object.keys(localStorage)
-                .filter(key => key.startsWith('user_'))
-                .map(key => JSON.parse(localStorage.getItem(key)));
-            return allUsers;
-            // --- END SIMULATED BACKEND RESPONSE ---
+            const usersCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
+            const q = query(usersCollectionRef); // No orderBy() for simplicity with security rules
 
+            const querySnapshot = await new Promise((resolve, reject) => {
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    unsubscribe(); // Unsubscribe immediately after first fetch
+                    resolve(snapshot);
+                }, (error) => {
+                    reject(error);
+                });
+            });
+
+            const usersData = [];
+            querySnapshot.forEach((doc) => {
+                usersData.push({ id: doc.id, ...doc.data() });
+            });
+            return usersData;
         } catch (error) {
-            console.error("Fetch all users API error:", error);
-            throw error;
+            console.error("Error fetching all users:", error.message);
+            throw new Error("Failed to fetch users list: " + error.message);
         } finally {
             hideLoadingSpinner();
         }
     }
 
     /**
-     * Updates a user's role by an admin.
+     * Updates a user's role by an admin/founder in Firestore.
      * @param {string} userId - ID of the user to update.
-     * @param {string} newRole - The new role ('member' or 'admin').
+     * @param {string} newRole - The new role ('member', 'admin', or 'founder').
      * @returns {Promise<boolean>} - True on success.
      */
-    async function updateUserRole(userId, newRole) {
-        const token = localStorage.getItem('current_user_token');
-        if (!token) {
-            showMessageModal("Not authorized to change roles.", 'error');
+    async function updateUserRoleFirestore(userId, newRole) {
+        // Only admins can change roles, but founders can change any role.
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Not authorized to change roles.");
+        }
+        
+        // Prevent admins from setting founder role (only founders can do this)
+        if (newRole === 'founder' && userData.role !== 'founder') {
+            throw new Error("Only a founder can assign the 'founder' role.");
+        }
+
+        // Prevent self-demotion from founder/admin, or self-deletion from any role via the panel.
+        if (userId === currentUser.uid) {
+            showMessageModal("You cannot change your own role or delete your own account from the admin panel. Please manage your own profile in the 'Profile' section.", 'info');
+            return false; // Indicate operation was not performed due to safety check
+        }
+
+        showLoadingSpinner();
+        try {
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
+            await updateDoc(userDocRef, { role: newRole });
+            return true;
+        } catch (error) {
+            console.error("Error updating user role in Firestore:", error.message);
+            throw new Error("Failed to update user role: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Sets a user's banned status.
+     * @param {string} userId - The ID of the user to ban/unban.
+     * @param {boolean} isBanned - True to ban, false to unban.
+     * @returns {Promise<boolean>} - True on success.
+     */
+    async function setUserBanStatusFirestore(userId, isBanned) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Not authorized to ban/unban users.");
+        }
+        if (userId === currentUser.uid) {
+            showMessageModal("You cannot ban or unban your own account.", 'info');
             return false;
         }
 
         showLoadingSpinner();
         try {
-            // --- SIMULATED BACKEND RESPONSE (Replace with actual fetch) ---
-            await new Promise(resolve => setTimeout(resolve, 700)); // Simulate network delay
-            const allUsers = Object.keys(localStorage).filter(key => key.startsWith('user_')).map(key => JSON.parse(localStorage.getItem(key)));
-            const userToUpdateIndex = allUsers.findIndex(user => user.id === userId);
-
-            if (userToUpdateIndex === -1) {
-                throw new Error('User not found.');
-            }
-
-            const updatedUser = { ...allUsers[userToUpdateIndex], role: newRole };
-            localStorage.setItem(`user_${updatedUser.email}`, JSON.stringify(updatedUser));
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
+            await updateDoc(userDocRef, { isBanned: isBanned });
             return true;
-            // --- END SIMULATED BACKEND RESPONSE ---
-
         } catch (error) {
-            console.error("Update role API error:", error);
-            throw error;
+            console.error("Error setting user ban status in Firestore:", error.message);
+            throw new Error("Failed to update user ban status: " + error.message);
         } finally {
             hideLoadingSpinner();
         }
     }
 
+
     /**
-     * Deletes a user by an admin.
+     * Deletes a user's data from Firestore by an admin/founder.
+     * Note: This does NOT delete the user from Firebase Authentication.
+     * For full deletion, server-side code (e.g., using Firebase Admin SDK) is required.
      * @param {string} userId - ID of the user to delete.
      * @returns {Promise<boolean>} - True on success.
      */
-    async function deleteUser(userId) {
-        const token = localStorage.getItem('current_user_token');
-        if (!token) {
-            showMessageModal("Not authorized to delete users.", 'error');
+    async function deleteUserFirestore(userId) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Not authorized to delete users.");
+        }
+        if (userId === currentUser.uid) {
+            showMessageModal("You cannot delete your own account from the admin panel.", 'info');
             return false;
         }
 
         showLoadingSpinner();
         try {
-            // --- SIMULATED BACKEND RESPONSE (Replace with actual fetch) ---
-            await new Promise(resolve => setTimeout(resolve, 700)); // Simulate network delay
-            const allUsers = Object.keys(localStorage).filter(key => key.startsWith('user_')).map(key => JSON.parse(localStorage.getItem(key)));
-            const userToDelete = allUsers.find(user => user.id === userId);
-
-            if (!userToDelete) {
-                throw new Error('User not found.');
-            }
-            localStorage.removeItem(`user_${userToDelete.email}`);
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userId);
+            await deleteDoc(userDocRef);
             return true;
-            // --- END SIMULATED BACKEND RESPONSE ---
-
         } catch (error) {
-            console.error("Delete user API error:", error);
-            throw error;
+            console.error("Error deleting user from Firestore:", error.message);
+            throw new Error("Failed to delete user: " + error.message);
         } finally {
             hideLoadingSpinner();
         }
     }
 
     /**
-     * SIMULATED: Fetches all rooms from localStorage.
-     * @returns {Promise<Array<object>>} - List of all rooms.
+     * Creates a new post in Firestore.
+     * Only callable by admins and founders.
+     * @param {string} title - The title of the post.
+     * @param {string} content - The content of the post.
+     * @returns {Promise<void>}
      */
-    async function fetchAllRoomsSimulated() {
+    async function createPostFirestore(title, content) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can create posts.");
+        }
         showLoadingSpinner();
         try {
-            await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-            const rooms = JSON.parse(localStorage.getItem('rooms_data') || '[]');
-            return rooms;
-        } catch (error) {
-            console.error("Error fetching simulated rooms:", error);
-            return [];
-        } finally {
-            hideLoadingSpinner();
-        }
-    }
-
-    /**
-     * SIMULATED: Sends a new chat message to localStorage.
-     * @param {string} roomId - The ID of the room.
-     * @param {string} messageText - The content of the message.
-     */
-    async function sendMessageSimulated(roomId, messageText) {
-        if (!currentUser || !userData || !roomId) {
-            showMessageModal("You must be logged in and in a room to send messages.", 'info');
-            return;
-        }
-        if (!messageText.trim()) {
-            showMessageModal("Message cannot be empty.", 'info');
-            return;
-        }
-
-        try {
-            showLoadingSpinner();
-            await new Promise(resolve => setTimeout(resolve, 200)); // Simulate network delay
-
-            const messagesKey = `room_messages_${roomId}`;
-            const existingMessages = JSON.parse(localStorage.getItem(messagesKey) || '[]');
-            const newMessage = {
-                id: `msg_${Date.now()}`,
-                text: messageText,
-                authorId: currentUser.id,
-                authorUsername: userData.username || currentUser.email,
-                profilePicUrl: userData.profilePicUrl || '',
-                timestamp: new Date().toISOString()
-            };
-            existingMessages.push(newMessage);
-            localStorage.setItem(messagesKey, JSON.stringify(existingMessages));
-
-            // Clear input after sending, assuming the input element is accessible
-            const messageInput = document.getElementById('message-input');
-            if (messageInput) messageInput.value = '';
-        } catch (error) {
-            console.error("Error sending simulated message:", error);
-            showMessageModal("Failed to send message: " + error.message, 'error');
-        } finally {
-            hideLoadingSpinner();
-        }
-    }
-
-    /**
-     * SIMULATED: Loads messages for the current room from localStorage.
-     */
-    function loadRoomMessagesSimulated() {
-        if (!currentUser || !currentRoomId) return;
-
-        // Clean up previous messages interval if any
-        if (messagesInterval) clearInterval(messagesInterval);
-
-        const chatMessagesDiv = document.getElementById('chat-messages');
-        if (!chatMessagesDiv) return;
-
-        const updateMessages = async () => {
-            const messagesKey = `room_messages_${currentRoomId}`;
-            const messages = JSON.parse(localStorage.getItem(messagesKey) || '[]')
-                                .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-            chatMessagesDiv.innerHTML = ''; // Clear existing messages
-
-            // Get all simulated users for display purposes
-            const allUsers = Object.keys(localStorage)
-                .filter(key => key.startsWith('user_'))
-                .map(key => JSON.parse(localStorage.getItem(key)));
-            const usersMap = {};
-            allUsers.forEach(user => usersMap[user.id] = user);
-
-            messages.forEach((msg) => {
-                const senderData = usersMap[msg.authorId] || { username: 'Unknown User', profilePicUrl: '' };
-                const profilePic = senderData.profilePicUrl || `https://placehold.co/40x40/F0F0F0/000000?text=${(senderData.username || 'U').charAt(0).toUpperCase()}`;
-
-                const messageElement = document.createElement('div');
-                // Discord-like message styling
-                messageElement.className = `
-                    flex items-start gap-3 p-3 rounded-lg w-full text-white
-                    ${msg.authorId === currentUser.id ? 'bg-indigo-700 self-end ml-auto flex-row-reverse' : 'bg-gray-700 self-start mr-auto'}
-                `;
-                messageElement.innerHTML = `
-                    <img src="${profilePic}" alt="Avatar" class="w-10 h-10 rounded-full object-cover border-2 border-gray-500 flex-shrink-0" onerror="this.onerror=null; this.src='https://placehold.co/40x40/F0F0F0/000000?text=${(senderData.username || 'U').charAt(0).toUpperCase()}'">
-                    <div class="flex flex-col ${msg.authorId === currentUser.id ? 'items-end' : 'items-start'} flex-grow">
-                        <p class="font-semibold text-sm ${msg.authorId === currentUser.id ? 'text-blue-300' : 'text-gray-200'}">${msg.authorUsername}</p>
-                        <p class="break-words text-lg">${msg.text}</p>
-                        <p class="text-xs text-gray-400 mt-1">${new Date(msg.timestamp).toLocaleString()}</p>
-                    </div>
-                `;
-                chatMessagesDiv.appendChild(messageElement);
+            const postsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
+            await setDoc(doc(postsCollectionRef), { // Use setDoc with an auto-generated ID for new doc
+                title: title,
+                content: content,
+                authorId: currentUser.uid,
+                authorUsername: userData.username || currentUser.displayName || currentUser.email,
+                timestamp: serverTimestamp(), // Use server timestamp for consistency
+                reactions: {}, // Initialize empty reactions map
+                comments: [] // Initialize empty comments array
             });
-            chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight; // Scroll to bottom
-        };
-
-        updateMessages(); // Initial load
-        messagesInterval = setInterval(updateMessages, 1000); // Poll for new messages every second (simulated)
-    }
-
-    /**
-     * SIMULATED: Updates the current user's presence status in the current room.
-     * This uses localStorage to simulate presence.
-     * @param {boolean} inCallStatus - True if the user is in a call, false otherwise.
-     */
-    async function updateMyPresenceSimulated(inCallStatus) {
-        if (!currentUser || !currentRoomId) return;
-
-        try {
-            const presenceKey = `room_presence_${currentRoomId}`;
-            const allPresence = JSON.parse(localStorage.getItem(presenceKey) || '{}');
-
-            allPresence[currentUser.id] = {
-                userId: currentUser.id,
-                username: userData.username || currentUser.email,
-                profilePicUrl: userData.profilePicUrl || '',
-                lastSeen: new Date().toISOString(),
-                inCall: inCallStatus,
-            };
-            localStorage.setItem(presenceKey, JSON.stringify(allPresence));
+            showMessageModal('Post created successfully!');
         } catch (error) {
-            console.error("Error updating simulated presence:", error);
+            console.error("Error creating post:", error.message);
+            throw new Error("Failed to create post: " + error.message);
+        } finally {
+            hideLoadingSpinner();
         }
     }
 
     /**
-     * SIMULATED: Sets up real-time presence tracking for the current user in the room.
-     * This polls localStorage for updates.
+     * Updates an existing post in Firestore.
+     * Only callable by admins and founders.
+     * @param {string} postId - The ID of the post to update.
+     * @param {string} title - The new title.
+     * @param {string} content - The new content.
+     * @returns {Promise<void>}
      */
-    async function setupPresenceSimulated() {
-        if (!currentUser || !currentRoomId) return;
+    async function updatePostFirestore(postId, title, content) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can edit posts.");
+        }
+        showLoadingSpinner();
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            await updateDoc(postDocRef, {
+                title: title,
+                content: content,
+                // Do not update author or timestamp here, only content
+            });
+            showMessageModal('Post updated successfully!');
+        } catch (error) {
+            console.error("Error updating post:", error.message);
+            throw new Error("Failed to update post: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
 
-        // Clean up previous presence listener and interval if any
-        if (presenceInterval) clearInterval(presenceInterval);
+    /**
+     * Deletes a post from Firestore.
+     * Only callable by admins and founders.
+     * @param {string} postId - The ID of the post to delete.
+     * @returns {Promise<void>}
+     */
+    async function deletePostFirestore(postId) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can delete posts.");
+        }
+        showLoadingSpinner();
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            await deleteDoc(postDocRef);
+            showMessageModal('Post deleted successfully!');
+        } catch (error) {
+            console.error("Error deleting post:", error.message);
+            throw new Error("Failed to delete post: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
 
-        // Initial presence update, reflecting current isInCall status
-        updateMyPresenceSimulated(isInCall);
+    /**
+     * Adds/updates a reaction to a post.
+     * Any authenticated user can react.
+     * @param {string} postId - The ID of the post.
+     * @param {string} emoji - The emoji character (e.g., '?', '❤️').
+     * @returns {Promise<void>}
+     */
+    async function addReactionToPost(postId, emoji) {
+        if (!currentUser) {
+            showMessageModal("You must be logged in to react to posts.", 'info');
+            return;
+        }
+        showLoadingSpinner();
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            const postSnap = await getDoc(postDocRef);
 
-        // Poll for other users' presence
-        presenceInterval = setInterval(() => {
-            const activeUsersListDiv = document.getElementById('active-users-list');
-            if (!activeUsersListDiv) return;
+            if (postSnap.exists()) {
+                const postData = postSnap.data();
+                const currentReactions = postData.reactions || {};
+                
+                // Get the user's previously reacted emoji for this post, if any
+                const userPreviousReaction = postData.userReactions ? postData.userReactions[currentUser.uid] : null;
 
-            activeUsersListDiv.innerHTML = '';
-            let activeUsersCount = 0;
-            const activeThreshold = new Date(Date.now() - 15 * 1000).toISOString(); // Users seen in last 15 seconds
+                // Prepare updates object
+                const updates = {};
 
-            const presenceKey = `room_presence_${currentRoomId}`;
-            const allPresence = JSON.parse(localStorage.getItem(presenceKey) || '{}');
-
-            Object.values(allPresence).forEach((presenceData) => {
-                if (presenceData.lastSeen && presenceData.lastSeen > activeThreshold) {
-                    activeUsersCount++;
-                    const userElement = document.createElement('div');
-                    userElement.className = 'flex items-center space-x-3 p-2 bg-gray-700 rounded-md shadow-sm text-white'; // Discord-like
-                    const userProfilePic = presenceData.profilePicUrl || `https://placehold.co/30x30/F0F0F0/000000?text=${(presenceData.username || 'U').charAt(0).toUpperCase()}`;
-
-                    userElement.innerHTML = `
-                        <img src="${userProfilePic}" alt="User Avatar" class="w-8 h-8 rounded-full object-cover border-2 ${presenceData.inCall ? 'border-green-500' : 'border-gray-500'}">
-                        <span class="font-semibold text-gray-200">${presenceData.username}</span>
-                        ${presenceData.userId === currentUser.id ? '<span class="text-xs text-blue-300">(You)</span>' : ''}
-                        ${presenceData.inCall ? '<i class="fas fa-phone text-green-500 ml-2" title="In Call"></i>' : ''}
-                    `;
-                    activeUsersListDiv.appendChild(userElement);
+                // If user previously reacted with a different emoji, decrement its count
+                if (userPreviousReaction && userPreviousReaction !== emoji) {
+                    updates[`reactions.${userPreviousReaction}`] = Math.max(0, (currentReactions[userPreviousReaction] || 0) - 1);
+                    if (updates[`reactions.${userPreviousReaction}`] <= 0) {
+                        updates[`reactions.${userPreviousReaction}`] = deleteField(); // Correctly use deleteField
+                    }
                 }
+
+                // If user reacted with the same emoji, toggle it off (decrement)
+                // If user reacted with a different emoji or no emoji, toggle it on (increment)
+                if (userPreviousReaction === emoji) {
+                    updates[`reactions.${emoji}`] = Math.max(0, (currentReactions[emoji] || 0) - 1);
+                    if (updates[`reactions.${emoji}`] <= 0) {
+                        updates[`reactions.${emoji}`] = deleteField(); // Correctly use deleteField
+                    }
+                    updates[`userReactions.${currentUser.uid}`] = deleteField(); // Remove user's specific reaction
+                } else {
+                    updates[`reactions.${emoji}`] = (currentReactions[emoji] || 0) + 1;
+                    updates[`userReactions.${currentUser.uid}`] = emoji; // Store user's new reaction
+                }
+                
+                // Perform the update
+                await updateDoc(postDocRef, updates);
+            }
+        } catch (error) {
+            console.error("Error adding reaction:", error.message);
+            showMessageModal("Failed to add reaction: " + error.message, 'error');
+        } finally {
+            hideLoadingSpinner();
+            // Re-render forum page to show updated reactions
+            renderForumPage(); 
+        }
+    }
+
+
+    /**
+     * Adds a comment to a post.
+     * Any authenticated user can comment.
+     * @param {string} postId - The ID of the post.
+     * @param {string} commentText - The comment content.
+     * @returns {Promise<void>}
+     */
+    async function addCommentToPost(postId, commentText) {
+        if (!currentUser) {
+            showMessageModal("You must be logged in to comment on posts.", 'info');
+            return;
+        }
+        if (!commentText.trim()) {
+            showMessageModal("Comment cannot be empty.", 'info');
+            return;
+        }
+
+        showLoadingSpinner();
+        try {
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            const newComment = {
+                authorId: currentUser.uid,
+                authorUsername: userData.username || currentUser.displayName || currentUser.email,
+                text: commentText,
+                timestamp: new Date().toISOString() // Use ISO string for client-side timestamp
+            };
+            await updateDoc(postDocRef, {
+                comments: arrayUnion(newComment) // Add the new comment to the array
+            });
+            showMessageModal('Comment added successfully!');
+        } catch (error) {
+            console.error("Error adding comment:", error.message);
+            showMessageModal("Failed to add comment: " + error.message, 'error');
+        } finally {
+            hideLoadingSpinner();
+            // Re-render forum page to show updated comments
+            renderForumPage(); 
+        }
+    }
+
+
+    /**
+     * Fetches all posts from Firestore, ordered by timestamp.
+     * @returns {Promise<Array<object>>} - List of all posts.
+     */
+    async function fetchAllPostsFirestore() {
+        showLoadingSpinner();
+        try {
+            const postsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/posts`);
+            const q = query(postsCollectionRef, orderBy('timestamp', 'desc')); // Order by newest first
+
+            const querySnapshot = await new Promise((resolve, reject) => {
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    unsubscribe(); // Unsubscribe immediately after first fetch
+                    resolve(snapshot);
+                }, (error) => {
+                    reject(error);
+                });
             });
 
-            if (activeUsersCount === 0) {
-                activeUsersListDiv.innerHTML = '<p class="text-gray-400 text-center text-sm">No one else is online.</p>';
-            }
-        }, 3000); // Update presence list every 3 seconds (simulated)
+            const postsData = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                postsData.push({
+                    id: doc.id,
+                    title: data.title,
+                    content: data.content,
+                    authorUsername: data.authorUsername,
+                    // Format timestamp for display (handle ISO string or Firestore Timestamp)
+                    timestamp: data.timestamp ? (typeof data.timestamp === 'string' ? new Date(data.timestamp).toLocaleString() : data.timestamp.toDate().toLocaleString()) : 'N/A',
+                    reactions: data.reactions || {}, // Ensure reactions is an object
+                    comments: data.comments || [] // Ensure comments is an array
+                });
+            });
+            return postsData;
+        } catch (error) {
+            console.error("Error fetching posts:", error.message);
+            throw new Error("Failed to fetch posts: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
     }
 
     /**
-     * Initiates a simulated call for the current user.
+     * Fetches all team members from Firestore.
+     * @returns {Promise<Array<object>>} - List of all team members.
      */
-    async function joinCallSimulated() {
-        if (!currentUser || !currentRoomId) return;
-        isInCall = true;
-        await updateMyPresenceSimulated(true);
-        showMessageModal("You have joined the call!", 'info');
-        // Update button states immediately
-        const joinCallBtn = document.getElementById('join-call-btn');
-        const leaveCallBtn = document.getElementById('leave-call-btn');
-        if (joinCallBtn) joinCallBtn.classList.add('hidden');
-        if (leaveCallBtn) leaveCallBtn.classList.remove('hidden');
+    async function fetchTeamMembersFirestore() {
+        showLoadingSpinner();
+        try {
+            const teamCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/team`);
+            const q = query(teamCollectionRef);
+
+            const querySnapshot = await new Promise((resolve, reject) => {
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    unsubscribe();
+                    resolve(snapshot);
+                }, (error) => {
+                    reject(error);
+                });
+            });
+
+            const teamMembersData = [];
+            querySnapshot.forEach((doc) => {
+                teamMembersData.push({ id: doc.id, ...doc.data() });
+            });
+            return teamMembersData;
+        } catch (error) {
+            console.error("Error fetching team members:", error.message);
+            throw new Error("Failed to fetch team members: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
     }
 
     /**
-     * Ends a simulated call for the current user.
+     * Adds a new team member to Firestore.
+     * Only callable by admins and founders.
+     * @param {string} username - The username of the team member.
+     * @param {string} role - The role of the team member.
+     * @returns {Promise<void>}
      */
-    async function leaveCallSimulated() {
-        if (!currentUser || !currentRoomId) return;
-        isInCall = false;
-        await updateMyPresenceSimulated(false);
-        showMessageModal("You have left the call.", 'info');
-        // Update button states immediately
-        const joinCallBtn = document.getElementById('join-call-btn');
-        const leaveCallBtn = document.getElementById('leave-call-btn');
-        if (joinCallBtn) joinCallBtn.classList.remove('hidden');
-        if (leaveCallBtn) leaveCallBtn.classList.add('hidden');
+    async function addTeamMemberFirestore(username, role) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can add team members.");
+        }
+        showLoadingSpinner();
+        try {
+            const teamCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/team`);
+            await addDoc(teamCollectionRef, {
+                username: username,
+                role: role,
+                addedBy: currentUser.uid,
+                addedByUsername: userData.username || currentUser.displayName || currentUser.email,
+                timestamp: serverTimestamp()
+            });
+            showMessageModal('Team member added successfully!');
+        } catch (error) {
+            console.error("Error adding team member:", error.message);
+            throw new Error("Failed to add team member: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
     }
+
+    /**
+     * Deletes a team member from Firestore.
+     * Only callable by admins and founders.
+     * @param {string} teamMemberId - The ID of the team member to delete.
+     * @returns {Promise<void>}
+     */
+    async function deleteTeamMemberFirestore(teamMemberId) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Only admins and founders can delete team members.");
+        }
+        showLoadingSpinner();
+        try {
+            const teamMemberDocRef = doc(db, `/artifacts/${APP_ID}/public/data/team`, teamMemberId);
+            await deleteDoc(teamMemberDocRef);
+            showMessageModal('Team member deleted successfully!');
+        } catch (error) {
+            console.error("Error deleting team member:", error.message);
+            throw new Error("Failed to delete team member: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
 
     // --- UI Rendering Functions ---
 
@@ -598,94 +777,290 @@ document.addEventListener('DOMContentLoaded', () => {
      * Renders the Navbar links based on authentication status.
      */
     function renderNavbar() {
-        navLinks.innerHTML = '';
-        mobileMenu.innerHTML = '';
+        // Clear desktop nav links
+        if (navLinks) {
+            navLinks.innerHTML = '';
+        } else {
+            console.warn("Element with ID 'nav-links' not found. Desktop navigation may not render correctly.");
+        }
+        
+        // Clear only dynamically added items from side drawer (keeping static Home/About)
+        // Find the index of the first dynamic button (or the length if none)
+        let firstDynamicIndex = 2; // Assuming mobile-drawer-home and mobile-drawer-about are always first 2 static elements
+        if (sideDrawerMenu) {
+            while (sideDrawerMenu.children.length > firstDynamicIndex) {
+                sideDrawerMenu.removeChild(sideDrawerMenu.lastChild);
+            }
+        } else {
+            console.warn("Element with ID 'side-drawer-menu' not found. Mobile navigation may not render correctly.");
+        }
 
-        const createButton = (id, text, page, iconHtml = '', isMobile = false) => {
+        // Update website title from config.js
+        document.querySelector('title').textContent = CONFIG.websiteTitle;
+        // The navHomeButton is a static element for the main title, already in index.html
+        if (navHomeButton) {
+            navHomeButton.textContent = CONFIG.websiteTitle;
+        } else {
+            console.warn("Element with ID 'nav-home' not found. Main title may not be functional.");
+        }
+
+
+        // Helper to create a button for a given menu (desktop or mobile)
+        const createAndAppendButton = (container, id, text, page, iconHtml = '', isMobile = false) => {
+            if (!container) return; // Defensive check
+
             const btn = document.createElement('button');
             btn.id = id;
             btn.className = `
-                ${isMobile ? 'block w-full text-left px-4 py-2 text-md' : 'px-4 py-2'}
-                rounded-lg hover:bg-gray-700 transition duration-200 text-white
-                ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' :
-                  (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' :
+                ${isMobile ? 'block w-full text-left px-4 py-3 text-lg font-semibold' : 'px-4 py-2'}
+                rounded-lg hover:bg-gray-700 text-white transition duration-200
+                ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : 
+                  (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : 
                   (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}
-            `;
+            `; // Removed founder-specific styling, admin styling will apply if a founder is shown admin panel
             btn.innerHTML = `${iconHtml}<span>${text}</span>`;
             btn.addEventListener('click', () => {
                 navigateTo(page);
-                closeSideDrawer(); // Ensure mobile menu closes on navigation
+                // Close side drawer after navigation
+                closeSideDrawer();
             });
-            return btn;
+            container.appendChild(btn);
         };
 
-        // Static buttons that always exist in HTML but need event listeners
-        navHomeButton.onclick = () => navigateTo('home');
-        navAboutButton.onclick = () => navigateTo('about');
-        navRoomsButton.onclick = () => navigateTo('rooms');
-
-        // Dynamically add links to desktop nav
-        if (currentUser && userData) {
-            if (userData.role === 'admin') {
-                navLinks.appendChild(createButton('nav-admin', 'Admin Panel', 'admin'));
+        // Navigation Categories for Desktop
+        const categories = [
+            {
+                name: 'Community',
+                items: [
+                    { id: 'nav-forum', text: 'Forum', page: 'forum' },
+                    { id: 'nav-team', text: 'Meet the Team', page: 'team' } // New category item
+                ],
+                authRequired: true
+            },
+            {
+                name: 'Administration',
+                items: [
+                    { id: 'nav-admin', text: 'Admin Panel', page: 'admin' }
+                ],
+                authRequired: true,
+                roles: ['admin', 'founder']
+            },
+            {
+                name: 'Account',
+                items: [], // Populated below based on auth state
+                authRequired: false
             }
+        ];
 
-            const profileIconHtml = userData.profilePicUrl ?
-                `<img src="${userData.profilePicUrl}" alt="Profile" class="w-8 h-8 rounded-full object-cover border-2 border-gray-400" onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${userData.username ? userData.username.charAt(0).toUpperCase() : 'U'}'">` :
-                `<span class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold">${userData.username ? userData.username.charAt(0).toUpperCase() : 'U'}</span>`;
+        // Populate Account category based on auth state
+        const accountCategory = categories.find(cat => cat.name === 'Account');
+        if (currentUser && userData) {
+            const profileIconSrc = userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`;
+            const profileIconHtml = `
+                <img src="${profileIconSrc}" alt="Profile" class="w-8 h-8 rounded-full object-cover border-2 border-gray-400"
+                     onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}'">`;
 
-            const profileBtn = document.createElement('button');
-            profileBtn.id = 'nav-profile';
-            profileBtn.className = 'px-4 py-2 rounded-lg hover:bg-gray-700 transition duration-200 flex items-center space-x-2 text-white';
-            profileBtn.innerHTML = `${profileIconHtml}<span>${userData.username || currentUser.email}</span>`;
-            profileBtn.addEventListener('click', () => navigateTo('profile'));
-            navLinks.appendChild(profileBtn);
-
-            navLinks.appendChild(createButton('nav-sign-out', 'Sign Out', 'logout'));
+            accountCategory.items.push(
+                { id: 'nav-profile', text: userData.username || currentUser.email, page: 'profile', icon: profileIconHtml },
+                { id: 'nav-sign-out', text: 'Sign Out', page: 'logout' }
+            );
         } else {
-            navLinks.appendChild(createButton('nav-auth', 'Sign In / Up', 'auth'));
+            accountCategory.items.push(
+                { id: 'nav-auth', text: 'Sign In / Up', page: 'auth' }
+            );
         }
 
-        // Dynamically add links to mobile menu
-        mobileMenu.appendChild(createButton('mobile-nav-home', 'Home', 'home', '', true));
-        mobileMenu.appendChild(createButton('mobile-nav-about', 'About', 'about', '', true));
-        mobileMenu.appendChild(createButton('mobile-nav-rooms', 'Rooms', 'rooms', '', true)); // Rooms for mobile
-        if (currentUser && userData) {
-            if (userData.role === 'admin') {
-                mobileMenu.appendChild(createButton('mobile-nav-admin', 'Admin Panel', 'admin', '', true));
-            }
-            mobileMenu.appendChild(createButton('mobile-nav-profile', 'Profile', 'profile', '', true));
-            mobileMenu.appendChild(createButton('mobile-nav-sign-out', 'Sign Out', 'logout', '', true));
-        } else {
-            mobileMenu.appendChild(createButton('mobile-nav-auth', 'Sign In / Up', 'auth', '', true));
-        }
+        // Close all desktop dropdowns function
+        const closeAllDesktopDropdowns = () => {
+            document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
+                content.classList.add('hidden');
+                content.style.maxHeight = '0px';
+                const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
+                if (icon) icon.classList.remove('rotate-180');
+            });
+        };
+
+        // Render Desktop Navigation
+        categories.forEach(category => {
+            if (category.authRequired && !currentUser) return; // Skip if auth required and user not logged in
+            if (category.roles && (!currentUser || !category.roles.includes(userData.role))) return; // Skip if roles required and user doesn't have them
+
+            const dropdownContainer = document.createElement('div');
+            dropdownContainer.className = 'relative inline-block text-left'; // Changed from 'group'
+
+            dropdownContainer.innerHTML = `
+                <button class="px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 flex items-center space-x-2 desktop-dropdown-toggle">
+                    <span>${category.name}</span>
+                    <i class="fas fa-chevron-down text-xs ml-1 transition-transform transform"></i>
+                </button>
+                <div class="desktop-dropdown-content absolute hidden bg-gray-700 text-white rounded-lg shadow-lg py-2 w-40 z-10 top-full mt-2 left-0 origin-top overflow-hidden" style="max-height: 0px; transition: max-height 0.3s ease-in-out;">
+                    ${category.items.map(item => `
+                        <button id="${item.id}" class="block w-full text-left px-4 py-2 hover:bg-gray-600 transition duration-200">
+                            ${item.icon || ''}<span>${item.text}</span>
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+            navLinks.appendChild(dropdownContainer);
+
+            const toggleButton = dropdownContainer.querySelector('.desktop-dropdown-toggle');
+            const dropdownContent = dropdownContainer.querySelector('.desktop-dropdown-content');
+            const dropdownIcon = toggleButton.querySelector('.fa-chevron-down');
+
+            toggleButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent document click from immediately closing it
+                const isOpen = !dropdownContent.classList.contains('hidden');
+
+                closeAllDesktopDropdowns(); // Close all other dropdowns first
+
+                if (!isOpen) {
+                    dropdownContent.classList.remove('hidden');
+                    // Set max-height to scrollHeight to enable smooth transition
+                    dropdownContent.style.maxHeight = dropdownContent.scrollHeight + 'px';
+                    dropdownIcon.classList.add('rotate-180');
+                } else {
+                    dropdownContent.style.maxHeight = '0px';
+                    dropdownContent.classList.add('hidden');
+                    dropdownIcon.classList.remove('rotate-180');
+                }
+            });
+
+            // Attach event listeners for dropdown items
+            dropdownContent.querySelectorAll('button[id]').forEach(btn => {
+                const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
+                if (page) {
+                    btn.addEventListener('click', () => {
+                        navigateTo(page);
+                        closeAllDesktopDropdowns(); // Close dropdown after navigation
+                    });
+                }
+            });
+        });
+
+        // Close desktop dropdowns when clicking anywhere on the document
+        document.removeEventListener('click', closeAllDesktopDropdowns); // Remove previous listener to prevent duplicates
+        document.addEventListener('click', closeAllDesktopDropdowns);
+
+
+        // Render Mobile Drawer Navigation
+        // Ensure static home/about buttons are already in HTML and have their listeners.
+        // We will append dynamic categories below them.
+
+        // Mobile dropdown toggle function
+        const createMobileDropdown = (categoryName, items) => {
+            const dropdownWrapper = document.createElement('div');
+            dropdownWrapper.className = 'w-full';
+            dropdownWrapper.innerHTML = `
+                <button class="mobile-dropdown-toggle block w-full text-left px-4 py-3 text-lg font-semibold bg-gray-700 hover:bg-gray-600 transition duration-200 flex justify-between items-center rounded-md">
+                    <span>${categoryName}</span>
+                    <i class="fas fa-chevron-down text-sm transition-transform transform"></i>
+                </button>
+                <div class="mobile-dropdown-content hidden bg-gray-700 py-1 rounded-b-lg overflow-hidden transition-all duration-300 ease-in-out" style="max-height: 0px;">
+                    ${items.map(item => `
+                        <button id="${item.id}" class="block w-full text-left px-6 py-2 text-md hover:bg-gray-600 text-white transition duration-200">
+                            ${item.icon || ''}<span>${item.text}</span>
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+            sideDrawerMenu.appendChild(dropdownWrapper);
+
+            const toggleButton = dropdownWrapper.querySelector('.mobile-dropdown-toggle');
+            const dropdownContent = dropdownWrapper.querySelector('.mobile-dropdown-content');
+            const dropdownIcon = dropdownWrapper.querySelector('.fa-chevron-down');
+
+            toggleButton.addEventListener('click', () => {
+                const isOpen = dropdownContent.classList.contains('open');
+                if (isOpen) {
+                    dropdownContent.style.maxHeight = '0px';
+                    dropdownContent.classList.remove('open');
+                    dropdownIcon.classList.remove('rotate-180');
+                } else {
+                    // Close all other open dropdowns first for cleaner UX
+                    sideDrawerMenu.querySelectorAll('.mobile-dropdown-content.open').forEach(openContent => {
+                        openContent.style.maxHeight = '0px';
+                        openContent.classList.remove('open');
+                        openContent.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
+                    });
+                    
+                    dropdownContent.style.maxHeight = dropdownContent.scrollHeight + 'px';
+                    dropdownContent.classList.add('open');
+                    dropdownIcon.classList.add('rotate-180');
+                }
+            });
+
+            dropdownContent.querySelectorAll('button[id]').forEach(btn => {
+                const page = categories.flatMap(cat => cat.items).find(item => item.id === btn.id)?.page;
+                if (page) {
+                    btn.addEventListener('click', () => {
+                        navigateTo(page);
+                        closeSideDrawer(); // Close drawer after navigating
+                    });
+                }
+            });
+        };
+
+        categories.forEach(category => {
+            if (category.authRequired && !currentUser) return;
+            if (category.roles && (!currentUser || !category.roles.includes(userData.role))) return;
+
+            createMobileDropdown(category.name, category.items);
+        });
     }
 
     /**
      * Renders the Home page content.
      */
     function renderHomePage() {
+        // Function to get VFX and color for role
+        const getRoleVFX = (role) => {
+            let emoji = '';
+            let colorClass = 'text-gray-800'; // Default color
+
+            switch (role) {
+                case 'member':
+                    emoji = '👤'; // User emoji
+                    colorClass = 'text-blue-600'; // Member color
+                    break;
+                case 'admin':
+                    emoji = '🛡️'; // Shield emoji
+                    colorClass = 'text-red-600'; // Admin color
+                    break;
+                case 'founder':
+                    emoji = '✨'; // Sparkles emoji
+                    colorClass = 'text-purple-600'; // Founder color
+                    break;
+                default:
+                    emoji = '';
+                    colorClass = 'text-gray-800';
+            }
+            // Apply a subtle animation for all roles, or only privileged ones
+            const animationClass = (role === 'admin' || role === 'founder') ? 'animate-pulse' : ''; 
+            return `<span class="font-semibold ${colorClass} ${animationClass}">${emoji} ${role}</span>`;
+        };
+
+
         contentArea.innerHTML = `
             <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
                 <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-green-600 mb-6">
-                    Welcome to MyWebsite!
+                    Welcome to ${CONFIG.websiteTitle}!
                 </h1>
                 ${currentUser && userData ? `
                     <p class="text-xl text-gray-700 mb-4">
                         Hello, <span class="font-semibold text-blue-600">${userData.username || currentUser.email}</span>!
-                        You are logged in as a <span class="font-semibold text-purple-600">${userData.role}</span>.
+                        You are logged in as a ${getRoleVFX(userData.role)}.
                     </p>
                     <p class="text-lg text-gray-600 mb-6">
-                        Explore your profile settings or check out the admin panel if you have the permissions.
+                        Explore your profile settings, check out the forum, or visit the admin panel if you have the permissions.
                     </p>
                     <div class="flex flex-col sm:flex-row justify-center gap-4">
                         <button id="go-to-profile-btn" class="py-3 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Go to Profile
                         </button>
-                        <button id="go-to-rooms-btn" class="py-3 px-6 rounded-full bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                            Go to Rooms
+                        <button id="go-to-forum-btn" class="py-3 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Visit Forum
                         </button>
-                        ${userData.role === 'admin' ? `
+                        ${userData.role === 'admin' || userData.role === 'founder' ? `
                         <button id="go-to-admin-btn" class="py-3 px-6 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Admin Panel
                         </button>` : ''}
@@ -703,8 +1078,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (currentUser && userData) {
             document.getElementById('go-to-profile-btn').addEventListener('click', () => navigateTo('profile'));
-            document.getElementById('go-to-rooms-btn').addEventListener('click', () => navigateTo('rooms'));
-            if (userData.role === 'admin') {
+            document.getElementById('go-to-forum-btn').addEventListener('click', () => navigateTo('forum'));
+            if (userData.role === 'admin' || userData.role === 'founder') {
                 document.getElementById('go-to-admin-btn').addEventListener('click', () => navigateTo('admin'));
             }
         } else {
@@ -745,6 +1120,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             Forgot Password?
                         </button>
                     </div>
+                    <div class="mt-6">
+                        <button id="google-auth-btn" class="w-full py-3 rounded-full bg-red-500 text-white font-bold text-lg hover:bg-red-600 transition duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12.24 10.26v3.29h6.14c-.26 1.63-1.4 3.01-3.23 3.91l-.01.01-2.58 2.02c-1.52 1.19-3.4 1.83-5.32 1.83-4.8 0-8.72-3.86-8.72-8.62s3.92-8.62 8.72-8.62c2.81 0 4.67 1.19 5.86 2.36L18.42 5c-.71-.69-2.09-1.83-5.46-1.83-3.69 0-6.73 2.97-6.73 6.64s3.04 6.64 6.73 6.64c2.86 0 4.69-1.22 5.56-2.26l.01-.01-4.73-3.71z" fill="#FFFFFF"></path>
+                            </svg>
+                            <span>Sign in with Google</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -758,6 +1141,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const authSubmitBtn = document.getElementById('auth-submit-btn');
         const toggleAuthModeBtn = document.getElementById('toggle-auth-mode');
         const forgotPasswordBtn = document.getElementById('forgot-password-btn');
+        const googleAuthBtn = document.getElementById('google-auth-btn'); // Get the Google button
 
         let isSignUpMode = false;
 
@@ -775,32 +1159,15 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const email = emailInput.value;
             const password = passwordInput.value;
-            const username = usernameInput.value; // Will be empty if not in signup mode
+            const username = usernameInput.value;
 
             try {
+                await authenticateUser(isSignUpMode ? 'signup' : 'login', { email, password, username });
+                // onAuthStateChanged listener will handle redirection after successful auth
                 if (isSignUpMode) {
-                    const newUser = await authenticateUser('signup', { email, password, username });
-                    if (newUser) {
-                        showMessageModal('Account created successfully! Please sign in.');
-                        isSignUpMode = false; // Switch to sign-in form
-                        authTitle.textContent = 'Sign In';
-                        authSubmitBtn.textContent = 'Sign In';
-                        toggleAuthModeBtn.textContent = 'Need an account? Sign Up';
-                        usernameField.classList.add('hidden');
-                        usernameInput.value = '';
-                        passwordInput.value = '';
-                        usernameInput.required = false;
-                        forgotPasswordBtn.classList.remove('hidden');
-                    }
+                    showMessageModal('Account created successfully! You are now signed in.');
                 } else {
-                    const loggedInUser = await authenticateUser('login', { email, password });
-                    if (loggedInUser) {
-                        currentUser = loggedInUser; // Update global state
-                        userData = loggedInUser;
-                        updateBodyBackground(); // Update background on login
-                        showMessageModal('Signed in successfully!');
-                        navigateTo('home');
-                    }
+                    showMessageModal('Signed in successfully!');
                 }
             } catch (error) {
                 showMessageModal(error.message, 'error');
@@ -813,21 +1180,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 showMessageModal("Please enter your email to reset password.", 'info');
                 return;
             }
-            showLoadingSpinner();
             try {
-                // --- SIMULATED BACKEND RESPONSE (Replace with actual fetch) ---
-                await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-                const storedUser = localStorage.getItem(`user_${email}`);
-                if (!storedUser) {
-                    throw new Error("No account found with that email.");
-                }
-                showMessageModal("Password reset email sent! Check your inbox. (Simulation: No actual email sent)");
-                // --- END SIMULATED BACKEND RESPONSE ---
-
+                await sendPasswordReset(email);
+                showMessageModal("Password reset email sent! Check your inbox.");
             } catch (error) {
                 showMessageModal(error.message, 'error');
-            } finally {
-                hideLoadingSpinner();
+            }
+        });
+
+        // Add event listener for Google button
+        googleAuthBtn.addEventListener('click', async () => {
+            try {
+                await authenticateUser('google');
+                showMessageModal('Signed in with Google successfully!');
+            } catch (error) {
+                showMessageModal(error.message, 'error');
             }
         });
     }
@@ -844,8 +1211,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const backgroundOptions = [
             { name: 'Blue-Purple Gradient (Default)', class: 'bg-gradient-to-r from-blue-400 to-purple-600' },
             { name: 'Green-Cyan Gradient', class: 'bg-gradient-to-r from-green-400 to-cyan-600' },
-            { name: 'Red-Black Gradient', class: 'bg-gradient-to-r from-red-800 to-black' },
-            { name: 'Orange-Red Gradient', class: 'bg-gradient-to-r from-orange-600 to-red-600' },
+            { name: 'Red-Black Gradient', class: 'bg-gradient-to-r from-red-800 to-black' }, // New
+            { name: 'Orange-Red Gradient', class: 'bg-gradient-to-r from-orange-600 to-red-600' }, // New
+            // Note: Custom URL for images/GIFs is handled by the input field directly below
         ];
 
         contentArea.innerHTML = `
@@ -854,7 +1222,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Your Profile Settings</h2>
 
                     <div class="flex flex-col items-center mb-6">
-                        <img id="profile-pic-display" src="${userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${userData.username ? userData.username.charAt(0).toUpperCase() : 'U'}`}" alt="Profile" class="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-md">
+                        <img id="profile-pic-display" src="${userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`}" alt="Profile" class="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-md">
                         <p class="text-gray-600 mt-4 text-sm">To change profile picture, provide a direct image URL below.</p>
                     </div>
 
@@ -881,7 +1249,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 `).join('')}
                             </select>
                         </div>
-                         <div>
+                        <div>
                             <label for="custom-background-url" class="block text-gray-700 text-sm font-semibold mb-2">Custom Background Image/GIF URL (Overrides Theme)</label>
                             <input type="url" id="custom-background-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., https://example.com/your-animated.gif" value="${(userData.backgroundUrl && (userData.backgroundUrl.startsWith('http') || userData.backgroundUrl.startsWith('https'))) ? userData.backgroundUrl : ''}">
                             <p class="text-xs text-gray-500 mt-1">For GIFs, choose a subtle or abstract one for a formal look. This will override the theme selection above.</p>
@@ -897,25 +1265,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const profileForm = document.getElementById('profile-form');
         const usernameInput = document.getElementById('profile-username');
         const profilePicUrlInput = document.getElementById('profile-pic-url');
-        const backgroundSelect = document.getElementById('profile-background-select');
-        const customBackgroundUrlInput = document.getElementById('custom-background-url'); // Get the custom URL input
+        const backgroundSelect = document.getElementById('profile-background-select'); // Changed ID
+        const customBackgroundUrlInput = document.getElementById('custom-background-url'); // New input
         const profilePicDisplay = document.getElementById('profile-pic-display');
 
+        // Update profile picture preview as URL changes
         profilePicUrlInput.addEventListener('input', () => {
-          profilePicDisplay.src = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameInput.value.charAt(0).toUpperCase()}`;
+          profilePicDisplay.src = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(usernameInput.value || 'U').charAt(0).toUpperCase()}`;
         });
         profilePicDisplay.onerror = () => { // Fallback for broken image URLs
-            profilePicDisplay.src = `https://placehold.co/100x100/F0F0F0/000000?text=${usernameInput.value.charAt(0).toUpperCase()}`;
+            profilePicDisplay.src = `https://placehold.co/100x100/F0F0F0/000000?text=${(usernameInput.value || 'U').charAt(0).toUpperCase()}`;
         };
 
 
         profileForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const newUsername = usernameInput.value;
-            const newProfilePicUrl = profilePicUrlInput.value;
+            const newProfilePicUrl = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(newUsername || 'U').charAt(0).toUpperCase()}`;
             
             let newBackgroundUrl;
-            if (customBackgroundUrlInput && customBackgroundUrlInput.value) {
+            // If custom URL is provided, use it. Otherwise, use the selected theme.
+            if (customBackgroundUrlInput.value) {
                 newBackgroundUrl = customBackgroundUrlInput.value;
             } else {
                 newBackgroundUrl = backgroundSelect.value;
@@ -924,8 +1294,8 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const updatedData = await updateProfileData({
                     username: newUsername,
-                    profilePicUrl: newProfilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${newUsername.charAt(0).toUpperCase()}`,
-                    backgroundUrl: newBackgroundUrl
+                    profilePicUrl: newProfilePicUrl,
+                    backgroundUrl: newBackgroundUrl // This can now be a class string or a URL
                 });
                 if (updatedData) {
                     userData = updatedData; // Update global userData
@@ -946,7 +1316,7 @@ document.addEventListener('DOMContentLoaded', () => {
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-600 mb-6">About Our Website</h2>
+                    <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-600 mb-6">About ${CONFIG.websiteTitle}</h2>
                     <p class="text-lg text-gray-700 mb-4">
                         Welcome to a secure and user-friendly platform designed to streamline your online experience. We offer robust user authentication, allowing you to sign up and sign in with ease, keeping your data safe.
                     </p>
@@ -954,7 +1324,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         Our platform is built with a focus on personalization. You can update your profile information, choose a custom background theme, and manage your personal details within a dedicated settings section.
                     </p>
                     <p class="text-lg text-gray-700 mb-4">
-                        For administrators, we provide a powerful admin panel. This feature allows designated users to oversee all registered accounts, view user details, and manage roles (assigning 'admin' or 'member' status) to ensure smooth operation and access control.
+                        For administrators, we provide a powerful admin panel. This feature allows designated users to oversee all registered accounts, view user details, and manage roles (assigning 'admin' or 'member' status) to ensure smooth operation and access control. Admins can also create and manage forum posts.
+                    </p>
+                    <p class="text-lg text-gray-700 mb-4">
+                        Members can engage with forum posts by adding reactions and comments, fostering a dynamic community environment.
                     </p>
                     <p class="text-lg text-gray-700 mb-4">
                         We prioritize responsive design, ensuring that our website looks great and functions perfectly on any device, from desktops to mobile phones. Our clean, modern interface is powered by efficient technologies to provide a seamless browsing experience.
@@ -971,7 +1344,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Renders the Admin Panel page.
      */
     async function renderAdminPanelPage() {
-        if (!currentUser || !userData || userData.role !== 'admin') {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -983,15 +1356,26 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Fetch users list (or use already fetched if available and recent)
-        usersList = await fetchAllUsers();
+        try {
+            usersList = await fetchAllUsersFirestore();
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+            usersList = []; // Clear list if fetch fails
+        }
+
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Admin Panel</h2>
-                    <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts here.</p>
+                    <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts, and create forum posts.</p>
+                    <div class="mb-6 text-center space-x-4">
+                        <button id="view-forum-admin-btn" class="py-2 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Manage Posts (Forum)
+                        </button>
+                    </div>
 
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Manage Users</h3>
                     ${usersList.length === 0 ? `
                         <p class="text-center text-gray-600">No users found.</p>
                     ` : `
@@ -1028,62 +1412,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (usersList.length > 0) {
             const usersTableBody = document.getElementById('users-table-body');
-            usersTableBody.innerHTML = usersList.map(user => `
-                <tr data-user-id="${user.id}" class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        ${user.profilePicUrl ? `
-                            <img src="${user.profilePicUrl}" alt="User Icon" class="w-10 h-10 rounded-full object-cover border-2 border-gray-300" onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${user.username ? user.username.charAt(0).toUpperCase() : 'U'}'">
-                        ` : `
-                            <span class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
-                                ${user.username ? user.username.charAt(0).toUpperCase() : 'U'}
-                            </span>
-                        `}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        ${user.username}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        ${user.email}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <select
-                            class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            ${user.id === currentUser.id ? 'disabled' : ''}
-                            data-role-select-id="${user.id}"
-                        >
-                            <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
-                            <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                        </select>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                            class="text-red-600 hover:text-red-900 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                            ${user.id === currentUser.id ? 'disabled' : ''}
-                            data-delete-user-id="${user.id}" data-username="${user.username}"
-                        >
-                            Delete
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
+            // Ensure the content is reset before mapping new users to avoid duplication on re-render
+            usersTableBody.innerHTML = usersList.map(user => {
+                const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
+                // Disable controls for the current user to prevent self-demotion/deletion via UI
+                const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; 
+                // Only founders can assign the 'founder' role
+                const canAssignFounder = userData.role === 'founder';
+                const showFounderOption = canAssignFounder || user.role === 'founder'; // Show founder option if current user is founder or if target user is already a founder
 
-            // Add event listeners for role change and delete buttons
+                return `
+                    <tr data-user-id="${user.id}" class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <img src="${profileIconSrc}" alt="User Icon" class="w-10 h-10 rounded-full object-cover border-2 border-gray-300" onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}'">
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            ${user.username}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${user.email}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <select
+                                class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                ${isDisabled}
+                                data-role-select-id="${user.id}"
+                            >
+                                <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
+                                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                ${showFounderOption ? `<option value="founder" ${user.role === 'founder' ? 'selected' : ''}>Founder</option>` : ''}
+                            </select>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                                class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-indigo-500"
+                                data-take-action-user-id="${user.id}" data-username="${user.username}"
+                            >
+                                Take Action
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Add event listeners for role change and "Take Action" buttons
             usersTableBody.querySelectorAll('[data-role-select-id]').forEach(selectElement => {
                 selectElement.addEventListener('change', async (e) => {
                     const userId = e.target.dataset.roleSelectId;
                     const newRole = e.target.value;
                     showMessageModal(`Are you sure you want to change this user's role to "${newRole}"?`, 'confirm', async () => {
                         try {
-                            const success = await updateUserRole(userId, newRole);
-                            if (success) {
+                            const success = await updateUserRoleFirestore(userId, newRole);
+                            if (success) { // Only show success if the operation actually proceeded (not blocked by self-check)
                                 showMessageModal(`User role updated to "${newRole}" successfully!`);
-                                // Re-render admin panel to reflect changes
-                                renderAdminPanelPage();
-                            } else {
-                                showMessageModal('Failed to update user role.', 'error');
-                                renderAdminPanelPage(); // Re-render to revert dropdown if failed
+                                renderAdminPanelPage(); // Re-render admin panel to reflect changes
                             }
-                        } catch (error) {
+                        }
+                        catch (error) {
                             showMessageModal(error.message, 'error');
                             renderAdminPanelPage(); // Re-render to revert dropdown if failed
                         }
@@ -1091,83 +1476,303 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
 
-            usersTableBody.querySelectorAll('[data-delete-user-id]').forEach(button => {
-                button.addEventListener('click', async (e) => {
-                    const userId = e.target.dataset.deleteUserId;
-                    const username = e.target.dataset.username;
-                    showMessageModal(`Are you sure you want to delete user "${username}"? This action cannot be undone and will remove their data.`, 'confirm', async () => {
-                        try {
-                            const success = await deleteUser(userId);
-                            if (success) {
-                                showMessageModal(`User "${username}" deleted successfully!`);
-                                // Re-render admin panel to reflect changes
-                                renderAdminPanelPage();
-                            } else {
-                                showMessageModal('Failed to delete user.', 'error');
-                            }
-                        } catch (error) {
-                            showMessageModal(error.message, 'error');
+            usersTableBody.querySelectorAll('[data-take-action-user-id]').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const userId = e.target.dataset.takeActionUserId;
+                    const userToActOn = usersList.find(user => user.id === userId);
+                    if (userToActOn) {
+                        showTakeActionModal(userToActOn);
+                    }
+                });
+            });
+        }
+        // Removed create-post-btn from here, as it's now on the forum page
+        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins/Founders can manage from forum view
+    }
+
+    /**
+     * Shows a modal for taking action on a user (Ban/Unban/Delete).
+     * @param {object} user - The user object to display and act upon.
+     */
+    function showTakeActionModal(user) {
+        if (currentModal) {
+            currentModal.remove(); // Remove any existing modal
+        }
+
+        const modal = document.createElement('div');
+        modal.id = 'take-action-modal';
+        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+
+        const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
+        const isDisabledForSelf = user.id === currentUser.uid ? 'disabled' : '';
+
+        modal.innerHTML = `
+            <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full relative">
+                <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold" id="close-take-action-modal">&times;</button>
+                <h3 class="text-2xl font-extrabold text-gray-800 mb-6">User Actions</h3>
+                
+                <div class="flex flex-col items-center mb-6">
+                    <img src="${profileIconSrc}" alt="User Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-3">
+                    <p class="text-xl font-semibold text-gray-900">${user.username}</p>
+                    <p class="text-md text-gray-600">${user.email}</p>
+                    <p class="text-md font-medium text-gray-700 mt-2">Role: <span class="font-bold">${user.role}</span></p>
+                    <p class="text-md font-medium text-gray-700">Status: <span class="font-bold ${user.isBanned ? 'text-red-600' : 'text-green-600'}">${user.isBanned ? 'Banned' : 'Active'}</span></p>
+                </div>
+
+                <div class="space-y-4">
+                    <button id="ban-user-btn" class="w-full py-3 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg ${user.isBanned ? 'hidden' : ''} ${isDisabledForSelf}">
+                        Ban Account
+                    </button>
+                    <button id="unban-user-btn" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg ${!user.isBanned ? 'hidden' : ''} ${isDisabledForSelf}">
+                        Unban Account
+                    </button>
+                    <button id="delete-user-btn" class="w-full py-3 rounded-full bg-gray-500 text-white font-bold text-lg hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg ${isDisabledForSelf}">
+                        Delete Account
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        currentModal = modal;
+
+        document.getElementById('close-take-action-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+        });
+
+        const banBtn = document.getElementById('ban-user-btn');
+        const unbanBtn = document.getElementById('unban-user-btn');
+        const deleteBtn = document.getElementById('delete-user-btn');
+
+        if (banBtn) {
+            banBtn.addEventListener('click', () => {
+                showMessageModal(`Are you sure you want to BAN user "${user.username}"? They will no longer be able to log in.`, 'confirm', async () => {
+                    try {
+                        const success = await setUserBanStatusFirestore(user.id, true);
+                        if (success) {
+                            showMessageModal(`User "${user.username}" has been banned.`);
+                            currentModal.remove(); // Close modal after action
+                            currentModal = null;
+                            renderAdminPanelPage(); // Re-render admin panel to update UI
                         }
-                    });
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
+                });
+            });
+        }
+
+        if (unbanBtn) {
+            unbanBtn.addEventListener('click', () => {
+                showMessageModal(`Are you sure you want to UNBAN user "${user.username}"? They will regain login access.`, 'confirm', async () => {
+                    try {
+                        const success = await setUserBanStatusFirestore(user.id, false);
+                        if (success) {
+                            showMessageModal(`User "${user.username}" has been unbanned.`);
+                            currentModal.remove(); // Close modal after action
+                            currentModal = null;
+                            renderAdminPanelPage(); // Re-render to update UI
+                        }
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
+                });
+            });
+        }
+
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                showMessageModal(`Are you sure you want to DELETE user "${user.username}"? This action cannot be undone and will only remove their data from Firestore.`, 'confirm', async () => {
+                    try {
+                        const success = await deleteUserFirestore(user.id);
+                        if (success) {
+                            showMessageModal(`User "${user.username}" data deleted successfully!`);
+                            currentModal.remove(); // Close modal after action
+                            currentModal = null;
+                            renderAdminPanelPage(); // Re-render admin panel to reflect changes
+                        }
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
                 });
             });
         }
     }
 
-    /**
-     * Renders the Rooms page, displaying available chat rooms.
-     */
-    async function renderRoomsPage() {
-        if (!currentUser) {
-             contentArea.innerHTML = `
-                 <div class="flex flex-col items-center justify-center p-4">
-                     <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                         <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                         <p class="text-lg text-gray-700">Please sign in to view the chat rooms.</p>
-                     </div>
-                 </div>
-             `;
-             return;
-         }
 
-        // Initialize some dummy rooms if they don't exist
-        if (!localStorage.getItem('rooms_data')) {
-            const initialRooms = [
-                { id: 'room1', title: 'General Chat', description: 'A place for everyone to chat!', creatorUsername: 'Admin', timestamp: new Date().toISOString() },
-                { id: 'room2', title: 'Developers Corner', description: 'Discussion about coding and projects.', creatorUsername: 'Admin', timestamp: new Date().toISOString() },
-                { id: 'room3', title: 'Gaming Lounge', description: 'Talk about your favorite games!', creatorUsername: 'Moderator', timestamp: new Date().toISOString() }
-            ];
-            localStorage.setItem('rooms_data', JSON.stringify(initialRooms));
+    /**
+     * Renders the Create Post page for admins/founders.
+     * This page is now removed and creation happens directly on forum.
+     */
+    // function renderCreatePostPage() { /* ... removed ... */ }
+
+    /**
+     * Renders the Edit Post page for admins/founders.
+     * @param {string} postId - The ID of the post to edit.
+     */
+    async function renderEditPostPage(postId) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">You do not have administrative privileges to edit posts.</p>
+                    </div>
+                </div>
+            `;
+            return;
         }
 
-        let rooms = [];
+        showLoadingSpinner();
+        let postData;
         try {
-            rooms = await fetchAllRoomsSimulated(); // Use simulated fetch
+            const postDocRef = doc(db, `/artifacts/${APP_ID}/public/data/posts`, postId);
+            const docSnap = await getDoc(postDocRef);
+            if (docSnap.exists()) {
+                postData = docSnap.data();
+            } else {
+                showMessageModal('Post not found.', 'error');
+                navigateTo('forum');
+                return;
+            }
+        } catch (error) {
+            showMessageModal('Error fetching post for editing: ' + error.message, 'error');
+            navigateTo('forum');
+            return;
+        } finally {
+            hideLoadingSpinner();
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Edit Post</h2>
+                    <form id="edit-post-form" class="space-y-6">
+                        <div>
+                            <label for="post-title" class="block text-gray-700 text-sm font-semibold mb-2">Post Title</label>
+                            <input type="text" id="post-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="${postData.title}" required>
+                        </div>
+                        <div>
+                            <label for="post-content" class="block text-gray-700 text-sm font-semibold mb-2">Post Content</label>
+                            <textarea id="post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>${postData.content}</textarea>
+                        </div>
+                        <button type="submit" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Save Changes
+                        </button>
+                        <button type="button" id="cancel-edit-btn" class="w-full py-3 rounded-full bg-gray-500 text-white font-bold text-lg hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg mt-2">
+                            Cancel
+                        </button>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('edit-post-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('post-title').value;
+            const content = document.getElementById('post-content').value;
+
+            try {
+                await updatePostFirestore(postId, title, content);
+                navigateTo('forum'); // Redirect to forum after editing
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+
+        document.getElementById('cancel-edit-btn').addEventListener('click', () => navigateTo('forum'));
+    }
+
+    /**
+     * Renders the Forum page, displaying all posts.
+     */
+    async function renderForumPage() {
+        if (!currentUser) {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">Please sign in to view the forum posts.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let posts = [];
+        try {
+            posts = await fetchAllPostsFirestore();
         } catch (error) {
             showMessageModal(error.message, 'error');
-            rooms = [];
+            posts = [];
         }
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Available Chat Rooms</h2>
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Forum & Announcements</h2>
+                    ${userData.role === 'admin' || userData.role === 'founder' ? `
+                        <div class="mb-6 text-center">
+                            <button id="create-post-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                                Create New Post
+                            </button>
+                        </div>
+                    ` : ''}
 
-                    ${rooms.length === 0 ? `
-                        <p class="text-center text-gray-600">No rooms available yet.</p>
+                    ${posts.length === 0 ? `
+                        <p class="text-center text-gray-600">No posts yet. Check back later!</p>
                     ` : `
-                        <div id="rooms-list" class="space-y-4">
-                            ${rooms.map(room => `
-                                <div class="bg-gray-100 p-6 rounded-lg shadow-md border border-gray-200 flex flex-col sm:flex-row justify-between items-center">
-                                    <div>
-                                        <h3 class="text-xl font-bold text-gray-800">${room.title}</h3>
-                                        <p class="text-gray-700 text-sm">${room.description}</p>
-                                        <p class="text-xs text-gray-500 mt-2">Created by ${room.creatorUsername} on ${new Date(room.timestamp).toLocaleString()}</p>
+                        <div id="posts-list" class="space-y-6">
+                            ${posts.map(post => `
+                                <div class="bg-gray-50 p-6 rounded-lg shadow-md border border-gray-200">
+                                    <h3 class="text-2xl font-bold text-gray-800 mb-2">${post.title}</h3>
+                                    <p class="text-gray-700 whitespace-pre-wrap">${post.content}</p>
+                                    <p class="text-sm text-gray-500 mt-4">
+                                        Posted by <span class="font-semibold">${post.authorUsername}</span> on ${post.timestamp}
+                                    </p>
+                                    
+                                    <div class="flex items-center space-x-4 mt-4 border-t pt-4 border-gray-300">
+                                        <!-- Reactions Section -->
+                                        <div class="flex items-center space-x-2">
+                                            ${['�', '❤️', '😂', '🔥'].map(emoji => `
+                                                <button class="text-xl p-1 rounded-full hover:bg-gray-200 transition duration-200" data-post-id="${post.id}" data-emoji="${emoji}">
+                                                    ${emoji} <span class="text-sm text-gray-600">${post.reactions[emoji] || 0}</span>
+                                                </button>
+                                            `).join('')}
+                                        </div>
+
+                                        <!-- Admin Actions (Edit/Delete) -->
+                                        ${userData.role === 'admin' || userData.role === 'founder' ? `
+                                            <div class="ml-auto space-x-2">
+                                                <button class="text-blue-600 hover:text-blue-800 font-semibold" data-post-id="${post.id}" data-action="edit">Edit</button>
+                                                <button class="text-red-600 hover:text-red-800 font-semibold" data-post-id="${post.id}" data-action="delete">Delete</button>
+                                            </div>
+                                        ` : ''}
                                     </div>
-                                    <button class="mt-4 sm:mt-0 py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-md hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg"
-                                            data-join-room-id="${room.id}" data-room-title="${encodeURIComponent(room.title)}">
-                                        Join Chat
-                                    </button>
+
+                                    <!-- Comments Section -->
+                                    <div class="mt-6 border-t pt-4 border-gray-300">
+                                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Comments (${post.comments.length})</h4>
+                                        <div class="space-y-3 mb-4">
+                                            ${post.comments.length === 0 ? `
+                                                <p class="text-sm text-gray-500">No comments yet. Be the first to comment!</p>
+                                            ` : `
+                                                ${post.comments.map(comment => `
+                                                    <div class="bg-white p-3 rounded-lg border border-gray-200">
+                                                        <p class="text-sm text-gray-700">${comment.text}</p>
+                                                        <p class="text-xs text-gray-500 mt-1">by <span class="font-medium">${comment.authorUsername}</span> on ${comment.timestamp ? new Date(comment.timestamp).toLocaleString() : 'N/A'}</p>
+                                                    </div>
+                                                `).join('')}
+                                            `}
+                                        </div>
+                                        <form class="comment-form" data-post-id="${post.id}">
+                                            <textarea class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" rows="2" placeholder="Add a comment..." required></textarea>
+                                            <button type="submit" class="mt-2 py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-200 text-sm">
+                                                Post Comment
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
                             `).join('')}
                         </div>
@@ -1176,135 +1781,268 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
-        // Add event listeners for "Join Chat" buttons within this page
-        contentArea.querySelectorAll('[data-join-room-id]').forEach(button => {
+        // Add event listeners for new "Create New Post" button on forum page
+        const createPostBtn = document.getElementById('create-post-btn');
+        if (createPostBtn) {
+            createPostBtn.addEventListener('click', () => {
+                // Instead of navigating to a separate page, show a modal for post creation
+                showCreatePostModal();
+            });
+        }
+
+
+        // Add event listeners for reactions
+        contentArea.querySelectorAll('[data-emoji]').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const postId = e.target.closest('[data-post-id]').dataset.postId;
+                const emoji = e.target.dataset.emoji || e.target.parentElement.dataset.emoji; // Handles click on span inside button
+                if (postId && emoji) {
+                    await addReactionToPost(postId, emoji);
+                }
+            });
+        });
+
+        // Add event listeners for admin actions (Edit/Delete)
+        contentArea.querySelectorAll('[data-action="edit"]').forEach(button => {
             button.addEventListener('click', (e) => {
-                const roomIdToJoin = e.target.dataset.joinRoomId;
-                const roomTitleToJoin = decodeURIComponent(e.target.dataset.roomTitle); // Decode title
-                navigateTo('room-chat', { id: roomIdToJoin, title: roomTitleToJoin });
+                const postId = e.target.dataset.postId;
+                navigateTo('edit-post', postId); // Pass postId to navigateTo
+            });
+        });
+
+        contentArea.querySelectorAll('[data-action="delete"]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const postId = e.target.dataset.postId;
+                showMessageModal('Are you sure you want to delete this post? This action cannot be undone.', 'confirm', async () => {
+                    try {
+                        await deletePostFirestore(postId);
+                        renderForumPage(); // Re-render to show updated list
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
+                });
+            });
+        });
+
+        // Add event listeners for comments
+        contentArea.querySelectorAll('.comment-form').forEach(form => {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const postId = form.dataset.postId;
+                const textarea = form.querySelector('textarea');
+                const commentText = textarea.value;
+                await addCommentToPost(postId, commentText);
+                textarea.value = ''; // Clear textarea after posting
             });
         });
     }
 
     /**
-     * Renders the actual chat interface for a specific room.
-     * @param {object} roomDetails - Object containing id and title of the room.
+     * Shows a modal for creating a new post.
      */
-    async function renderRoomChatPage(roomDetails) {
-        if (!currentUser || !userData) {
-            showMessageModal("You must be logged in to join chat rooms.", 'info');
-            navigateTo('auth');
-            return;
+    function showCreatePostModal() {
+        const modal = document.createElement('div');
+        modal.id = 'create-post-modal';
+        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+        modal.innerHTML = `
+            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 border border-gray-200">
+                <h2 class="text-2xl font-extrabold text-center text-gray-800 mb-6">Create New Post</h2>
+                <form id="create-post-modal-form" class="space-y-4">
+                    <div>
+                        <label for="modal-post-title" class="block text-gray-700 text-sm font-semibold mb-2">Title</label>
+                        <input type="text" id="modal-post-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter post title" required>
+                    </div>
+                    <div>
+                        <label for="modal-post-content" class="block text-gray-700 text-sm font-semibold mb-2">Content</label>
+                        <textarea id="modal-post-content" rows="7" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Write your post content here..." required></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-4 mt-6">
+                        <button type="button" id="cancel-create-post-modal" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Cancel
+                        </button>
+                        <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Publish
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        currentModal = modal;
+
+        document.getElementById('cancel-create-post-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+        });
+
+        document.getElementById('create-post-modal-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('modal-post-title').value;
+            const content = document.getElementById('modal-post-content').value;
+
+            try {
+                await createPostFirestore(title, content);
+                currentModal.remove();
+                currentModal = null;
+                renderForumPage(); // Re-render forum to show new post
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+    }
+
+    /**
+     * Renders the "Meet the Team" page.
+     */
+    async function renderTeamPage() {
+        showLoadingSpinner();
+        let teamMembers = [];
+        try {
+            teamMembers = await fetchTeamMembersFirestore();
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+        } finally {
+            hideLoadingSpinner();
         }
 
-        currentRoomId = roomDetails.id;
-        currentRoomTitle = roomDetails.title;
-        isInCall = false; // Reset call status when entering a new room
+        const isAdminOrFounder = currentUser && (userData.role === 'admin' || userData.role === 'founder');
 
         contentArea.innerHTML = `
-            <div class="flex flex-col md:flex-row items-start justify-center p-4 w-full h-full min-h-screen gap-4">
-                <!-- Main Chat Area -->
-                <div class="bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-2xl border border-gray-700" style="height: 80vh; max-height: 700px; display: flex; flex-direction: column;">
-                    <h2 id="room-title-chat" class="text-3xl font-extrabold text-center text-white mb-6">Chat in "${currentRoomTitle}"</h2>
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Meet the Team</h2>
+                    
+                    ${isAdminOrFounder ? `
+                        <div class="mb-8 p-6 bg-gray-100 rounded-lg shadow-inner">
+                            <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Add New Team Member</h3>
+                            <form id="add-team-member-form" class="space-y-4">
+                                <div>
+                                    <label for="team-username" class="block text-gray-700 text-sm font-semibold mb-2">Username</label>
+                                    <input type="text" id="team-username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter team member's username" required>
+                                </div>
+                                <div>
+                                    <label for="team-role" class="block text-gray-700 text-sm font-semibold mb-2">Role</label>
+                                    <select id="team-role" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none" required>
+                                        <option value="">Select Role</option>
+                                        <option value="member">Member</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="founder">Founder</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                                    Add Team Member
+                                </button>
+                            </form>
+                        </div>
+                    ` : ''}
 
-                    <!-- Call Buttons -->
-                    <div class="flex justify-center mb-4 space-x-4">
-                        <button id="join-call-btn" class="py-2 px-6 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center">
-                            <i class="fas fa-phone mr-2"></i> Join Call
-                        </button>
-                        <button id="leave-call-btn" class="py-2 px-6 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg hidden flex items-center justify-center">
-                            <i class="fas fa-phone-slash mr-2"></i> Leave Call
-                        </button>
-                    </div>
-
-                    <div id="chat-messages" class="bg-gray-900 p-4 rounded-lg mb-4 space-y-3 overflow-y-auto" style="flex-grow: 1; scroll-behavior: smooth;">
-                        <!-- Chat messages will be loaded here -->
-                    </div>
-                    <form id="chat-form" class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                        <textarea id="message-input" rows="1" class="flex-grow resize-none px-4 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white bg-gray-700 placeholder-gray-400" placeholder="Type your message..." required></textarea>
-                        <button type="submit" id="send-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 transform hover:scale-105 shadow-lg">
-                            Send
-                        </button>
-                    </form>
-                    <div class="mt-4 text-center">
-                        <button id="back-to-rooms-list-btn" class="py-2 px-4 rounded-full bg-gray-600 text-white font-bold text-sm hover:bg-gray-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                            Back to Room List
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Active Users Panel -->
-                <div class="bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-xs border border-gray-700 h-fit md:h-[80vh]">
-                    <h3 class="text-2xl font-extrabold text-center text-white mb-4">Active Users</h3>
-                    <div id="active-users-list" class="space-y-2 overflow-y-auto max-h-[calc(80vh-100px)]">
-                        <!-- Active users will be listed here -->
-                        <p class="text-gray-400 text-center text-sm">Loading active users...</p>
-                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Current Team</h3>
+                    ${teamMembers.length === 0 ? `
+                        <p class="text-center text-gray-600">No team members listed yet.</p>
+                    ` : `
+                        <div class="space-y-4">
+                            ${teamMembers.map(member => `
+                                <div class="flex items-center justify-between bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200">
+                                    <div class="flex items-center space-x-4">
+                                        <p class="text-lg font-semibold text-gray-900">${member.username}</p>
+                                        <span class="text-sm text-gray-600 px-3 py-1 rounded-full bg-gray-200">${member.role}</span>
+                                    </div>
+                                    ${isAdminOrFounder ? `
+                                        <button class="text-red-600 hover:text-red-800 font-semibold text-sm" data-delete-team-member-id="${member.id}" data-username="${member.username}">
+                                            Delete
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
                 </div>
             </div>
         `;
 
-        // Set up listeners for the current room
-        loadRoomMessagesSimulated();
-        setupPresenceSimulated(); // This will also handle initial button state
+        if (isAdminOrFounder) {
+            document.getElementById('add-team-member-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = document.getElementById('team-username').value;
+                const role = document.getElementById('team-role').value;
+                try {
+                    await addTeamMemberFirestore(username, role);
+                    renderTeamPage(); // Re-render to show updated list
+                } catch (error) {
+                    showMessageModal(error.message, 'error');
+                }
+            });
 
-        // Add event listeners specific to this page
-        document.getElementById('chat-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const messageInput = document.getElementById('message-input');
-            sendMessageSimulated(currentRoomId, messageInput.value);
-        });
-
-        document.getElementById('back-to-rooms-list-btn').addEventListener('click', () => {
-            navigateTo('rooms'); // Go back to the list of rooms
-        });
-
-        document.getElementById('join-call-btn').addEventListener('click', joinCallSimulated);
-        document.getElementById('leave-call-btn').addEventListener('click', leaveCallSimulated);
+            contentArea.querySelectorAll('[data-delete-team-member-id]').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const teamMemberId = e.target.dataset.deleteTeamMemberId;
+                    const username = e.target.dataset.username;
+                    showMessageModal(`Are you sure you want to remove "${username}" from the team?`, 'confirm', async () => {
+                        try {
+                            await deleteTeamMemberFirestore(teamMemberId);
+                            renderTeamPage(); // Re-render to show updated list
+                        } catch (error) {
+                            showMessageModal(error.message, 'error');
+                        }
+                    });
+                });
+            });
+        }
     }
 
 
     // --- Navigation and Initialization ---
 
     /**
-     * Cleans up active intervals related to the chat rooms.
-     * This should be called before navigating away from a chat room.
+     * Closes the side drawer menu.
      */
-    function cleanupRoomIntervals() {
-        if (presenceInterval) {
-            clearInterval(presenceInterval);
-            presenceInterval = null;
-            console.log("Cleared presenceInterval.");
-        }
-        if (messagesInterval) {
-            clearInterval(messagesInterval);
-            messagesInterval = null;
-            console.log("Cleared messagesInterval.");
-        }
-        // If current user was in a call, set inCall to false when leaving the room
-        if (currentUser && currentRoomId && isInCall) {
-            updateMyPresenceSimulated(false); // Update presence to indicate leaving call
-        }
-        currentRoomId = null; // Clear current room state
-        currentRoomTitle = '';
-        isInCall = false; // Reset call status for next room entry
+    function closeSideDrawer() {
+        if (sideDrawerMenu) sideDrawerMenu.classList.remove('open');
+        if (overlayBackdrop) overlayBackdrop.classList.remove('visible');
+        if (mobileMenuIconOpen) mobileMenuIconOpen.classList.remove('hidden');
+        if (mobileMenuIconClose) mobileMenuIconClose.classList.add('hidden');
+        // Reset mobile dropdowns when closing the main drawer
+        sideDrawerMenu.querySelectorAll('.mobile-dropdown-content.open').forEach(openContent => {
+            openContent.style.maxHeight = '0px';
+            openContent.classList.remove('open');
+            openContent.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
+        });
     }
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'logout', 'rooms', 'room-chat').
-     * @param {object} [param=null] - Optional: {id, title} for room-chat.
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team').
+     * @param {string} [id=null] - Optional: postId for edit-post route, or any other ID.
      */
-    async function navigateTo(page, param = null) {
-        // Cleanup any active room intervals before navigating to a new page
-        cleanupRoomIntervals();
+    async function navigateTo(page, id = null) {
+        // Store the current page in a data attribute on the content area for tracking
+        contentArea.dataset.currentPage = page;
+        contentArea.dataset.currentId = id; // Store generic ID if applicable
+
+        // Close any open desktop dropdowns on navigation
+        document.querySelectorAll('.desktop-dropdown-content').forEach(content => {
+            content.classList.add('hidden');
+            content.style.maxHeight = '0px';
+            const icon = content.previousElementSibling.querySelector('.fa-chevron-down');
+            if (icon) icon.classList.remove('rotate-180');
+        });
 
         if (page === 'logout') {
-            localStorage.removeItem('current_user_token');
-            currentUser = null;
-            userData = null;
-            showMessageModal('You have been signed out.');
-            page = 'home'; // Redirect to home after logout
+            showLoadingSpinner();
+            try {
+                await signOut(auth);
+                currentUser = null;
+                userData = null;
+                showMessageModal('You have been signed out.');
+                page = 'home'; // Redirect to home after logout
+            } catch (error) {
+                console.error("Error signing out:", error.message);
+                showMessageModal("Failed to sign out. Please try again.", 'error');
+                hideLoadingSpinner();
+                return; // Prevent navigating away if sign out fails
+            } finally {
+                hideLoadingSpinner();
+            }
         }
 
         switch (page) {
@@ -1323,16 +2061,20 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'admin':
                 renderAdminPanelPage();
                 break;
-            case 'rooms': // List of all chat rooms
-                renderRoomsPage();
-                break;
-            case 'room-chat': // Specific chat room
-                if (param && param.id && param.title) {
-                    renderRoomChatPage(param);
+            // Removed 'create-post' as a direct navigation target, now part of forum page actions
+            case 'edit-post': // For editing existing posts
+                if (id) {
+                    renderEditPostPage(id);
                 } else {
-                    showMessageModal("Invalid room details provided.", 'error');
-                    navigateTo('rooms'); // Go back to room list
+                    showMessageModal("Invalid post ID for editing.", 'error');
+                    navigateTo('forum');
                 }
+                break;
+            case 'forum': // Forum page now includes create post functionality
+                renderForumPage();
+                break;
+            case 'team': // New Team page
+                renderTeamPage();
                 break;
             default:
                 renderHomePage();
@@ -1340,34 +2082,127 @@ document.addEventListener('DOMContentLoaded', () => {
         renderNavbar(); // Always re-render navbar after page change to update login/logout state
     }
 
-    // Mobile menu toggle
-    mobileMenuToggle.addEventListener('click', () => {
-        const isHidden = mobileMenu.classList.contains('hidden');
-        mobileMenu.classList.toggle('hidden', !isHidden);
-        mobileMenuIconOpen.classList.toggle('hidden', !isHidden);
-        mobileMenuIconClose.classList.toggle('hidden', isHidden);
-    });
-
-    // Initial check for authentication status and render initial page
-    async function initializeApp() {
-        showLoadingSpinner();
-        currentUser = await fetchCurrentUser(); // Attempt to fetch user based on stored token
-        if (currentUser) {
-            userData = currentUser; // If currentUser fetched, assign to userData
-            updateBodyBackground(); // Apply user's saved background
-            navigateTo('home'); // Go to home if already logged in
-        } else {
-            navigateTo('home'); // Go to home if not logged in
-        }
-        hideLoadingSpinner();
+    // Mobile menu toggle (for side drawer)
+    if (mobileMenuToggle) { // Defensive check
+        mobileMenuToggle.addEventListener('click', () => {
+            // Check if sideDrawerMenu exists before trying to access its classList
+            const isOpen = sideDrawerMenu && sideDrawerMenu.classList.contains('open');
+            if (isOpen) {
+                closeSideDrawer();
+            } else {
+                if (sideDrawerMenu) sideDrawerMenu.classList.add('open');
+                if (overlayBackdrop) overlayBackdrop.classList.add('visible');
+                if (mobileMenuIconOpen) mobileMenuIconOpen.classList.add('hidden');
+                if (mobileMenuIconClose) mobileMenuIconClose.classList.remove('hidden');
+            }
+        });
+    } else {
+        console.warn("Element with ID 'mobile-menu-toggle' not found. Mobile menu functionality may be broken.");
     }
 
-    // Call initialization function when the DOM is fully loaded
-    initializeApp();
 
-    // Event listeners for static navbar buttons (already defined in HTML)
-    // Make sure these are attached here to ensure they are active
-    navHomeButton.addEventListener('click', () => navigateTo('home'));
-    navAboutButton.addEventListener('click', () => navigateTo('about'));
-    navRoomsButton.addEventListener('click', () => navigateTo('rooms')); // Attach listener for new Rooms button
+    // Close side drawer when clicking on the overlay backdrop
+    if (overlayBackdrop) { // Defensive check
+        overlayBackdrop.addEventListener('click', closeSideDrawer);
+    } else {
+        console.warn("Element with ID 'overlay-backdrop' not found. Mobile menu overlay may not close correctly.");
+    }
+
+    // Firebase Auth State Listener
+    // This is the most critical part for initial load and ongoing authentication state changes
+    onAuthStateChanged(auth, async (user) => {
+        showLoadingSpinner();
+        if (user) {
+            currentUser = user;
+            try {
+                const fetchedUserData = await fetchCurrentUserFirestoreData();
+                if (fetchedUserData) {
+                    userData = fetchedUserData;
+                } else {
+                    // This scenario should be rare if signup works correctly, but handles edge cases
+                    // where a user exists in Auth but not Firestore.
+                    console.warn("User exists in Auth but not Firestore. Creating default entry.");
+                    const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, user.uid);
+                    // Prioritize photoURL from auth provider, fallback to placeholder
+                    const defaultProfilePic = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.displayName || user.email || 'U').charAt(0).toUpperCase()}`;
+                    const defaultBackground = 'bg-gradient-to-r from-blue-400 to-purple-600';
+                    await setDoc(userDocRef, {
+                        email: user.email,
+                        username: user.displayName || user.email?.split('@')[0],
+                        role: 'member',
+                        profilePicUrl: defaultProfilePic,
+                        backgroundUrl: defaultBackground
+                    });
+                    userData = {
+                        email: user.email,
+                        username: user.displayName || user.email?.split('@')[0],
+                        role: 'member',
+                        profilePicUrl: defaultProfilePic,
+                        backgroundUrl: defaultBackground
+                    };
+                }
+                updateBodyBackground(); // Apply user's saved background
+                renderNavbar(); // Update navbar with user info
+                // Determine which page to render based on current state or previous navigation
+                let pageToRender = contentArea.dataset.currentPage || 'home';
+                let currentId = contentArea.dataset.currentId || null;
+
+                if (pageToRender === 'auth' || pageToRender === 'logout') {
+                    pageToRender = 'home'; // Always redirect to home if coming from auth/logout
+                }
+                navigateTo(pageToRender, currentId); // Navigate to the appropriate page
+
+            } catch (error) {
+                console.error("Error setting up user data after auth state change:", error);
+                // Attempt to sign out if data fetching fails critically
+                await signOut(auth);
+                currentUser = null;
+                userData = null;
+                showMessageModal("Failed to load user data. Please try signing in again.", 'error');
+                navigateTo('auth');
+            }
+        } else {
+            currentUser = null;
+            userData = null;
+            updateBodyBackground(); // Reset to default background
+            renderNavbar(); // Update navbar to logged out state
+            // Only redirect if current page is not home or about, or if it was a protected page
+            if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about' && contentArea.dataset.currentPage !== 'team') {
+                 navigateTo('home'); // Redirect to home if logged out from a protected page
+            }
+        }
+        hideLoadingSpinner();
+    });
+
+
+    // Initial render call moved inside the DOMContentLoaded listener but outside onAuthStateChanged,
+    // to ensure elements are present for the very first render.
+    // The onAuthStateChanged listener will then handle subsequent renders based on auth state.
+    // It is important that this is called *after* onAuthStateChanged has been set up,
+    // to ensure initial user state can be reacted to.
+    if (!contentArea.dataset.currentPage) { // Only render if no page has been set yet
+        navigateTo('home');
+    }
+
+
+    // Event listeners for static navbar buttons (ensure these are attached AFTER initial DOM render)
+    // The home and about buttons in the main navbar are static in index.html, so their event listeners
+    // are attached here, but they are *not* added dynamically by renderNavbar
+    if (navHomeButton) { // Defensive check
+        navHomeButton.addEventListener('click', () => navigateTo('home'));
+    } else {
+        console.warn("Element with ID 'nav-home' not found. Home button may not be functional.");
+    }
+    if (navAboutButton) { // Defensive check
+        navAboutButton.addEventListener('click', () => navigateTo('about'));
+    } else {
+        console.warn("Element with ID 'nav-about' not found. About button may not be functional.");
+    }
+    // Event listeners for static mobile drawer buttons (also ensure attached once)
+    if (mobileDrawerHomeButton) { // Defensive check
+        mobileDrawerHomeButton.addEventListener('click', () => navigateTo('home'));
+    }
+    if (mobileDrawerAboutButton) { // Defensive check
+        mobileDrawerAboutButton.addEventListener('click', () => navigateTo('about'));
+    }
 });
