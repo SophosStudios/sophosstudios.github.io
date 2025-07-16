@@ -5,7 +5,7 @@
 // Import Firebase functions
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField, addDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 // Import configuration from config.js
 import CONFIG from './config.js'; // Make sure config.js is in the same directory
@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     function updateBodyBackground() {
         // Clear all previous body classes and inline styles to avoid conflicts
-        document.body.className = ''; 
+        document.body.className = '';
         document.body.style.backgroundImage = '';
         document.body.style.backgroundSize = '';
         document.body.style.backgroundPosition = '';
@@ -200,6 +200,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             let fetchedUserData;
             if (docSnap.exists()) {
                 fetchedUserData = docSnap.data();
+                // --- START ADDITION FOR BAN FUNCTIONALITY ---
+                if (fetchedUserData.isBanned) {
+                    await signOut(auth); // Log out the user from Firebase Auth
+                    throw new Error("Your account has been banned. Please contact support for more information.");
+                }
+                // --- END ADDITION FOR BAN FUNCTIONALITY ---
             } else {
                 // Create user document if it doesn't exist (e.g., new Google user)
                 const usernameToUse = user.displayName || user.email?.split('@')[0] || 'User';
@@ -239,6 +245,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 errorMessage = 'Invalid Firebase API Key. Please check your firebaseConfig.';
             } else if (error.code === 'auth/account-exists-with-different-credential') {
                 errorMessage = 'Account already exists with a different login method. Try signing in with that method.';
+            } else if (error.message.includes("Your account has been banned")) { // Catch the custom ban error
+                errorMessage = error.message;
             }
             throw new Error(errorMessage); // Re-throw with a user-friendly message
         } finally {
@@ -373,7 +381,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             throw new Error("Not authorized to change roles.");
         }
-        
+
         // Prevent admins from setting founder role (only founders can do this)
         if (newRole === 'founder' && userData.role !== 'founder') {
             throw new Error("Only a founder can assign the 'founder' role.");
@@ -560,7 +568,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (postSnap.exists()) {
                 const postData = postSnap.data();
                 const currentReactions = postData.reactions || {};
-                
+
                 // Get the user's previously reacted emoji for this post, if any
                 const userPreviousReaction = postData.userReactions ? postData.userReactions[currentUser.uid] : null;
 
@@ -587,7 +595,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     updates[`reactions.${emoji}`] = (currentReactions[emoji] || 0) + 1;
                     updates[`userReactions.${currentUser.uid}`] = emoji; // Store user's new reaction
                 }
-                
+
                 // Perform the update
                 await updateDoc(postDocRef, updates);
             }
@@ -597,7 +605,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
             hideLoadingSpinner();
             // Re-render forum page to show updated reactions
-            renderForumPage(); 
+            renderForumPage();
         }
     }
 
@@ -638,7 +646,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
             hideLoadingSpinner();
             // Re-render forum page to show updated comments
-            renderForumPage(); 
+            renderForumPage();
         }
     }
 
@@ -770,6 +778,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Simulates sending an email by storing its content in Firestore.
+     * @param {string} recipientEmail - The email address of the recipient.
+     * @param {string} subject - The subject of the email.
+     * @param {string} message - The body of the email.
+     * @param {string} [imageUrl=null] - Optional URL of an image attachment.
+     * @returns {Promise<void>}
+     */
+    async function sendEmailToUserFirestore(recipientEmail, subject, message, imageUrl = null) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Not authorized to send emails.");
+        }
+        showLoadingSpinner();
+        try {
+            const sentEmailsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/sentEmails`);
+            await addDoc(sentEmailsCollectionRef, {
+                senderId: currentUser.uid,
+                senderUsername: userData.username || currentUser.displayName || currentUser.email,
+                recipientEmail: recipientEmail,
+                subject: subject,
+                message: message,
+                imageUrl: imageUrl,
+                timestamp: serverTimestamp()
+            });
+            showMessageModal('Email content saved to Firestore (simulated send)!');
+        } catch (error) {
+            console.error("Error simulating email send to Firestore:", error.message);
+            throw new Error("Failed to save email content: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
 
     // --- UI Rendering Functions ---
 
@@ -783,7 +824,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             console.warn("Element with ID 'nav-links' not found. Desktop navigation may not render correctly.");
         }
-        
+
         // Clear only dynamically added items from side drawer (keeping static Home/About)
         // Find the index of the first dynamic button (or the length if none)
         let firstDynamicIndex = 2; // Assuming mobile-drawer-home and mobile-drawer-about are always first 2 static elements
@@ -814,8 +855,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.className = `
                 ${isMobile ? 'block w-full text-left px-4 py-3 text-lg font-semibold' : 'px-4 py-2'}
                 rounded-lg hover:bg-gray-700 text-white transition duration-200
-                ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' : 
-                  (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' : 
+                ${id.includes('admin') ? 'bg-red-600 hover:bg-red-700 shadow-md' :
+                  (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' :
                   (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}
             `; // Removed founder-specific styling, admin styling will apply if a founder is shown admin panel
             btn.innerHTML = `${iconHtml}<span>${text}</span>`;
@@ -982,7 +1023,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         openContent.classList.remove('open');
                         openContent.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
                     });
-                    
+
                     dropdownContent.style.maxHeight = dropdownContent.scrollHeight + 'px';
                     dropdownContent.classList.add('open');
                     dropdownIcon.classList.add('rotate-180');
@@ -1035,7 +1076,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     colorClass = 'text-gray-800';
             }
             // Apply a subtle animation for all roles, or only privileged ones
-            const animationClass = (role === 'admin' || role === 'founder') ? 'animate-pulse' : ''; 
+            const animationClass = (role === 'admin' || role === 'founder') ? 'animate-pulse' : '';
             return `<span class="font-semibold ${colorClass} ${animationClass}">${emoji} ${role}</span>`;
         };
 
@@ -1282,7 +1323,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             const newUsername = usernameInput.value;
             const newProfilePicUrl = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(newUsername || 'U').charAt(0).toUpperCase()}`;
-            
+
             let newBackgroundUrl;
             // If custom URL is provided, use it. Otherwise, use the selected theme.
             if (customBackgroundUrlInput.value) {
@@ -1416,7 +1457,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             usersTableBody.innerHTML = usersList.map(user => {
                 const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
                 // Disable controls for the current user to prevent self-demotion/deletion via UI
-                const isDisabled = user.id === currentUser.uid ? 'disabled' : ''; 
+                const isDisabled = user.id === currentUser.uid ? 'disabled' : '';
                 // Only founders can assign the 'founder' role
                 const canAssignFounder = userData.role === 'founder';
                 const showFounderOption = canAssignFounder || user.role === 'founder'; // Show founder option if current user is founder or if target user is already a founder
@@ -1491,7 +1532,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Shows a modal for taking action on a user (Ban/Unban/Delete).
+     * Shows a modal for taking action on a user (Ban/Unban/Delete/Send Email).
      * @param {object} user - The user object to display and act upon.
      */
     function showTakeActionModal(user) {
@@ -1510,7 +1551,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full relative">
                 <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold" id="close-take-action-modal">&times;</button>
                 <h3 class="text-2xl font-extrabold text-gray-800 mb-6">User Actions</h3>
-                
+
                 <div class="flex flex-col items-center mb-6">
                     <img src="${profileIconSrc}" alt="User Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-3">
                     <p class="text-xl font-semibold text-gray-900">${user.username}</p>
@@ -1525,6 +1566,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </button>
                     <button id="unban-user-btn" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg ${!user.isBanned ? 'hidden' : ''} ${isDisabledForSelf}">
                         Unban Account
+                    </button>
+                    <button id="send-email-btn" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg ${isDisabledForSelf}">
+                        Send Email
                     </button>
                     <button id="delete-user-btn" class="w-full py-3 rounded-full bg-gray-500 text-white font-bold text-lg hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg ${isDisabledForSelf}">
                         Delete Account
@@ -1543,6 +1587,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const banBtn = document.getElementById('ban-user-btn');
         const unbanBtn = document.getElementById('unban-user-btn');
+        const sendEmailBtn = document.getElementById('send-email-btn'); // New button
         const deleteBtn = document.getElementById('delete-user-btn');
 
         if (banBtn) {
@@ -1578,6 +1623,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                         showMessageModal(error.message, 'error');
                     }
                 });
+            });
+        }
+
+        // Event listener for "Send Email" button
+        if (sendEmailBtn) {
+            sendEmailBtn.addEventListener('click', () => {
+                currentModal.remove(); // Close the current modal
+                currentModal = null;
+                navigateTo('send-email', user.id); // Navigate to the send email page, passing the user ID
             });
         }
 
@@ -1731,11 +1785,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <p class="text-sm text-gray-500 mt-4">
                                         Posted by <span class="font-semibold">${post.authorUsername}</span> on ${post.timestamp}
                                     </p>
-                                    
+
                                     <div class="flex items-center space-x-4 mt-4 border-t pt-4 border-gray-300">
                                         <!-- Reactions Section -->
                                         <div class="flex items-center space-x-2">
-                                            ${['�', '❤️', '😂', '🔥'].map(emoji => `
+                                            ${['😀', '❤️', '😂', '🔥'].map(emoji => `
                                                 <button class="text-xl p-1 rounded-full hover:bg-gray-200 transition duration-200" data-post-id="${post.id}" data-emoji="${emoji}">
                                                     ${emoji} <span class="text-sm text-gray-600">${post.reactions[emoji] || 0}</span>
                                                 </button>
@@ -1911,7 +1965,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Meet the Team</h2>
-                    
+
                     ${isAdminOrFounder ? `
                         <div class="mb-8 p-6 bg-gray-100 rounded-lg shadow-inner">
                             <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Add New Team Member</h3>
@@ -1990,6 +2044,105 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Renders the Send Email page for admins/founders.
+     * @param {string} [recipientUserId=null] - The ID of the user to pre-fill the recipient email.
+     */
+    async function renderSendEmailPage(recipientUserId = null) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">You do not have administrative privileges to send emails.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let recipientEmail = '';
+        let recipientUsername = 'Recipient';
+
+        if (recipientUserId) {
+            showLoadingSpinner();
+            try {
+                const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, recipientUserId);
+                const docSnap = await getDoc(userDocRef);
+                if (docSnap.exists()) {
+                    const recipientData = docSnap.data();
+                    recipientEmail = recipientData.email || '';
+                    recipientUsername = recipientData.username || recipientData.email || 'Recipient';
+                }
+            } catch (error) {
+                console.error("Error fetching recipient user data:", error.message);
+                showMessageModal("Could not pre-fill recipient email.", 'error');
+            } finally {
+                hideLoadingSpinner();
+            }
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Send Email to User</h2>
+                    <form id="send-email-form" class="space-y-6">
+                        <div>
+                            <label for="recipient-email" class="block text-gray-700 text-sm font-semibold mb-2">Recipient Email</label>
+                            <input type="email" id="recipient-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="${recipientEmail}" placeholder="Enter recipient email" required>
+                        </div>
+                        <div>
+                            <label for="email-subject" class="block text-gray-700 text-sm font-semibold mb-2">Subject</label>
+                            <input type="text" id="email-subject" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter email subject" required>
+                        </div>
+                        <div>
+                            <label for="email-message" class="block text-gray-700 text-sm font-semibold mb-2">Message</label>
+                            <textarea id="email-message" rows="8" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Write your email message here..." required></textarea>
+                        </div>
+                        <div>
+                            <label for="image-attachment-url" class="block text-gray-700 text-sm font-semibold mb-2">Attach Image (URL)</label>
+                            <input type="url" id="image-attachment-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Optional: Enter direct image URL (e.g., https://example.com/image.jpg)">
+                            <p class="text-xs text-gray-500 mt-1">Only direct image URLs are supported for attachments.</p>
+                        </div>
+                        <div class="flex justify-end space-x-4 mt-6">
+                            <button type="button" id="cancel-send-email-btn" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                                Cancel
+                            </button>
+                            <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                                Send Email
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        const sendEmailForm = document.getElementById('send-email-form');
+        const recipientEmailInput = document.getElementById('recipient-email');
+        const emailSubjectInput = document.getElementById('email-subject');
+        const emailMessageInput = document.getElementById('email-message');
+        const imageAttachmentUrlInput = document.getElementById('image-attachment-url');
+
+        document.getElementById('cancel-send-email-btn').addEventListener('click', () => {
+            navigateTo('admin'); // Go back to admin panel
+        });
+
+        sendEmailForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const recipient = recipientEmailInput.value;
+            const subject = emailSubjectInput.value;
+            const message = emailMessageInput.value;
+            const imageUrl = imageAttachmentUrlInput.value || null;
+
+            try {
+                await sendEmailToUserFirestore(recipient, subject, message, imageUrl);
+                navigateTo('admin'); // Go back to admin panel after "sending"
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+    }
+
 
     // --- Navigation and Initialization ---
 
@@ -2011,8 +2164,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team').
-     * @param {string} [id=null] - Optional: postId for edit-post route, or any other ID.
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team', 'send-email').
+     * @param {string} [id=null] - Optional: postId for edit-post route, userId for send-email route, or any other ID.
      */
     async function navigateTo(page, id = null) {
         // Store the current page in a data attribute on the content area for tracking
@@ -2075,6 +2228,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
             case 'team': // New Team page
                 renderTeamPage();
+                break;
+            case 'send-email': // New Send Email page
+                renderSendEmailPage(id); // Pass the user ID to pre-fill recipient
                 break;
             default:
                 renderHomePage();
@@ -2146,6 +2302,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Determine which page to render based on current state or previous navigation
                 let pageToRender = contentArea.dataset.currentPage || 'home';
                 let currentId = contentArea.dataset.currentId || null;
+
+                // Check if the user is banned before allowing them to proceed
+                if (userData.isBanned) {
+                    await signOut(auth); // Ensure they are signed out from Firebase Auth
+                    currentUser = null;
+                    userData = null;
+                    showMessageModal("Your account has been banned. Please contact support for more information.", 'error');
+                    navigateTo('auth'); // Redirect to auth page or a specific banned page
+                    hideLoadingSpinner();
+                    return; // Stop further rendering
+                }
+
 
                 if (pageToRender === 'auth' || pageToRender === 'logout') {
                     pageToRender = 'home'; // Always redirect to home if coming from auth/logout
