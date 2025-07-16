@@ -217,7 +217,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     username: usernameToUse,
                     role: 'member', // Default role for new users
                     profilePicUrl: profilePicToUse,
-                    backgroundUrl: 'bg-gradient-to-r from-blue-400 to-purple-600' // Default background
+                    backgroundUrl: 'bg-gradient-to-r from-blue-400 to-purple-600', // Default background
+                    bio: '' // Initialize empty bio for new users
                 });
                 const newDocSnap = await getDoc(userDocRef);
                 fetchedUserData = newDocSnap.data();
@@ -303,7 +304,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Updates the current user's profile data in Firestore.
-     * @param {object} newUserData - Data to update (username, profilePicUrl, backgroundUrl).
+     * @param {object} newUserData - Data to update (username, profilePicUrl, backgroundUrl, bio).
      * @returns {Promise<object>} - Updated user data.
      */
     async function updateProfileData(newUserData) {
@@ -339,10 +340,6 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<Array<object>>} - List of all users.
      */
     async function fetchAllUsersFirestore() {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
-            throw new Error("Not authorized to view users list.");
-        }
-
         showLoadingSpinner();
         try {
             const usersCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/users`);
@@ -688,91 +685,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             console.error("Error fetching posts:", error.message);
             throw new Error("Failed to fetch posts: " + error.message);
-        } finally {
-            hideLoadingSpinner();
-        }
-    }
-
-    /**
-     * Fetches all team members from Firestore.
-     * @returns {Promise<Array<object>>} - List of all team members.
-     */
-    async function fetchTeamMembersFirestore() {
-        showLoadingSpinner();
-        try {
-            const teamCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/team`);
-            const q = query(teamCollectionRef);
-
-            const querySnapshot = await new Promise((resolve, reject) => {
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    unsubscribe();
-                    resolve(snapshot);
-                }, (error) => {
-                    reject(error);
-                });
-            });
-
-            const teamMembersData = [];
-            querySnapshot.forEach((doc) => {
-                teamMembersData.push({ id: doc.id, ...doc.data() });
-            });
-            return teamMembersData;
-        } catch (error) {
-            console.error("Error fetching team members:", error.message);
-            throw new Error("Failed to fetch team members: " + error.message);
-        } finally {
-            hideLoadingSpinner();
-        }
-    }
-
-    /**
-     * Adds a new team member to Firestore.
-     * Only callable by admins and founders.
-     * @param {string} username - The username of the team member.
-     * @param {string} role - The role of the team member.
-     * @returns {Promise<void>}
-     */
-    async function addTeamMemberFirestore(username, role) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
-            throw new Error("Only admins and founders can add team members.");
-        }
-        showLoadingSpinner();
-        try {
-            const teamCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/team`);
-            await addDoc(teamCollectionRef, {
-                username: username,
-                role: role,
-                addedBy: currentUser.uid,
-                addedByUsername: userData.username || currentUser.displayName || currentUser.email,
-                timestamp: serverTimestamp()
-            });
-            showMessageModal('Team member added successfully!');
-        } catch (error) {
-            console.error("Error adding team member:", error.message);
-            throw new Error("Failed to add team member: " + error.message);
-        } finally {
-            hideLoadingSpinner();
-        }
-    }
-
-    /**
-     * Deletes a team member from Firestore.
-     * Only callable by admins and founders.
-     * @param {string} teamMemberId - The ID of the team member to delete.
-     * @returns {Promise<void>}
-     */
-    async function deleteTeamMemberFirestore(teamMemberId) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
-            throw new Error("Only admins and founders can delete team members.");
-        }
-        showLoadingSpinner();
-        try {
-            const teamMemberDocRef = doc(db, `/artifacts/${APP_ID}/public/data/team`, teamMemberId);
-            await deleteDoc(teamMemberDocRef);
-            showMessageModal('Team member deleted successfully!');
-        } catch (error) {
-            console.error("Error deleting team member:", error.message);
-            throw new Error("Failed to delete team member: " + error.message);
         } finally {
             hideLoadingSpinner();
         }
@@ -1295,6 +1207,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <input type="url" id="custom-background-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., https://example.com/your-animated.gif" value="${(userData.backgroundUrl && (userData.backgroundUrl.startsWith('http') || userData.backgroundUrl.startsWith('https'))) ? userData.backgroundUrl : ''}">
                             <p class="text-xs text-gray-500 mt-1">For GIFs, choose a subtle or abstract one for a formal look. This will override the theme selection above.</p>
                         </div>
+                        <div>
+                            <label for="profile-bio" class="block text-gray-700 text-sm font-semibold mb-2">Bio</label>
+                            <textarea id="profile-bio" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tell us about yourself...">${userData.bio || ''}</textarea>
+                        </div>
                         <button type="submit" id="save-profile-btn" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Save Changes
                         </button>
@@ -1308,6 +1224,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const profilePicUrlInput = document.getElementById('profile-pic-url');
         const backgroundSelect = document.getElementById('profile-background-select'); // Changed ID
         const customBackgroundUrlInput = document.getElementById('custom-background-url'); // New input
+        const profileBioInput = document.getElementById('profile-bio'); // New bio input
         const profilePicDisplay = document.getElementById('profile-pic-display');
 
         // Update profile picture preview as URL changes
@@ -1323,6 +1240,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             const newUsername = usernameInput.value;
             const newProfilePicUrl = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(newUsername || 'U').charAt(0).toUpperCase()}`;
+            const newBio = profileBioInput.value; // Get the new bio
 
             let newBackgroundUrl;
             // If custom URL is provided, use it. Otherwise, use the selected theme.
@@ -1336,7 +1254,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const updatedData = await updateProfileData({
                     username: newUsername,
                     profilePicUrl: newProfilePicUrl,
-                    backgroundUrl: newBackgroundUrl // This can now be a class string or a URL
+                    backgroundUrl: newBackgroundUrl, // This can now be a class string or a URL
+                    bio: newBio // Include the new bio field
                 });
                 if (updatedData) {
                     userData = updatedData; // Update global userData
@@ -1556,8 +1475,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <img src="${profileIconSrc}" alt="User Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-3">
                     <p class="text-xl font-semibold text-gray-900">${user.username}</p>
                     <p class="text-md text-gray-600">${user.email}</p>
-                    <p class="text-md font-medium text-gray-700 mt-2">Role: <span class="font-bold">${user.role}</span></p>
-                    <p class="text-md font-medium text-gray-700">Status: <span class="font-bold ${user.isBanned ? 'text-red-600' : 'text-green-600'}">${user.isBanned ? 'Banned' : 'Active'}</span></p>
+                    <p class="text-md font-medium text-gray-700 mt-2">Role: <span class="font-bold ${user.isBanned ? 'text-red-600' : 'text-green-600'}">${user.isBanned ? 'Banned' : 'Active'}</span></p>
                 </div>
 
                 <div class="space-y-4">
@@ -1950,99 +1868,66 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function renderTeamPage() {
         showLoadingSpinner();
-        let teamMembers = [];
+        let allUsers = [];
         try {
-            teamMembers = await fetchTeamMembersFirestore();
+            // Fetch all users to determine who are admins/founders
+            allUsers = await fetchAllUsersFirestore();
         } catch (error) {
             showMessageModal(error.message, 'error');
+            allUsers = []; // Clear list if fetch fails
         } finally {
             hideLoadingSpinner();
         }
 
-        const isAdminOrFounder = currentUser && (userData.role === 'admin' || userData.role === 'founder');
+        // Filter users to only include admins and founders
+        const teamMembers = allUsers.filter(user => user.role === 'admin' || user.role === 'founder');
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Meet the Team</h2>
 
-                    ${isAdminOrFounder ? `
-                        <div class="mb-8 p-6 bg-gray-100 rounded-lg shadow-inner">
-                            <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Add New Team Member</h3>
-                            <form id="add-team-member-form" class="space-y-4">
-                                <div>
-                                    <label for="team-username" class="block text-gray-700 text-sm font-semibold mb-2">Username</label>
-                                    <input type="text" id="team-username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter team member's username" required>
-                                </div>
-                                <div>
-                                    <label for="team-role" class="block text-gray-700 text-sm font-semibold mb-2">Role</label>
-                                    <select id="team-role" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none" required>
-                                        <option value="">Select Role</option>
-                                        <option value="member">Member</option>
-                                        <option value="admin">Admin</option>
-                                        <option value="founder">Founder</option>
-                                    </select>
-                                </div>
-                                <button type="submit" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                                    Add Team Member
-                                </button>
-                            </form>
-                        </div>
-                    ` : ''}
-
-                    <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Current Team</h3>
                     ${teamMembers.length === 0 ? `
                         <p class="text-center text-gray-600">No team members listed yet.</p>
                     ` : `
-                        <div class="space-y-4">
-                            ${teamMembers.map(member => `
-                                <div class="flex items-center justify-between bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200">
-                                    <div class="flex items-center space-x-4">
-                                        <p class="text-lg font-semibold text-gray-900">${member.username}</p>
-                                        <span class="text-sm text-gray-600 px-3 py-1 rounded-full bg-gray-200">${member.role}</span>
+                        <div class="space-y-6">
+                            ${teamMembers.map(member => {
+                                const profilePicSrc = member.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(member.username || member.email || 'U').charAt(0).toUpperCase()}`;
+                                const isCurrentUser = currentUser && member.id === currentUser.uid;
+
+                                return `
+                                    <div class="flex flex-col sm:flex-row items-center sm:items-start p-6 bg-gray-50 rounded-lg shadow-md border border-gray-200">
+                                        <img src="${profilePicSrc}" alt="${member.username}'s Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-4 sm:mb-0 sm:mr-6"
+                                             onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(member.username || member.email || 'U').charAt(0).toUpperCase()}'">
+                                        <div class="flex-grow text-center sm:text-left">
+                                            <h3 class="text-xl font-bold text-gray-900">${member.username}</h3>
+                                            <p class="text-md text-gray-600 mb-2">${member.role.charAt(0).toUpperCase() + member.role.slice(1)}</p>
+                                            <p class="text-gray-700 text-sm whitespace-pre-wrap">${member.bio || 'No bio provided yet.'}</p>
+                                            ${isCurrentUser ? `
+                                                <button class="mt-4 py-2 px-4 rounded-full bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg"
+                                                        id="edit-my-bio-btn">
+                                                    Edit My Bio
+                                                </button>
+                                            ` : ''}
+                                        </div>
                                     </div>
-                                    ${isAdminOrFounder ? `
-                                        <button class="text-red-600 hover:text-red-800 font-semibold text-sm" data-delete-team-member-id="${member.id}" data-username="${member.username}">
-                                            Delete
-                                        </button>
-                                    ` : ''}
-                                </div>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </div>
                     `}
                 </div>
             </div>
         `;
 
-        if (isAdminOrFounder) {
-            document.getElementById('add-team-member-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const username = document.getElementById('team-username').value;
-                const role = document.getElementById('team-role').value;
-                try {
-                    await addTeamMemberFirestore(username, role);
-                    renderTeamPage(); // Re-render to show updated list
-                } catch (error) {
-                    showMessageModal(error.message, 'error');
-                }
-            });
-
-            contentArea.querySelectorAll('[data-delete-team-member-id]').forEach(button => {
-                button.addEventListener('click', async (e) => {
-                    const teamMemberId = e.target.dataset.deleteTeamMemberId;
-                    const username = e.target.dataset.username;
-                    showMessageModal(`Are you sure you want to remove "${username}" from the team?`, 'confirm', async () => {
-                        try {
-                            await deleteTeamMemberFirestore(teamMemberId);
-                            renderTeamPage(); // Re-render to show updated list
-                        } catch (error) {
-                            showMessageModal(error.message, 'error');
-                        }
-                    });
-                });
+        // Add event listener for "Edit My Bio" button if present
+        const editMyBioBtn = document.getElementById('edit-my-bio-btn');
+        if (editMyBioBtn) {
+            editMyBioBtn.addEventListener('click', () => {
+                navigateTo('profile'); // Redirect to profile page to edit bio
             });
         }
     }
+
 
     /**
      * Renders the Send Email page for admins/founders.
@@ -2287,14 +2172,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                         username: user.displayName || user.email?.split('@')[0],
                         role: 'member',
                         profilePicUrl: defaultProfilePic,
-                        backgroundUrl: defaultBackground
+                        backgroundUrl: defaultBackground,
+                        bio: '' // Initialize empty bio for new users
                     });
                     userData = {
                         email: user.email,
                         username: user.displayName || user.email?.split('@')[0],
                         role: 'member',
                         profilePicUrl: defaultProfilePic,
-                        backgroundUrl: defaultBackground
+                        backgroundUrl: defaultBackground,
+                        bio: ''
                     };
                 }
                 updateBodyBackground(); // Apply user's saved background
