@@ -2426,7 +2426,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 // Link icons and their corresponding Font Awesome classes
                                 const linkIcons = {
                                     discord: 'fab fa-discord',
-                                    roblox: 'fab fa-roblox',
+                                    roblox: 'fab fa-gamepad',
                                     fivem: 'fas fa-gamepad', // Generic gamepad for FiveM
                                     codingCommunity: 'fas fa-code', // Generic code for coding community
                                     minecraft: 'fas fa-cube', // Generic cube for Minecraft
@@ -2523,7 +2523,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                                 const linkIcons = {
                                     discord: 'fab fa-discord',
-                                    roblox: 'fab fa-roblox',
+                                    roblox: 'fab fa-gamepad',
                                     fivem: 'fas fa-gamepad',
                                     codingCommunity: 'fas fa-code',
                                     minecraft: 'fas fa-cube',
