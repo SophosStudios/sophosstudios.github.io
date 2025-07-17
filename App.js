@@ -135,7 +135,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
+     * Applies theme classes to the document body based on user data.
+     */
+    function applyThemeClasses() {
+        document.documentElement.classList.remove('light-theme', 'dark-theme'); // Remove existing themes
+        if (userData && userData.theme === 'dark') {
+            document.documentElement.classList.add('dark-theme');
+            // For Tailwind's dark mode, you might also toggle a 'dark' class on the HTML element
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.add('light-theme');
+            document.documentElement.classList.remove('dark');
+        }
+    }
+
+    /**
      * Updates the body's background. Can be a Tailwind class string or a direct image URL.
+     * This function also calls applyThemeClasses to ensure theme consistency.
      */
     function updateBodyBackground() {
         // Clear all previous body classes and inline styles to avoid conflicts
@@ -161,10 +177,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         } else {
             // Default fallback if no user data or backgroundUrl
-            document.body.classList.add('bg-gradient-to-r', 'from-blue-400', 'to-purple-600');
+            // Apply default based on theme
+            if (userData?.theme === 'dark') {
+                document.body.classList.add('bg-gray-900', 'text-white'); // Dark default
+            } else {
+                document.body.classList.add('bg-gradient-to-r', 'from-blue-400', 'to-purple-600'); // Light default
+            }
         }
         // Always add core classes for consistent styling
         document.body.classList.add('min-h-screen', 'font-inter');
+
+        applyThemeClasses(); // Apply theme classes after background
     }
 
     // --- Firebase Integration Functions ---
@@ -208,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // --- END ADDITION FOR BAN FUNCTIONALITY ---
             } else {
                 // Create user document if it doesn't exist (e.g., new Google user)
-                const usernameToUse = user.displayName || user.email?.split('@')[0] || 'User';
+                const usernameToUse = formData.username || user.displayName || user.email?.split('@')[0] || 'User';
                 // Prioritize user.photoURL from auth provider, fallback to placeholder
                 const profilePicToUse = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
 
@@ -222,7 +245,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     partnerInfo: { // Initialize empty partner info
                         description: '',
                         links: {}
-                    }
+                    },
+                    theme: 'light' // Default theme for new users
                 });
                 const newDocSnap = await getDoc(userDocRef);
                 fetchedUserData = newDocSnap.data();
@@ -308,7 +332,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Updates the current user's profile data in Firestore.
-     * @param {object} newUserData - Data to update (username, profilePicUrl, backgroundUrl, bio, partnerInfo).
+     * @param {object} newUserData - Data to update (username, profilePicUrl, backgroundUrl, bio, partnerInfo, theme).
      * @returns {Promise<object>} - Updated user data.
      */
     async function updateProfileData(newUserData) {
@@ -321,7 +345,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
 
             // Update Firebase Auth display name if username changed
-            if (auth.currentUser && auth.currentUser.displayName !== newUserData.username) {
+            if (auth.currentUser && newUserData.username && auth.currentUser.displayName !== newUserData.username) {
                 await updateProfile(auth.currentUser, { displayName: newUserData.username });
             }
 
@@ -776,6 +800,107 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Submits a partner application to Firestore.
+     * @param {object} applicationData - The application data including answers to questions.
+     * @returns {Promise<void>}
+     */
+    async function submitPartnerApplicationFirestore(applicationData) {
+        if (!currentUser) {
+            throw new Error("You must be logged in to submit a partner application.");
+        }
+        showLoadingSpinner();
+        try {
+            const applicationsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/partnerApplications`);
+            await addDoc(applicationsCollectionRef, {
+                applicantId: currentUser.uid,
+                applicantUsername: userData.username || currentUser.displayName || currentUser.email,
+                applicantEmail: currentUser.email,
+                status: 'pending', // Initial status
+                applicationQuestions: applicationData,
+                timestamp: serverTimestamp()
+            });
+            showMessageModal('Partner application submitted successfully! We will review it soon.');
+        } catch (error) {
+            console.error("Error submitting partner application:", error.message);
+            throw new Error("Failed to submit application: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Fetches all partner applications for admin review.
+     * @returns {Promise<Array<object>>} - List of partner applications.
+     */
+    async function fetchAllPartnerApplicationsFirestore() {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Not authorized to view partner applications.");
+        }
+        showLoadingSpinner();
+        try {
+            const applicationsCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/partnerApplications`);
+            const q = query(applicationsCollectionRef, orderBy('timestamp', 'desc'));
+
+            const querySnapshot = await new Promise((resolve, reject) => {
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    unsubscribe();
+                    resolve(snapshot);
+                }, (error) => {
+                    reject(error);
+                });
+            });
+
+            const applicationsData = [];
+            querySnapshot.forEach((doc) => {
+                applicationsData.push({ id: doc.id, ...doc.data() });
+            });
+            return applicationsData;
+        } catch (error) {
+            console.error("Error fetching partner applications:", error.message);
+            throw new Error("Failed to fetch partner applications: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Updates the status of a partner application and optionally updates user role.
+     * @param {string} applicationId - The ID of the application to update.
+     * @param {string} status - The new status ('approved', 'rejected').
+     * @param {string} reviewNotes - Optional notes from the reviewer.
+     * @param {string} applicantId - The UID of the applicant.
+     * @returns {Promise<void>}
+     */
+    async function updatePartnerApplicationStatusFirestore(applicationId, status, reviewNotes, applicantId) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Not authorized to review partner applications.");
+        }
+        showLoadingSpinner();
+        try {
+            const applicationDocRef = doc(db, `/artifacts/${APP_ID}/public/data/partnerApplications`, applicationId);
+            await updateDoc(applicationDocRef, {
+                status: status,
+                reviewNotes: reviewNotes,
+                reviewedBy: currentUser.uid,
+                reviewTimestamp: serverTimestamp()
+            });
+
+            if (status === 'approved') {
+                const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, applicantId);
+                await updateDoc(userDocRef, { role: 'partner' });
+                showMessageModal('Application approved and user role updated to Partner!');
+            } else {
+                showMessageModal('Application rejected.');
+            }
+        } catch (error) {
+            console.error("Error updating partner application status:", error.message);
+            throw new Error("Failed to update application status: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
 
     // --- UI Rendering Functions ---
 
@@ -847,14 +972,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 name: 'Partnership', // New Category
                 items: [
                     { id: 'nav-partners', text: 'Check Out Partners', page: 'partners' },
-                    { id: 'nav-partner-tos', text: 'Partner TOS', page: 'partner-tos' }
+                    { id: 'nav-partner-tos', text: 'Partner TOS', page: 'partner-tos' },
+                    { id: 'nav-apply-partner', text: 'Apply for Partnership', page: 'apply-partner', roles: ['member'] } // Only members can apply
                 ],
                 authRequired: true // Partnership features require login
             },
             {
                 name: 'Administration',
                 items: [
-                    { id: 'nav-admin', text: 'Admin Panel', page: 'admin' }
+                    { id: 'nav-admin', text: 'Admin Panel', page: 'admin' },
+                    { id: 'nav-partner-applications', text: 'Partner Applications', page: 'partner-applications' } // New admin link
                 ],
                 authRequired: true,
                 roles: ['admin', 'founder']
@@ -875,7 +1002,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                      onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}'">`;
 
             accountCategory.items.push(
-                { id: 'nav-profile', text: userData.username || currentUser.email, page: 'profile', icon: profileIconHtml },
+                { id: 'nav-profile', text: 'Profile', page: 'profile', icon: profileIconHtml }, // Simplified Profile
+                { id: 'nav-settings', text: 'Settings', page: 'settings' }, // New Settings page
                 { id: 'nav-sign-out', text: 'Sign Out', page: 'logout' }
             );
         } else {
@@ -897,7 +1025,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Render Desktop Navigation
         categories.forEach(category => {
             if (category.authRequired && !currentUser) return; // Skip if auth required and user not logged in
-            if (category.roles && (!currentUser || !category.roles.includes(userData.role))) return; // Skip if roles required and user doesn't have them
+            // Filter items within a category based on roles
+            const filteredItems = category.items.filter(item => {
+                if (item.roles) {
+                    return userData && item.roles.includes(userData.role);
+                }
+                if (category.roles) { // Category-level roles
+                    return userData && category.roles.includes(userData.role);
+                }
+                return true;
+            });
+
+            if (filteredItems.length === 0) return; // Skip category if no items are visible
 
             const dropdownContainer = document.createElement('div');
             dropdownContainer.className = 'relative inline-block text-left'; // Changed from 'group'
@@ -908,7 +1047,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <i class="fas fa-chevron-down text-xs ml-1 transition-transform transform"></i>
                 </button>
                 <div class="desktop-dropdown-content absolute hidden bg-gray-700 text-white rounded-lg shadow-lg py-2 w-40 z-10 top-full mt-2 left-0 origin-top overflow-hidden" style="max-height: 0px; transition: max-height 0.3s ease-in-out;">
-                    ${category.items.map(item => `
+                    ${filteredItems.map(item => `
                         <button id="${item.id}" class="block w-full text-left px-4 py-2 hover:bg-gray-600 transition duration-200">
                             ${item.icon || ''}<span>${item.text}</span>
                         </button>
@@ -1016,9 +1155,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         categories.forEach(category => {
             if (category.authRequired && !currentUser) return;
-            if (category.roles && (!currentUser || !category.roles.includes(userData.role))) return;
+            const filteredItems = category.items.filter(item => {
+                if (item.roles) {
+                    return userData && item.roles.includes(userData.role);
+                }
+                if (category.roles) {
+                    return userData && category.roles.includes(userData.role);
+                }
+                return true;
+            });
 
-            createMobileDropdown(category.name, category.items);
+            if (filteredItems.length === 0) return;
+
+            createMobileDropdown(category.name, filteredItems);
         });
     }
 
@@ -1033,7 +1182,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             switch (role) {
                 case 'member':
-                    emoji = '👤'; // User emoji
+                    emoji = '�'; // User emoji
                     colorClass = 'text-blue-600'; // Member color
                     break;
                 case 'admin':
@@ -1059,16 +1208,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
         contentArea.innerHTML = `
-            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-green-600 mb-6">
                     Welcome to ${CONFIG.websiteTitle}!
                 </h1>
                 ${currentUser && userData ? `
-                    <p class="text-xl text-gray-700 mb-4">
+                    <p class="text-xl text-gray-700 dark:text-gray-300 mb-4">
                         Hello, <span class="font-semibold text-blue-600">${userData.username || currentUser.email}</span>!
                         You are logged in as a ${getRoleVFX(userData.role)}.
                     </p>
-                    <p class="text-lg text-gray-600 mb-6">
+                    <p class="text-lg text-gray-600 dark:text-gray-400 mb-6">
                         Explore your profile settings, check out the forum, or visit the admin panel if you have the permissions.
                     </p>
                     <div class="flex flex-col sm:flex-row justify-center gap-4">
@@ -1084,7 +1233,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </button>` : ''}
                     </div>
                 ` : `
-                    <p class="text-lg text-gray-700 mb-6">
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-6">
                         Sign in or create an account to unlock full features and personalize your experience.
                     </p>
                     <button id="go-to-auth-btn" class="py-3 px-8 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -1111,20 +1260,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderAuthPage() {
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 id="auth-title" class="text-3xl font-extrabold text-center text-gray-800 mb-8">Sign In</h2>
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 id="auth-title" class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Sign In</h2>
                     <form id="auth-form" class="space-y-6">
                         <div>
-                            <label for="email" class="block text-gray-700 text-sm font-semibold mb-2">Email</label>
-                            <input type="email" id="email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="your@example.com" required>
+                            <label for="email" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Email</label>
+                            <input type="email" id="email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="your@example.com" required>
                         </div>
                         <div id="username-field" class="hidden">
-                            <label for="username" class="block text-gray-700 text-sm font-semibold mb-2">Username</label>
-                            <input type="text" id="username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Choose a username">
+                            <label for="username" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Username</label>
+                            <input type="text" id="username" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Choose a username">
                         </div>
                         <div>
-                            <label for="password" class="block text-gray-700 text-sm font-semibold mb-2">Password</label>
-                            <input type="password" id="password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Minimum 6 characters" required>
+                            <label for="password" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Password</label>
+                            <input type="password" id="password" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Minimum 6 characters" required>
                         </div>
                         <button type="submit" id="auth-submit-btn" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Sign In
@@ -1218,7 +1367,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Renders the Profile (Settings) page.
+     * Renders the Profile page (simplified).
      */
     function renderProfilePage() {
         if (!currentUser || !userData) {
@@ -1226,85 +1375,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        const backgroundOptions = [
-            { name: 'Blue-Purple Gradient (Default)', class: 'bg-gradient-to-r from-blue-400 to-purple-600' },
-            { name: 'Green-Cyan Gradient', class: 'bg-gradient-to-r from-green-400 to-cyan-600' },
-            { name: 'Red-Black Gradient', class: 'bg-gradient-to-r from-red-800 to-black' }, // New
-            { name: 'Orange-Red Gradient', class: 'bg-gradient-to-r from-orange-600 to-red-600' }, // New
-            // Note: Custom URL for images/GIFs is handled by the input field directly below
-        ];
-
-        // Partner specific fields visibility
-        const isPartnerOrAdmin = userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder';
-        const partnerLinks = userData.partnerInfo?.links || {};
-
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Your Profile Settings</h2>
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Your Profile</h2>
 
                     <div class="flex flex-col items-center mb-6">
                         <img id="profile-pic-display" src="${userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`}" alt="Profile" class="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-md">
-                        <p class="text-gray-600 mt-4 text-sm">To change profile picture, provide a direct image URL below.</p>
                     </div>
 
                     <form id="profile-form" class="space-y-6">
                         <div>
-                            <label for="profile-username" class="block text-gray-700 text-sm font-semibold mb-2">Username</label>
-                            <input type="text" id="profile-username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="${userData.username || ''}" required>
+                            <label for="profile-username" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Username</label>
+                            <input type="text" id="profile-username" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" value="${userData.username || ''}" required>
                         </div>
                         <div>
-                            <label for="profile-email" class="block text-gray-700 text-sm font-semibold mb-2">Email</label>
-                            <input type="email" id="profile-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed" value="${currentUser.email}" disabled>
+                            <label for="profile-email" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Email</label>
+                            <input type="email" id="profile-email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 dark:text-gray-100 cursor-not-allowed" value="${currentUser.email}" disabled>
                         </div>
-                        <div>
-                            <label for="profile-pic-url" class="block text-gray-700 text-sm font-semibold mb-2">Profile Picture URL</label>
-                            <input type="url" id="profile-pic-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., https://example.com/your-image.jpg" value="${userData.profilePicUrl || ''}">
-                        </div>
-                        <div>
-                            <label for="profile-background-select" class="block text-gray-700 text-sm font-semibold mb-2">Website Background Theme</label>
-                            <select id="profile-background-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
-                                ${backgroundOptions.map(option => `
-                                    <option value="${option.class}" ${userData.backgroundUrl === option.class ? 'selected' : ''}>
-                                        ${option.name}
-                                    </option>
-                                `).join('')}
-                            </select>
-                        </div>
-                        <div>
-                            <label for="custom-background-url" class="block text-gray-700 text-sm font-semibold mb-2">Custom Background Image/GIF URL (Overrides Theme)</label>
-                            <input type="url" id="custom-background-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., https://example.com/your-animated.gif" value="${(userData.backgroundUrl && (userData.backgroundUrl.startsWith('http') || userData.backgroundUrl.startsWith('https'))) ? userData.backgroundUrl : ''}">
-                            <p class="text-xs text-gray-500 mt-1">For GIFs, choose a subtle or abstract one for a formal look. This will override the theme selection above.</p>
-                        </div>
-                        <div>
-                            <label for="profile-bio" class="block text-gray-700 text-sm font-semibold mb-2">Bio</label>
-                            <textarea id="profile-bio" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tell us about yourself...">${userData.bio || ''}</textarea>
-                        </div>
-
-                        ${isPartnerOrAdmin ? `
-                            <div class="border-t border-gray-200 pt-6 mt-6">
-                                <h3 class="text-xl font-bold text-gray-800 mb-4">Partner Card Information</h3>
-                                <p class="text-sm text-gray-600 mb-4">This information will be displayed on your public partner card.</p>
-
-                                <div>
-                                    <label for="partner-description" class="block text-gray-700 text-sm font-semibold mb-2">Partner Description</label>
-                                    <textarea id="partner-description" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="A short description for your partner card...">${userData.partnerInfo?.description || ''}</textarea>
-                                </div>
-
-                                <div class="space-y-4 mt-4">
-                                    <h4 class="text-lg font-semibold text-gray-800">Partner Links</h4>
-                                    ${['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', "website"].map(platform => `
-                                        <div>
-                                            <label for="partner-link-${platform}" class="block text-gray-700 text-sm font-semibold mb-2 capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()} Link</label>
-                                            <input type="url" id="partner-link-${platform}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter URL for ${platform} profile/community" value="${partnerLinks[platform] || ''}">
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        ` : ''}
-
+                        <button type="button" id="reset-password-btn" class="w-full py-3 rounded-full bg-yellow-600 text-white font-bold text-lg hover:bg-yellow-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Reset Password
+                        </button>
                         <button type="submit" id="save-profile-btn" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Save Changes
+                        </button>
+                        <button type="button" id="go-to-settings-btn" class="w-full py-3 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg mt-4">
+                            Go to Settings
                         </button>
                     </form>
                 </div>
@@ -1313,33 +1409,253 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const profileForm = document.getElementById('profile-form');
         const usernameInput = document.getElementById('profile-username');
-        const profilePicUrlInput = document.getElementById('profile-pic-url');
-        const backgroundSelect = document.getElementById('profile-background-select');
-        const customBackgroundUrlInput = document.getElementById('custom-background-url');
-        const profileBioInput = document.getElementById('profile-bio');
-        const profilePicDisplay = document.getElementById('profile-pic-display');
-
-        // Partner specific elements
-        const partnerDescriptionInput = document.getElementById('partner-description');
-        const partnerLinkInputs = {};
-        ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', "website"].forEach(platform => {
-            partnerLinkInputs[platform] = document.getElementById(`partner-link-${platform}`);
-        });
-
-
-        // Update profile picture preview as URL changes
-        profilePicUrlInput.addEventListener('input', () => {
-          profilePicDisplay.src = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(usernameInput.value || 'U').charAt(0).toUpperCase()}`;
-        });
-        profilePicDisplay.onerror = () => { // Fallback for broken image URLs
-            profilePicDisplay.src = `https://placehold.co/100x100/F0F0F0/000000?text=${(usernameInput.value || 'U').charAt(0).toUpperCase()}`;
-        };
+        const resetPasswordBtn = document.getElementById('reset-password-btn');
+        const goToSettingsBtn = document.getElementById('go-to-settings-btn');
 
 
         profileForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const newUsername = usernameInput.value;
-            const newProfilePicUrl = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(newUsername || 'U').charAt(0).toUpperCase()}`;
+
+            try {
+                const updatedData = await updateProfileData({
+                    username: newUsername
+                });
+                if (updatedData) {
+                    userData = updatedData; // Update global userData
+                    showMessageModal('Username updated successfully!');
+                    renderNavbar(); // Re-render navbar to update name
+                }
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+
+        resetPasswordBtn.addEventListener('click', async () => {
+            showMessageModal('Are you sure you want to send a password reset email to your registered email address?', 'confirm', async () => {
+                try {
+                    await sendPasswordReset(currentUser.email);
+                    showMessageModal("Password reset email sent! Check your inbox.");
+                } catch (error) {
+                    showMessageModal(error.message, 'error');
+                }
+            });
+        });
+
+        goToSettingsBtn.addEventListener('click', () => navigateTo('settings'));
+    }
+
+    /**
+     * Renders the new Settings page.
+     */
+    function renderSettingsPage() {
+        if (!currentUser || !userData) {
+            navigateTo('auth'); // Redirect to auth if not logged in
+            return;
+        }
+
+        const backgroundOptions = [
+            { name: 'Blue-Purple Gradient (Default)', class: 'bg-gradient-to-r from-blue-400 to-purple-600' },
+            { name: 'Green-Cyan Gradient', class: 'bg-gradient-to-r from-green-400 to-cyan-600' },
+            { name: 'Red-Black Gradient', class: 'bg-gradient-to-r from-red-800 to-black' },
+            { name: 'Orange-Red Gradient', class: 'bg-gradient-to-r from-orange-600 to-red-600' },
+        ];
+
+        const isPartnerOrAdmin = userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder';
+        const partnerLinks = userData.partnerInfo?.links || {};
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Account Settings</h2>
+
+                    <form id="settings-form" class="space-y-8">
+                        <!-- Profile Picture & Bio Section -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start border-b border-gray-200 dark:border-gray-700 pb-8">
+                            <div class="flex flex-col items-center justify-center">
+                                <img id="profile-pic-display" src="${userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`}" alt="Profile" class="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-md mb-4">
+                                <label for="profile-pic-url" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Profile Picture URL</label>
+                                <input type="url" id="profile-pic-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., https://example.com/your-image.jpg" value="${userData.profilePicUrl || ''}">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">Provide a direct image URL.</p>
+                            </div>
+                            <div>
+                                <label for="profile-bio" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Your Bio</label>
+                                <textarea id="profile-bio" rows="6" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Tell us about yourself...">${userData.bio || ''}</textarea>
+                            </div>
+                        </div>
+
+                        <!-- Theme & Background Section -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start border-b border-gray-200 dark:border-gray-700 pb-8 pt-8">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Display Options</h3>
+                                <div class="flex items-center space-x-3 mb-4">
+                                    <label for="dark-mode-toggle" class="text-gray-700 dark:text-gray-300 text-md font-semibold">Dark Mode</label>
+                                    <label class="switch">
+                                        <input type="checkbox" id="dark-mode-toggle" ${userData.theme === 'dark' ? 'checked' : ''}>
+                                        <span class="slider round"></span>
+                                    </label>
+                                </div>
+
+                                <label for="profile-background-select" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Website Background Theme</label>
+                                <select id="profile-background-select" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-gray-50 dark:bg-gray-700 dark:text-gray-100">
+                                    ${backgroundOptions.map(option => `
+                                        <option value="${option.class}" ${userData.backgroundUrl === option.class ? 'selected' : ''}>
+                                            ${option.name}
+                                        </option>
+                                    `).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="custom-background-url" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Custom Background Image/GIF URL (Overrides Theme)</label>
+                                <input type="url" id="custom-background-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., https://example.com/your-animated.gif" value="${(userData.backgroundUrl && (userData.backgroundUrl.startsWith('http') || userData.backgroundUrl.startsWith('https'))) ? userData.backgroundUrl : ''}">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">For GIFs, choose a subtle or abstract one for a formal look. This will override the theme selection above.</p>
+                            </div>
+                        </div>
+
+                        <!-- Partner Card Information Section -->
+                        ${isPartnerOrAdmin ? `
+                            <div class="border-b border-gray-200 dark:border-gray-700 pb-8 pt-8">
+                                <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Partner Card Information</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">This information will be displayed on your public partner card.</p>
+
+                                <div class="mb-4">
+                                    <label for="partner-description" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Partner Description</label>
+                                    <textarea id="partner-description" rows="4" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="A short description for your partner card...">${userData.partnerInfo?.description || ''}</textarea>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <h4 class="col-span-full text-lg font-semibold text-gray-800 dark:text-gray-100 mt-4">Partner Links</h4>
+                                    ${['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', 'website'].map(platform => `
+                                        <div>
+                                            <label for="partner-link-${platform}" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2 capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()} Link</label>
+                                            <input type="url" id="partner-link-${platform}" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Enter URL for ${platform} profile/community" value="${partnerLinks[platform] || ''}">
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <button type="submit" id="save-settings-btn" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg mt-6">
+                            Save All Settings
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <style>
+                /* Dark Mode Toggle Switch Styling */
+                .switch {
+                    position: relative;
+                    display: inline-block;
+                    width: 60px;
+                    height: 34px;
+                }
+
+                .switch input {
+                    opacity: 0;
+                    width: 0;
+                    height: 0;
+                }
+
+                .slider {
+                    position: absolute;
+                    cursor: pointer;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: #ccc;
+                    -webkit-transition: .4s;
+                    transition: .4s;
+                }
+
+                .slider:before {
+                    position: absolute;
+                    content: "";
+                    height: 26px;
+                    width: 26px;
+                    left: 4px;
+                    bottom: 4px;
+                    background-color: white;
+                    -webkit-transition: .4s;
+                    transition: .4s;
+                }
+
+                input:checked + .slider {
+                    background-color: #2196F3; /* Blue for "on" */
+                }
+
+                input:focus + .slider {
+                    box-shadow: 0 0 1px #2196F3;
+                }
+
+                input:checked + .slider:before {
+                    -webkit-transform: translateX(26px);
+                    -ms-transform: translateX(26px);
+                    transform: translateX(26px);
+                }
+
+                /* Rounded sliders */
+                .slider.round {
+                    border-radius: 34px;
+                }
+
+                .slider.round:before {
+                    border-radius: 50%;
+                }
+
+                /* Dark mode specific styles for the switch */
+                .dark-theme .slider {
+                    background-color: #555; /* Darker background for switch in dark mode */
+                }
+                .dark-theme input:checked + .slider {
+                    background-color: #667EEA; /* A lighter blue/indigo for dark mode toggle */
+                }
+            </style>
+        `;
+
+        const settingsForm = document.getElementById('settings-form');
+        const profilePicUrlInput = document.getElementById('profile-pic-url');
+        const backgroundSelect = document.getElementById('profile-background-select');
+        const customBackgroundUrlInput = document.getElementById('custom-background-url');
+        const profileBioInput = document.getElementById('profile-bio');
+        const profilePicDisplay = document.getElementById('profile-pic-display');
+        const darkModeToggle = document.getElementById('dark-mode-toggle');
+
+        // Partner specific elements
+        const partnerDescriptionInput = document.getElementById('partner-description');
+        const partnerLinkInputs = {};
+        ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', 'website'].forEach(platform => {
+            partnerLinkInputs[platform] = document.getElementById(`partner-link-${platform}`);
+        });
+
+        // Update profile picture preview as URL changes
+        profilePicUrlInput.addEventListener('input', () => {
+          profilePicDisplay.src = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`;
+        });
+        profilePicDisplay.onerror = () => { // Fallback for broken image URLs
+            profilePicDisplay.src = `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`;
+        };
+
+        // Dark mode toggle listener
+        darkModeToggle.addEventListener('change', async () => {
+            const newTheme = darkModeToggle.checked ? 'dark' : 'light';
+            try {
+                const updatedData = await updateProfileData({ theme: newTheme });
+                if (updatedData) {
+                    userData = updatedData;
+                    updateBodyBackground(); // Re-apply theme and background
+                    showMessageModal(`Theme changed to ${newTheme} mode!`);
+                }
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+                darkModeToggle.checked = (userData.theme === 'dark'); // Revert toggle if save fails
+            }
+        });
+
+
+        settingsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newProfilePicUrl = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(userData.username || currentUser.email || 'U').charAt(0).toUpperCase()}`;
             const newBio = profileBioInput.value;
 
             let newBackgroundUrl;
@@ -1355,7 +1671,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
 
             if (isPartnerOrAdmin) {
-                ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', "website"].forEach(platform => {
+                ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', 'website'].forEach(platform => {
                     if (partnerLinkInputs[platform]) {
                         updatedPartnerInfo.links[platform] = partnerLinkInputs[platform].value;
                     }
@@ -1368,7 +1684,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             try {
                 const updatedData = await updateProfileData({
-                    username: newUsername,
                     profilePicUrl: newProfilePicUrl,
                     backgroundUrl: newBackgroundUrl,
                     bio: newBio,
@@ -1377,8 +1692,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (updatedData) {
                     userData = updatedData; // Update global userData
                     updateBodyBackground(); // Apply new background immediately
-                    showMessageModal('Profile updated successfully!');
-                    renderNavbar(); // Re-render navbar to update name/pic
+                    showMessageModal('Settings updated successfully!');
+                    renderNavbar(); // Re-render navbar to update pic
                 }
             } catch (error) {
                 showMessageModal(error.message, 'error');
@@ -1392,24 +1707,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderAboutPage() {
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-600 mb-6">About ${CONFIG.websiteTitle}</h2>
-                    <p class="text-lg text-gray-700 mb-4">
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-4">
                         Welcome to a secure and user-friendly platform designed to streamline your online experience. We offer robust user authentication, allowing you to sign up and sign in with ease, keeping your data safe.
                     </p>
-                    <p class="text-lg text-gray-700 mb-4">
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-4">
                         Our platform is built with a focus on personalization. You can update your profile information, choose a custom background theme, and manage your personal details within a dedicated settings section.
                     </p>
-                    <p class="text-lg text-gray-700 mb-4">
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-4">
                         For administrators, we provide a powerful admin panel. This feature allows designated users to oversee all registered accounts, view user details, and manage roles (assigning 'admin' or 'member' status) to ensure smooth operation and access control. Admins can also create and manage forum posts.
                     </p>
-                    <p class="text-lg text-gray-700 mb-4">
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-4">
                         Members can engage with forum posts by adding reactions and comments, fostering a dynamic community environment.
                     </p>
-                    <p class="text-lg text-gray-700 mb-4">
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-4">
                         We prioritize responsive design, ensuring that our website looks great and functions perfectly on any device, from desktops to mobile phones. Our clean, modern interface is powered by efficient technologies to provide a seamless browsing experience.
                     </p>
-                    <p class="text-lg text-gray-700">
+                    <p class="text-lg text-gray-700 dark:text-gray-300">
                         Thank you for choosing our platform. We're committed to providing a reliable and enjoyable service.
                     </p>
                 </div>
@@ -1424,9 +1739,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
-                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                         <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                        <p class="text-lg text-gray-700">You do not have administrative privileges to access this page.</p>
+                        <p class="text-lg text-gray-700 dark:text-gray-300">You do not have administrative privileges to access this page.</p>
                     </div>
                 </div>
             `;
@@ -1443,41 +1758,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Admin Panel</h2>
-                    <p class="text-lg text-gray-700 text-center mb-6">Manage user roles and accounts, and create forum posts.</p>
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Admin Panel</h2>
+                    <p class="text-lg text-gray-700 dark:text-gray-300 text-center mb-6">Manage user roles and accounts, and create forum posts.</p>
                     <div class="mb-6 text-center space-x-4">
                         <button id="view-forum-admin-btn" class="py-2 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Manage Posts (Forum)
                         </button>
+                        <button id="view-partner-applications-btn" class="py-2 px-6 rounded-full bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            View Partner Applications
+                        </button>
                     </div>
 
-                    <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Manage Users</h3>
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 text-center">Manage Users</h3>
                     ${usersList.length === 0 ? `
-                        <p class="text-center text-gray-600">No users found.</p>
+                        <p class="text-center text-gray-600 dark:text-gray-400">No users found.</p>
                     ` : `
-                        <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-100">
+                        <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead class="bg-gray-100 dark:bg-gray-700">
                                     <tr>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                             Icon
                                         </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                             Username
                                         </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                             Email
                                         </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                             Role
                                         </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                             Actions
                                         </th>
                                     </tr>
                                 </thead>
-                                <tbody class="bg-white divide-y divide-gray-200" id="users-table-body">
+                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700" id="users-table-body">
                                     <!-- Users will be populated here by JS -->
                                 </tbody>
                             </table>
@@ -1499,19 +1817,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const showFounderOption = canAssignFounder || user.role === 'founder'; // Show founder option if current user is founder or if target user is already a founder
 
                 return `
-                    <tr data-user-id="${user.id}" class="hover:bg-gray-50">
+                    <tr data-user-id="${user.id}" class="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <img src="${profileIconSrc}" alt="User Icon" class="w-10 h-10 rounded-full object-cover border-2 border-gray-300" onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}'">
+                            <img src="${profileIconSrc}" alt="User Icon" class="w-10 h-10 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600" onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}'">
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                             ${user.username}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                             ${user.email}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <select
-                                class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                class="block w-full py-2 px-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                                 ${isDisabled}
                                 data-role-select-id="${user.id}"
                             >
@@ -1523,7 +1841,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button
-                                class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-indigo-500"
+                                class="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-indigo-500"
                                 data-take-action-user-id="${user.id}" data-username="${user.username}"
                             >
                                 Take Action
@@ -1566,6 +1884,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         // Removed create-post-btn from here, as it's now on the forum page
         document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins/Founders can manage from forum view
+        document.getElementById('view-partner-applications-btn').addEventListener('click', () => navigateTo('partner-applications'));
     }
 
     /**
@@ -1587,16 +1906,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isAdminOrFounder = userData.role === 'admin' || userData.role === 'founder';
 
         modal.innerHTML = `
-            <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full relative">
-                <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold" id="close-take-action-modal">&times;</button>
-                <h3 class="text-2xl font-extrabold text-gray-800 mb-6">User Actions</h3>
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl text-center max-w-md w-full relative">
+                <button class="absolute top-4 right-4 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100 text-2xl font-bold" id="close-take-action-modal">&times;</button>
+                <h3 class="text-2xl font-extrabold text-gray-800 dark:text-gray-100 mb-6">User Actions</h3>
 
                 <div class="flex flex-col items-center mb-6">
                     <img src="${profileIconSrc}" alt="User Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-3">
-                    <p class="text-xl font-semibold text-gray-900">${user.username}</p>
-                    <p class="text-md text-gray-600">${user.email}</p>
-                    <p class="text-md font-medium text-gray-700 mt-2">Role: <span class="font-bold ${user.isBanned ? 'text-red-600' : 'text-green-600'}">${user.role.charAt(0).toUpperCase() + user.role.slice(1)}</span></p>
-                    <p class="text-md font-medium text-gray-700">Status: <span class="font-bold ${user.isBanned ? 'text-red-600' : 'text-green-600'}">${user.isBanned ? 'Banned' : 'Active'}</span></p>
+                    <p class="text-xl font-semibold text-gray-900 dark:text-gray-100">${user.username}</p>
+                    <p class="text-md text-gray-600 dark:text-gray-300">${user.email}</p>
+                    <p class="text-md font-medium text-gray-700 dark:text-gray-200 mt-2">Role: <span class="font-bold ${user.isBanned ? 'text-red-600' : 'text-green-600'}">${user.role.charAt(0).toUpperCase() + user.role.slice(1)}</span></p>
+                    <p class="text-md font-medium text-gray-700 dark:text-gray-200">Status: <span class="font-bold ${user.isBanned ? 'text-red-600' : 'text-green-600'}">${user.isBanned ? 'Banned' : 'Active'}</span></p>
                 </div>
 
                 <div class="space-y-4">
@@ -1723,9 +2042,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
-                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                         <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                        <p class="text-lg text-gray-700">You do not have administrative privileges to edit posts.</p>
+                        <p class="text-lg text-gray-700 dark:text-gray-300">You do not have administrative privileges to edit posts.</p>
                     </div>
                 </div>
             `;
@@ -1754,16 +2073,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Edit Post</h2>
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Edit Post</h2>
                     <form id="edit-post-form" class="space-y-6">
                         <div>
-                            <label for="post-title" class="block text-gray-700 text-sm font-semibold mb-2">Post Title</label>
-                            <input type="text" id="post-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="${postData.title}" required>
+                            <label for="post-title" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Post Title</label>
+                            <input type="text" id="post-title" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" value="${postData.title}" required>
                         </div>
                         <div>
-                            <label for="post-content" class="block text-gray-700 text-sm font-semibold mb-2">Post Content</label>
-                            <textarea id="post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>${postData.content}</textarea>
+                            <label for="post-content" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Post Content</label>
+                            <textarea id="post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>${postData.content}</textarea>
                         </div>
                         <button type="submit" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Save Changes
@@ -1799,9 +2118,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentUser) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
-                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                         <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                        <p class="text-lg text-gray-700">Please sign in to view the forum posts.</p>
+                        <p class="text-lg text-gray-700 dark:text-gray-300">Please sign in to view the forum posts.</p>
                     </div>
                 </div>
             `;
@@ -1818,8 +2137,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Forum & Announcements</h2>
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Forum & Announcements</h2>
                     ${userData.role === 'admin' || userData.role === 'founder' ? `
                         <div class="mb-6 text-center">
                             <button id="create-post-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -1829,23 +2148,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ` : ''}
 
                     ${posts.length === 0 ? `
-                        <p class="text-center text-gray-600">No posts yet. Check back later!</p>
+                        <p class="text-center text-gray-600 dark:text-gray-400">No posts yet. Check back later!</p>
                     ` : `
                         <div id="posts-list" class="space-y-6">
                             ${posts.map(post => `
-                                <div class="bg-gray-50 p-6 rounded-lg shadow-md border border-gray-200">
-                                    <h3 class="text-2xl font-bold text-gray-800 mb-2">${post.title}</h3>
-                                    <p class="text-gray-700 whitespace-pre-wrap">${post.content}</p>
-                                    <p class="text-sm text-gray-500 mt-4">
+                                <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-600">
+                                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">${post.title}</h3>
+                                    <p class="text-gray-700 dark:text-gray-200 whitespace-pre-wrap">${post.content}</p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-4">
                                         Posted by <span class="font-semibold">${post.authorUsername}</span> on ${post.timestamp}
                                     </p>
 
-                                    <div class="flex items-center space-x-4 mt-4 border-t pt-4 border-gray-300">
+                                    <div class="flex items-center space-x-4 mt-4 border-t pt-4 border-gray-300 dark:border-gray-600">
                                         <!-- Reactions Section -->
                                         <div class="flex items-center space-x-2">
                                             ${['😀', '❤️', '😂', '🔥'].map(emoji => `
-                                                <button class="text-xl p-1 rounded-full hover:bg-gray-200 transition duration-200" data-post-id="${post.id}" data-emoji="${emoji}">
-                                                    ${emoji} <span class="text-sm text-gray-600">${post.reactions[emoji] || 0}</span>
+                                                <button class="text-xl p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition duration-200 text-gray-800 dark:text-gray-100" data-post-id="${post.id}" data-emoji="${emoji}">
+                                                    ${emoji} <span class="text-sm text-gray-600 dark:text-gray-300">${post.reactions[emoji] || 0}</span>
                                                 </button>
                                             `).join('')}
                                         </div>
@@ -1860,22 +2179,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     </div>
 
                                     <!-- Comments Section -->
-                                    <div class="mt-6 border-t pt-4 border-gray-300">
-                                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Comments (${post.comments.length})</h4>
+                                    <div class="mt-6 border-t pt-4 border-gray-300 dark:border-gray-600">
+                                        <h4 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-3">Comments (${post.comments.length})</h4>
                                         <div class="space-y-3 mb-4">
                                             ${post.comments.length === 0 ? `
-                                                <p class="text-sm text-gray-500">No comments yet. Be the first to comment!</p>
+                                                <p class="text-sm text-gray-500 dark:text-gray-400">No comments yet. Be the first to comment!</p>
                                             ` : `
                                                 ${post.comments.map(comment => `
-                                                    <div class="bg-white p-3 rounded-lg border border-gray-200">
-                                                        <p class="text-sm text-gray-700">${comment.text}</p>
-                                                        <p class="text-xs text-gray-500 mt-1">by <span class="font-medium">${comment.authorUsername}</span> on ${comment.timestamp ? new Date(comment.timestamp).toLocaleString() : 'N/A'}</p>
+                                                    <div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+                                                        <p class="text-sm text-gray-700 dark:text-gray-200">${comment.text}</p>
+                                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">by <span class="font-medium">${comment.authorUsername}</span> on ${comment.timestamp ? new Date(comment.timestamp).toLocaleString() : 'N/A'}</p>
                                                     </div>
                                                 `).join('')}
                                             `}
                                         </div>
                                         <form class="comment-form" data-post-id="${post.id}">
-                                            <textarea class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" rows="2" placeholder="Add a comment..." required></textarea>
+                                            <textarea class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-gray-50 dark:bg-gray-700 dark:text-gray-100" rows="2" placeholder="Add a comment..." required></textarea>
                                             <button type="submit" class="mt-2 py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-200 text-sm">
                                                 Post Comment
                                             </button>
@@ -1953,16 +2272,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         modal.id = 'create-post-modal';
         modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
         modal.innerHTML = `
-            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 border border-gray-200">
-                <h2 class="text-2xl font-extrabold text-center text-gray-800 mb-6">Create New Post</h2>
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700">
+                <h2 class="text-2xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-6">Create New Post</h2>
                 <form id="create-post-modal-form" class="space-y-4">
                     <div>
-                        <label for="modal-post-title" class="block text-gray-700 text-sm font-semibold mb-2">Title</label>
-                        <input type="text" id="modal-post-title" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter post title" required>
+                        <label for="modal-post-title" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Title</label>
+                        <input type="text" id="modal-post-title" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Enter post title" required>
                     </div>
                     <div>
-                        <label for="modal-post-content" class="block text-gray-700 text-sm font-semibold mb-2">Content</label>
-                        <textarea id="modal-post-content" rows="7" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Write your post content here..." required></textarea>
+                        <label for="modal-post-content" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Content</label>
+                        <textarea id="modal-post-content" rows="7" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Write your post content here..." required></textarea>
                     </div>
                     <div class="flex justify-end space-x-4 mt-6">
                         <button type="button" id="cancel-create-post-modal" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -2020,11 +2339,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Meet the Team</h2>
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Meet the Team</h2>
 
                     ${teamMembers.length === 0 ? `
-                        <p class="text-center text-gray-600">No team members listed yet.</p>
+                        <p class="text-center text-gray-600 dark:text-gray-400">No team members listed yet.</p>
                     ` : `
                         <div class="space-y-6">
                             ${teamMembers.map(member => {
@@ -2042,18 +2361,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 };
 
                                 return `
-                                    <div class="flex flex-col sm:flex-row items-center sm:items-start p-6 bg-gray-50 rounded-lg shadow-md border border-gray-200">
+                                    <div class="flex flex-col sm:flex-row items-center sm:items-start p-6 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-md border border-gray-200 dark:border-gray-600">
                                         <img src="${profilePicSrc}" alt="${member.username}'s Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-4 sm:mb-0 sm:mr-6"
                                              onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(member.username || member.email || 'U').charAt(0).toUpperCase()}'">
                                         <div class="flex-grow text-center sm:text-left">
-                                            <h3 class="text-xl font-bold text-gray-900">${member.username}</h3>
-                                            <p class="text-md text-gray-600 mb-2">${member.role.charAt(0).toUpperCase() + member.role.slice(1)}</p>
-                                            <p class="text-gray-700 text-sm whitespace-pre-wrap">${member.bio || 'No bio provided yet.'}</p>
+                                            <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">${member.username}</h3>
+                                            <p class="text-md text-gray-600 dark:text-gray-300 mb-2">${member.role.charAt(0).toUpperCase() + member.role.slice(1)}</p>
+                                            <p class="text-gray-700 dark:text-gray-200 text-sm whitespace-pre-wrap">${member.bio || 'No bio provided yet.'}</p>
 
                                             ${member.role === 'partner' || member.role === 'admin' || member.role === 'founder' ? `
                                                 <div class="mt-4 flex flex-wrap justify-center sm:justify-start gap-3">
                                                     ${Object.entries(member.partnerInfo?.links || {}).map(([platform, link]) => link ? `
-                                                        <a href="${link}" target="_blank" rel="noopener noreferrer" class="text-gray-700 hover:text-blue-600 transition duration-200 flex items-center space-x-2">
+                                                        <a href="${link}" target="_blank" rel="noopener noreferrer" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 transition duration-200 flex items-center space-x-2">
                                                             <i class="${linkIcons[platform]} text-lg"></i>
                                                             <span class="text-sm capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()}</span>
                                                         </a>
@@ -2081,7 +2400,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const editMyCardBtn = document.getElementById('edit-my-card-btn');
         if (editMyCardBtn) {
             editMyCardBtn.addEventListener('click', () => {
-                navigateTo('profile'); // Redirect to profile page to edit partner info
+                navigateTo('settings'); // Redirect to settings page to edit partner info
             });
         }
     }
@@ -2093,9 +2412,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentUser) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
-                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                         <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                        <p class="text-lg text-gray-700">Please sign in to view our partners.</p>
+                        <p class="text-lg text-gray-700 dark:text-gray-300">Please sign in to view our partners.</p>
                     </div>
                 </div>
             `;
@@ -2118,11 +2437,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Our Valued Partners</h2>
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Our Valued Partners</h2>
 
                     ${partners.length === 0 ? `
-                        <p class="text-center text-gray-600">No partners listed yet. Check back soon!</p>
+                        <p class="text-center text-gray-600 dark:text-gray-400">No partners listed yet. Check back soon!</p>
                     ` : `
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             ${partners.map(partner => {
@@ -2134,21 +2453,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     roblox: 'fab fa-roblox',
                                     fivem: 'fas fa-gamepad',
                                     codingCommunity: 'fas fa-code',
-                                    minecraft: 'fas fa-cube', // Generic cube for Minecraft
+                                    minecraft: 'fas fa-cube',
                                     website: 'fas fa-globe',
                                 };
 
                                 return `
-                                    <div class="bg-gray-100 p-6 rounded-lg shadow-md border border-gray-200 flex flex-col items-center text-center">
+                                    <div class="bg-gray-100 dark:bg-gray-700 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-600 flex flex-col items-center text-center">
                                         <img src="${profilePicSrc}" alt="${partner.username}'s Profile" class="w-28 h-28 rounded-full object-cover border-4 border-indigo-500 shadow-lg mb-4"
                                              onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(partner.username || partner.email || 'U').charAt(0).toUpperCase()}'">
-                                        <h3 class="text-2xl font-bold text-gray-900 mb-2">${partner.username}</h3>
+                                        <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">${partner.username}</h3>
                                         <p class="text-md text-indigo-600 font-semibold mb-3">Official Partner</p>
-                                        <p class="text-gray-700 text-sm mb-4 whitespace-pre-wrap">${partner.partnerInfo?.description || 'No description provided yet.'}</p>
+                                        <p class="text-gray-700 dark:text-gray-200 text-sm mb-4 whitespace-pre-wrap">${partner.partnerInfo?.description || 'No description provided yet.'}</p>
 
                                         <div class="flex flex-wrap justify-center gap-3 mb-4">
                                             ${Object.entries(partner.partnerInfo?.links || {}).map(([platform, link]) => link ? `
-                                                <a href="${link}" target="_blank" rel="noopener noreferrer" class="text-gray-700 hover:text-blue-600 transition duration-200 flex items-center space-x-2">
+                                                <a href="${link}" target="_blank" rel="noopener noreferrer" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 transition duration-200 flex items-center space-x-2">
                                                     <i class="${linkIcons[platform]} text-lg"></i>
                                                     <span class="text-sm capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()}</span>
                                                 </a>
@@ -2199,21 +2518,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         const currentPartnerInfo = partnerUser.partnerInfo || { description: '', links: {} };
 
         modal.innerHTML = `
-            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 border border-gray-200 relative">
-                <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold" id="close-edit-partner-card-modal">&times;</button>
-                <h2 class="text-2xl font-extrabold text-center text-gray-800 mb-6">Edit Partner Card for ${partnerUser.username}</h2>
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700 relative">
+                <button class="absolute top-4 right-4 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100 text-2xl font-bold" id="close-edit-partner-card-modal">&times;</button>
+                <h2 class="text-2xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-6">Edit Partner Card for ${partnerUser.username}</h2>
                 <form id="edit-partner-card-form" class="space-y-4">
                     <div>
-                        <label for="modal-partner-description" class="block text-gray-700 text-sm font-semibold mb-2">Partner Description</label>
-                        <textarea id="modal-partner-description" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="A short description for their partner card...">${currentPartnerInfo.description || ''}</textarea>
+                        <label for="modal-partner-description" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Partner Description</label>
+                        <textarea id="modal-partner-description" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="A short description for their partner card...">${currentPartnerInfo.description || ''}</textarea>
                     </div>
 
                     <div class="space-y-3">
-                        <h3 class="text-lg font-semibold text-gray-800">Partner Links</h3>
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Partner Links</h3>
                         ${['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', 'website'].map(platform => `
                             <div>
-                                <label for="modal-partner-link-${platform}" class="block text-gray-700 text-sm font-semibold mb-2 capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()} Link</label>
-                                <input type="url" id="modal-partner-link-${platform}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter URL for ${platform} profile/community" value="${currentPartnerInfo.links[platform] || ''}">
+                                <label for="modal-partner-link-${platform}" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2 capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()} Link</label>
+                                <input type="url" id="modal-partner-link-${platform}" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Enter URL for ${platform} profile/community" value="${currentPartnerInfo.links[platform] || ''}">
                             </div>
                         `).join('')}
                     </div>
@@ -2295,9 +2614,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
-                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                         <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                        <p class="text-lg text-gray-700">You do not have administrative privileges to send emails.</p>
+                        <p class="text-lg text-gray-700 dark:text-gray-300">You do not have administrative privileges to send emails.</p>
                     </div>
                 </div>
             `;
@@ -2327,25 +2646,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Send Email to User</h2>
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Send Email to User</h2>
                     <form id="send-email-form" class="space-y-6">
                         <div>
-                            <label for="recipient-email" class="block text-gray-700 text-sm font-semibold mb-2">Recipient Email</label>
-                            <input type="email" id="recipient-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="${recipientEmail}" placeholder="Enter recipient email" required>
+                            <label for="recipient-email" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Recipient Email</label>
+                            <input type="email" id="recipient-email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" value="${recipientEmail}" placeholder="Enter recipient email" required>
                         </div>
                         <div>
-                            <label for="email-subject" class="block text-gray-700 text-sm font-semibold mb-2">Subject</label>
-                            <input type="text" id="email-subject" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter email subject" required>
+                            <label for="email-subject" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Subject</label>
+                            <input type="text" id="email-subject" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Enter email subject" required>
                         </div>
                         <div>
-                            <label for="email-message" class="block text-gray-700 text-sm font-semibold mb-2">Message</label>
-                            <textarea id="email-message" rows="8" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Write your email message here..." required></textarea>
+                            <label for="email-message" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Message</label>
+                            <textarea id="email-message" rows="8" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Write your email message here..." required></textarea>
                         </div>
                         <div>
-                            <label for="image-attachment-url" class="block text-gray-700 text-sm font-semibold mb-2">Attach Image (URL)</label>
-                            <input type="url" id="image-attachment-url" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Optional: Enter direct image URL (e.g., https://example.com/image.jpg)">
-                            <p class="text-xs text-gray-500 mt-1">Only direct image URLs are supported for attachments.</p>
+                            <label for="image-attachment-url" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Attach Image (URL)</label>
+                            <input type="url" id="image-attachment-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Optional: Enter direct image URL (e.g., https://example.com/image.jpg)">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Only direct image URLs are supported for attachments.</p>
                         </div>
                         <div class="flex justify-end space-x-4 mt-6">
                             <button type="button" id="cancel-send-email-btn" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -2393,9 +2712,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentUser) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
-                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                         <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                        <p class="text-lg text-gray-700">Please sign in to view the Partner Terms of Service.</p>
+                        <p class="text-lg text-gray-700 dark:text-gray-300">Please sign in to view the Partner Terms of Service.</p>
                     </div>
                 </div>
             `;
@@ -2414,9 +2733,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
-                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Partner Terms of Service</h2>
-                    <div id="tos-content" class="prose max-w-none text-gray-700 leading-relaxed mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Partner Terms of Service</h2>
+                    <div id="tos-content" class="prose max-w-none text-gray-700 dark:text-gray-200 leading-relaxed mb-6 p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
                         <p class="whitespace-pre-wrap">${tosContent}</p>
                     </div>
                     ${isAdminOrFounder ? `
@@ -2451,13 +2770,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
 
         modal.innerHTML = `
-            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 border border-gray-200 relative">
-                <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold" id="close-edit-tos-modal">&times;</button>
-                <h2 class="text-2xl font-extrabold text-center text-gray-800 mb-6">Edit Partner Terms of Service</h2>
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700 relative">
+                <button class="absolute top-4 right-4 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100 text-2xl font-bold" id="close-edit-tos-modal">&times;</button>
+                <h2 class="text-2xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-6">Edit Partner Terms of Service</h2>
                 <form id="edit-tos-form" class="space-y-4">
                     <div>
-                        <label for="modal-tos-content" class="block text-gray-700 text-sm font-semibold mb-2">Terms of Service Content</label>
-                        <textarea id="modal-tos-content" rows="15" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>${currentContent}</textarea>
+                        <label for="modal-tos-content" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Terms of Service Content</label>
+                        <textarea id="modal-tos-content" rows="15" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>${currentContent}</textarea>
                     </div>
                     <div class="flex justify-end space-x-4 mt-6">
                         <button type="button" id="cancel-edit-tos-modal" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -2498,6 +2817,260 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    /**
+     * Renders the page for members to submit a partner application.
+     */
+    async function renderApplyPartnerPage() {
+        if (!currentUser) {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700 dark:text-gray-300">Please sign in to apply for partnership.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // Prevent partners, admins, founders from applying
+        if (userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder') {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                        <h2 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 mb-4">Partnership Status</h2>
+                        <p class="text-lg text-gray-700 dark:text-gray-300">You are already a ${userData.role}. You cannot submit a new partner application.</p>
+                        <button id="go-to-partners-btn" class="mt-6 py-2 px-6 rounded-full bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            View Partners Page
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('go-to-partners-btn').addEventListener('click', () => navigateTo('partners'));
+            return;
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Apply for Partnership</h2>
+                    <p class="text-lg text-gray-700 dark:text-gray-300 text-center mb-6">Fill out the form below to submit your application to become an official partner.</p>
+                    <form id="partner-application-form" class="space-y-6">
+                        <div>
+                            <label for="why-partner" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Why do you want to be a partner? <span class="text-red-500">*</span></label>
+                            <textarea id="why-partner" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Tell us about your motivation..." required></textarea>
+                        </div>
+                        <div>
+                            <label for="content-type" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">What kind of content do you create/share? <span class="text-red-500">*</span></label>
+                            <textarea id="content-type" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., gaming videos, coding tutorials, art, community management" required></textarea>
+                        </div>
+                        <div>
+                            <label for="social-links" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Links to your work/social media (optional)</label>
+                            <textarea id="social-links" rows="3" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Provide relevant links, one per line (e.g., YouTube, Twitch, GitHub, Discord server invite)"></textarea>
+                        </div>
+                        <div class="flex justify-end space-x-4 mt-6">
+                            <button type="button" id="cancel-application-btn" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                                Cancel
+                            </button>
+                            <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                                Submit Application
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('cancel-application-btn').addEventListener('click', () => navigateTo('home'));
+
+        document.getElementById('partner-application-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const whyPartner = document.getElementById('why-partner').value;
+            const contentType = document.getElementById('content-type').value;
+            const socialLinks = document.getElementById('social-links').value;
+
+            const applicationData = {
+                whyPartner: whyPartner,
+                contentType: contentType,
+                socialLinks: socialLinks.split('\n').map(link => link.trim()).filter(link => link !== '')
+            };
+
+            try {
+                await submitPartnerApplicationFirestore(applicationData);
+                navigateTo('partners'); // Redirect to partners page after submission
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+    }
+
+    /**
+     * Renders the admin page to view and manage partner applications.
+     */
+    async function renderPartnerApplicationsAdminPage() {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700 dark:text-gray-300">You do not have administrative privileges to view partner applications.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let applications = [];
+        try {
+            applications = await fetchAllPartnerApplicationsFirestore();
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+            applications = [];
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Partner Applications</h2>
+
+                    ${applications.length === 0 ? `
+                        <p class="text-center text-gray-600 dark:text-gray-400">No partner applications found.</p>
+                    ` : `
+                        <div class="space-y-6">
+                            ${applications.map(app => `
+                                <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-600">
+                                    <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">Applicant: ${app.applicantUsername} (${app.applicantEmail})</h3>
+                                    <p class="text-md text-gray-600 dark:text-gray-300">Status: <span class="font-semibold capitalize ${app.status === 'pending' ? 'text-yellow-600' : (app.status === 'approved' ? 'text-green-600' : 'text-red-600')}">${app.status}</span></p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Submitted on: ${app.timestamp ? (typeof app.timestamp === 'string' ? new Date(app.timestamp).toLocaleString() : app.timestamp.toDate().toLocaleString()) : 'N/A'}</p>
+
+                                    <div class="mt-4 text-right">
+                                        <button class="py-2 px-4 rounded-full bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg"
+                                                data-application-id="${app.id}" data-action="view-details">
+                                            View Details
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+
+        contentArea.querySelectorAll('[data-action="view-details"]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const applicationId = e.target.dataset.applicationId;
+                const applicationToView = applications.find(app => app.id === applicationId);
+                if (applicationToView) {
+                    showReviewApplicationModal(applicationToView);
+                }
+            });
+        });
+    }
+
+    /**
+     * Shows a modal for reviewing a partner application.
+     * @param {object} application - The application object to review.
+     */
+    function showReviewApplicationModal(application) {
+        if (currentModal) {
+            currentModal.remove();
+        }
+
+        const modal = document.createElement('div');
+        modal.id = 'review-application-modal';
+        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+
+        modal.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700 relative">
+                <button class="absolute top-4 right-4 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100 text-2xl font-bold" id="close-review-application-modal">&times;</button>
+                <h2 class="text-2xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-6">Review Partner Application</h2>
+
+                <div class="space-y-4 text-gray-800 dark:text-gray-200 text-left mb-6">
+                    <p><span class="font-semibold">Applicant:</span> ${application.applicantUsername} (${application.applicantEmail})</p>
+                    <p><span class="font-semibold">Status:</span> <span class="capitalize ${application.status === 'pending' ? 'text-yellow-600' : (application.status === 'approved' ? 'text-green-600' : 'text-red-600')}">${application.status}</span></p>
+                    <p><span class="font-semibold">Submitted:</span> ${application.timestamp ? (typeof application.timestamp === 'string' ? new Date(application.timestamp).toLocaleString() : application.timestamp.toDate().toLocaleString()) : 'N/A'}</p>
+                    <hr class="border-gray-200 dark:border-gray-600">
+                    <p><span class="font-semibold">Why they want to be a partner:</span></p>
+                    <p class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md whitespace-pre-wrap">${application.applicationQuestions?.whyPartner || 'N/A'}</p>
+                    <p><span class="font-semibold">Content they create/share:</span></p>
+                    <p class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md whitespace-pre-wrap">${application.applicationQuestions?.contentType || 'N/A'}</p>
+                    <p><span class="font-semibold">Social Links:</span></p>
+                    <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md">
+                        ${(application.applicationQuestions?.socialLinks && application.applicationQuestions.socialLinks.length > 0) ?
+                            application.applicationQuestions.socialLinks.map(link => `<a href="${link}" target="_blank" rel="noopener noreferrer" class="block text-blue-600 hover:underline">${link}</a>`).join('')
+                            : 'No links provided.'}
+                    </div>
+                    ${application.reviewNotes ? `
+                        <p><span class="font-semibold">Review Notes:</span></p>
+                        <p class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md whitespace-pre-wrap">${application.reviewNotes}</p>
+                    ` : ''}
+                    ${application.reviewedBy ? `
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Reviewed by: ${application.reviewedByUsername || application.reviewedBy} on ${application.reviewTimestamp ? (typeof application.reviewTimestamp === 'string' ? new Date(application.reviewTimestamp).toLocaleString() : application.reviewTimestamp.toDate().toLocaleString()) : 'N/A'}</p>
+                    ` : ''}
+                </div>
+
+                ${application.status === 'pending' ? `
+                    <div class="mt-6">
+                        <label for="review-notes" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Add Review Notes (optional)</label>
+                        <textarea id="review-notes" rows="3" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Add notes for this application..."></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-4 mt-6">
+                        <button type="button" id="reject-application-btn" class="py-2 px-5 rounded-full bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Reject
+                        </button>
+                        <button type="button" id="approve-application-btn" class="py-2 px-5 rounded-full bg-green-600 text-white font-bold hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Approve
+                        </button>
+                    </div>
+                ` : `
+                    <div class="text-center mt-6">
+                        <p class="text-lg font-semibold text-gray-700 dark:text-gray-200">This application has already been ${application.status}.</p>
+                    </div>
+                `}
+            </div>
+        `;
+        document.body.appendChild(modal);
+        currentModal = modal;
+
+        document.getElementById('close-review-application-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+            renderPartnerApplicationsAdminPage(); // Re-render the applications list
+        });
+
+        if (application.status === 'pending') {
+            const reviewNotesInput = document.getElementById('review-notes');
+            document.getElementById('approve-application-btn').addEventListener('click', async () => {
+                const notes = reviewNotesInput.value;
+                showMessageModal(`Are you sure you want to APPROVE this application and make ${application.applicantUsername} a partner?`, 'confirm', async () => {
+                    try {
+                        await updatePartnerApplicationStatusFirestore(application.id, 'approved', notes, application.applicantId);
+                        currentModal.remove();
+                        currentModal = null;
+                        renderPartnerApplicationsAdminPage();
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
+                });
+            });
+
+            document.getElementById('reject-application-btn').addEventListener('click', async () => {
+                const notes = reviewNotesInput.value;
+                showMessageModal(`Are you sure you want to REJECT this application?`, 'confirm', async () => {
+                    try {
+                        await updatePartnerApplicationStatusFirestore(application.id, 'rejected', notes, application.applicantId);
+                        currentModal.remove();
+                        currentModal = null;
+                        renderPartnerApplicationsAdminPage();
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
+                });
+            });
+        }
+    }
+
 
     // --- Navigation and Initialization ---
 
@@ -2519,7 +3092,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team', 'send-email', 'partners', 'partner-tos').
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'settings', 'about', 'admin', 'edit-post', 'forum', 'logout', 'team', 'send-email', 'partners', 'partner-tos', 'apply-partner', 'partner-applications').
      * @param {string} [id=null] - Optional: postId for edit-post route, userId for send-email route, or any other ID.
      */
     async function navigateTo(page, id = null) {
@@ -2563,13 +3136,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'profile':
                 renderProfilePage();
                 break;
+            case 'settings': // New settings page
+                renderSettingsPage();
+                break;
             case 'about':
                 renderAboutPage();
                 break;
             case 'admin':
                 renderAdminPanelPage();
                 break;
-            // Removed 'create-post' as a direct navigation target, now part of forum page actions
             case 'edit-post': // For editing existing posts
                 if (id) {
                     renderEditPostPage(id);
@@ -2592,6 +3167,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
             case 'partner-tos': // New Partner TOS page
                 renderPartnerTOSPage();
+                break;
+            case 'apply-partner': // New Apply for Partner page
+                renderApplyPartnerPage();
+                break;
+            case 'partner-applications': // New Admin: View Partner Applications page
+                renderPartnerApplicationsAdminPage();
                 break;
             default:
                 renderHomePage();
@@ -2653,7 +3234,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         partnerInfo: { // Initialize empty partner info for new users
                             description: '',
                             links: {}
-                        }
+                        },
+                        theme: 'light' // Default theme for new users
                     });
                     userData = {
                         email: user.email,
@@ -2665,10 +3247,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         partnerInfo: {
                             description: '',
                             links: {}
-                        }
+                        },
+                        theme: 'light'
                     };
                 }
-                updateBodyBackground(); // Apply user's saved background
+                updateBodyBackground(); // Apply user's saved background and theme
                 renderNavbar(); // Update navbar with user info
                 // Determine which page to render based on current state or previous navigation
                 let pageToRender = contentArea.dataset.currentPage || 'home';
@@ -2703,7 +3286,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             currentUser = null;
             userData = null;
-            updateBodyBackground(); // Reset to default background
+            // Ensure theme is reset if no user is logged in
+            document.documentElement.classList.remove('dark'); // Remove dark class from html
+            document.documentElement.classList.add('light-theme'); // Ensure light theme is active
+            updateBodyBackground(); // Reset to default background (light theme default)
             renderNavbar(); // Update navbar to logged out state
             // Only redirect if current page is not home or about, or if it was a protected page
             if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about' && contentArea.dataset.currentPage !== 'team' && contentArea.dataset.currentPage !== 'partners' && contentArea.dataset.currentPage !== 'partner-tos') {
