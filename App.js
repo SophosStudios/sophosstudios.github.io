@@ -218,7 +218,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     role: 'member', // Default role for new users
                     profilePicUrl: profilePicToUse,
                     backgroundUrl: 'bg-gradient-to-r from-blue-400 to-purple-600', // Default background
-                    bio: '' // Initialize empty bio for new users
+                    bio: '', // Initialize empty bio for new users
+                    partnerInfo: { // Initialize empty partner info
+                        description: '',
+                        links: {}
+                    }
                 });
                 const newDocSnap = await getDoc(userDocRef);
                 fetchedUserData = newDocSnap.data();
@@ -304,7 +308,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Updates the current user's profile data in Firestore.
-     * @param {object} newUserData - Data to update (username, profilePicUrl, backgroundUrl, bio).
+     * @param {object} newUserData - Data to update (username, profilePicUrl, backgroundUrl, bio, partnerInfo).
      * @returns {Promise<object>} - Updated user data.
      */
     async function updateProfileData(newUserData) {
@@ -370,7 +374,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     /**
      * Updates a user's role by an admin/founder in Firestore.
      * @param {string} userId - ID of the user to update.
-     * @param {string} newRole - The new role ('member', 'admin', or 'founder').
+     * @param {string} newRole - The new role ('member', 'admin', 'founder', 'partner').
      * @returns {Promise<boolean>} - True on success.
      */
     async function updateUserRoleFirestore(userId, newRole) {
@@ -723,6 +727,55 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Fetches the Partner TOS content from Firestore.
+     * @returns {Promise<string>} - The TOS content or a default message.
+     */
+    async function fetchPartnerTOSFirestore() {
+        showLoadingSpinner();
+        try {
+            const tosDocRef = doc(db, `/artifacts/${APP_ID}/public/data/settings`, 'partnerTOS');
+            const docSnap = await getDoc(tosDocRef);
+            if (docSnap.exists() && docSnap.data().content) {
+                return docSnap.data().content;
+            }
+            return "No partnership terms of service have been set yet. Please check back later.";
+        } catch (error) {
+            console.error("Error fetching Partner TOS:", error.message);
+            return "Failed to load partnership terms. Please try again later.";
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Updates the Partner TOS content in Firestore.
+     * Only callable by admins and founders.
+     * @param {string} newContent - The new TOS content.
+     * @returns {Promise<void>}
+     */
+    async function updatePartnerTOSFirestore(newContent) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+            throw new Error("Not authorized to update Partner TOS.");
+        }
+        showLoadingSpinner();
+        try {
+            const tosDocRef = doc(db, `/artifacts/${APP_ID}/public/data/settings`, 'partnerTOS');
+            await setDoc(tosDocRef, {
+                content: newContent,
+                lastUpdated: serverTimestamp(),
+                updatedBy: currentUser.uid,
+                updatedByUsername: userData.username || currentUser.displayName || currentUser.email
+            }, { merge: true }); // Use merge to only update specified fields
+            showMessageModal('Partner TOS updated successfully!');
+        } catch (error) {
+            console.error("Error updating Partner TOS:", error.message);
+            throw new Error("Failed to update Partner TOS: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
 
     // --- UI Rendering Functions ---
 
@@ -786,9 +839,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 name: 'Community',
                 items: [
                     { id: 'nav-forum', text: 'Forum', page: 'forum' },
-                    { id: 'nav-team', text: 'Meet the Team', page: 'team' } // New category item
+                    { id: 'nav-team', text: 'Meet the Team', page: 'team' }
                 ],
                 authRequired: true
+            },
+            {
+                name: 'Partnership', // New Category
+                items: [
+                    { id: 'nav-partners', text: 'Check Out Partners', page: 'partners' },
+                    { id: 'nav-partner-tos', text: 'Partner TOS', page: 'partner-tos' }
+                ],
+                authRequired: true // Partnership features require login
             },
             {
                 name: 'Administration',
@@ -983,12 +1044,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     emoji = '✨'; // Sparkles emoji
                     colorClass = 'text-purple-600'; // Founder color
                     break;
+                case 'partner': // New partner role
+                    emoji = '🤝'; // Handshake emoji
+                    colorClass = 'text-indigo-600'; // Partner color
+                    break;
                 default:
                     emoji = '';
                     colorClass = 'text-gray-800';
             }
             // Apply a subtle animation for all roles, or only privileged ones
-            const animationClass = (role === 'admin' || role === 'founder') ? 'animate-pulse' : '';
+            const animationClass = (role === 'admin' || role === 'founder' || role === 'partner') ? 'animate-pulse' : '';
             return `<span class="font-semibold ${colorClass} ${animationClass}">${emoji} ${role}</span>`;
         };
 
@@ -1169,6 +1234,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Note: Custom URL for images/GIFs is handled by the input field directly below
         ];
 
+        // Partner specific fields visibility
+        const isPartnerOrAdmin = userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder';
+        const partnerLinks = userData.partnerInfo?.links || {};
+
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
                 <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
@@ -1211,6 +1280,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <label for="profile-bio" class="block text-gray-700 text-sm font-semibold mb-2">Bio</label>
                             <textarea id="profile-bio" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tell us about yourself...">${userData.bio || ''}</textarea>
                         </div>
+
+                        ${isPartnerOrAdmin ? `
+                            <div class="border-t border-gray-200 pt-6 mt-6">
+                                <h3 class="text-xl font-bold text-gray-800 mb-4">Partner Card Information</h3>
+                                <p class="text-sm text-gray-600 mb-4">This information will be displayed on your public partner card.</p>
+
+                                <div>
+                                    <label for="partner-description" class="block text-gray-700 text-sm font-semibold mb-2">Partner Description</label>
+                                    <textarea id="partner-description" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="A short description for your partner card...">${userData.partnerInfo?.description || ''}</textarea>
+                                </div>
+
+                                <div class="space-y-4 mt-4">
+                                    <h4 class="text-lg font-semibold text-gray-800">Partner Links</h4>
+                                    ${['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft'].map(platform => `
+                                        <div>
+                                            <label for="partner-link-${platform}" class="block text-gray-700 text-sm font-semibold mb-2 capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()} Link</label>
+                                            <input type="url" id="partner-link-${platform}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter URL for ${platform} profile/community" value="${partnerLinks[platform] || ''}">
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+
                         <button type="submit" id="save-profile-btn" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Save Changes
                         </button>
@@ -1222,10 +1314,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         const profileForm = document.getElementById('profile-form');
         const usernameInput = document.getElementById('profile-username');
         const profilePicUrlInput = document.getElementById('profile-pic-url');
-        const backgroundSelect = document.getElementById('profile-background-select'); // Changed ID
-        const customBackgroundUrlInput = document.getElementById('custom-background-url'); // New input
-        const profileBioInput = document.getElementById('profile-bio'); // New bio input
+        const backgroundSelect = document.getElementById('profile-background-select');
+        const customBackgroundUrlInput = document.getElementById('custom-background-url');
+        const profileBioInput = document.getElementById('profile-bio');
         const profilePicDisplay = document.getElementById('profile-pic-display');
+
+        // Partner specific elements
+        const partnerDescriptionInput = document.getElementById('partner-description');
+        const partnerLinkInputs = {};
+        ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft'].forEach(platform => {
+            partnerLinkInputs[platform] = document.getElementById(`partner-link-${platform}`);
+        });
+
 
         // Update profile picture preview as URL changes
         profilePicUrlInput.addEventListener('input', () => {
@@ -1240,22 +1340,39 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             const newUsername = usernameInput.value;
             const newProfilePicUrl = profilePicUrlInput.value || `https://placehold.co/100x100/F0F0F0/000000?text=${(newUsername || 'U').charAt(0).toUpperCase()}`;
-            const newBio = profileBioInput.value; // Get the new bio
+            const newBio = profileBioInput.value;
 
             let newBackgroundUrl;
-            // If custom URL is provided, use it. Otherwise, use the selected theme.
             if (customBackgroundUrlInput.value) {
                 newBackgroundUrl = customBackgroundUrlInput.value;
             } else {
                 newBackgroundUrl = backgroundSelect.value;
             }
 
+            const updatedPartnerInfo = {
+                description: partnerDescriptionInput ? partnerDescriptionInput.value : (userData.partnerInfo?.description || ''),
+                links: {}
+            };
+
+            if (isPartnerOrAdmin) {
+                ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft'].forEach(platform => {
+                    if (partnerLinkInputs[platform]) {
+                        updatedPartnerInfo.links[platform] = partnerLinkInputs[platform].value;
+                    }
+                });
+            } else {
+                // If not a partner/admin, preserve existing partnerInfo if it exists
+                updatedPartnerInfo.description = userData.partnerInfo?.description || '';
+                updatedPartnerInfo.links = userData.partnerInfo?.links || {};
+            }
+
             try {
                 const updatedData = await updateProfileData({
                     username: newUsername,
                     profilePicUrl: newProfilePicUrl,
-                    backgroundUrl: newBackgroundUrl, // This can now be a class string or a URL
-                    bio: newBio // Include the new bio field
+                    backgroundUrl: newBackgroundUrl,
+                    bio: newBio,
+                    partnerInfo: updatedPartnerInfo
                 });
                 if (updatedData) {
                     userData = updatedData; // Update global userData
@@ -1400,6 +1517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             >
                                 <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
                                 <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                <option value="partner" ${user.role === 'partner' ? 'selected' : ''}>Partner</option>
                                 ${showFounderOption ? `<option value="founder" ${user.role === 'founder' ? 'selected' : ''}>Founder</option>` : ''}
                             </select>
                         </td>
@@ -1451,7 +1569,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Shows a modal for taking action on a user (Ban/Unban/Delete/Send Email).
+     * Shows a modal for taking action on a user (Ban/Unban/Delete/Send Email/Edit Partner Card).
      * @param {object} user - The user object to display and act upon.
      */
     function showTakeActionModal(user) {
@@ -1465,6 +1583,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
         const isDisabledForSelf = user.id === currentUser.uid ? 'disabled' : '';
+        const isPartner = user.role === 'partner';
+        const isAdminOrFounder = userData.role === 'admin' || userData.role === 'founder';
 
         modal.innerHTML = `
             <div class="bg-white p-8 rounded-xl shadow-2xl text-center max-w-md w-full relative">
@@ -1475,7 +1595,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <img src="${profileIconSrc}" alt="User Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-3">
                     <p class="text-xl font-semibold text-gray-900">${user.username}</p>
                     <p class="text-md text-gray-600">${user.email}</p>
-                    <p class="text-md font-medium text-gray-700 mt-2">Role: <span class="font-bold ${user.isBanned ? 'text-red-600' : 'text-green-600'}">${user.isBanned ? 'Banned' : 'Active'}</span></p>
+                    <p class="text-md font-medium text-gray-700 mt-2">Role: <span class="font-bold ${user.isBanned ? 'text-red-600' : 'text-green-600'}">${user.role.charAt(0).toUpperCase() + user.role.slice(1)}</span></p>
+                    <p class="text-md font-medium text-gray-700">Status: <span class="font-bold ${user.isBanned ? 'text-red-600' : 'text-green-600'}">${user.isBanned ? 'Banned' : 'Active'}</span></p>
                 </div>
 
                 <div class="space-y-4">
@@ -1488,6 +1609,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button id="send-email-btn" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg ${isDisabledForSelf}">
                         Send Email
                     </button>
+                    ${(isPartner && isAdminOrFounder) ? `
+                        <button id="edit-partner-card-admin-btn" class="w-full py-3 rounded-full bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-700 transition duration-300 transform hover:scale-105 shadow-lg ${isDisabledForSelf}">
+                            Edit Partner Card
+                        </button>
+                    ` : ''}
                     <button id="delete-user-btn" class="w-full py-3 rounded-full bg-gray-500 text-white font-bold text-lg hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg ${isDisabledForSelf}">
                         Delete Account
                     </button>
@@ -1505,7 +1631,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const banBtn = document.getElementById('ban-user-btn');
         const unbanBtn = document.getElementById('unban-user-btn');
-        const sendEmailBtn = document.getElementById('send-email-btn'); // New button
+        const sendEmailBtn = document.getElementById('send-email-btn');
+        const editPartnerCardAdminBtn = document.getElementById('edit-partner-card-admin-btn'); // New button
         const deleteBtn = document.getElementById('delete-user-btn');
 
         if (banBtn) {
@@ -1550,6 +1677,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentModal.remove(); // Close the current modal
                 currentModal = null;
                 navigateTo('send-email', user.id); // Navigate to the send email page, passing the user ID
+            });
+        }
+
+        // Event listener for "Edit Partner Card" button (for admins/founders)
+        if (editPartnerCardAdminBtn) {
+            editPartnerCardAdminBtn.addEventListener('click', () => {
+                currentModal.remove(); // Close the current modal
+                currentModal = null;
+                showEditPartnerCardModal(user); // Open the partner card edit modal for this user
             });
         }
 
@@ -1879,8 +2015,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             hideLoadingSpinner();
         }
 
-        // Filter users to only include admins and founders
-        const teamMembers = allUsers.filter(user => user.role === 'admin' || user.role === 'founder');
+        // Filter users to only include admins, founders, and partners
+        const teamMembers = allUsers.filter(user => user.role === 'admin' || user.role === 'founder' || user.role === 'partner');
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
@@ -1895,6 +2031,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 const profilePicSrc = member.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(member.username || member.email || 'U').charAt(0).toUpperCase()}`;
                                 const isCurrentUser = currentUser && member.id === currentUser.uid;
 
+                                // Link icons and their corresponding Font Awesome classes
+                                const linkIcons = {
+                                    discord: 'fab fa-discord',
+                                    roblox: 'fab fa-roblox',
+                                    fivem: 'fas fa-gamepad', // Generic gamepad for FiveM
+                                    codingCommunity: 'fas fa-code', // Generic code for coding community
+                                    minecraft: 'fas fa-cube' // Generic cube for Minecraft
+                                };
+
                                 return `
                                     <div class="flex flex-col sm:flex-row items-center sm:items-start p-6 bg-gray-50 rounded-lg shadow-md border border-gray-200">
                                         <img src="${profilePicSrc}" alt="${member.username}'s Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-4 sm:mb-0 sm:mr-6"
@@ -1903,10 +2048,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                                             <h3 class="text-xl font-bold text-gray-900">${member.username}</h3>
                                             <p class="text-md text-gray-600 mb-2">${member.role.charAt(0).toUpperCase() + member.role.slice(1)}</p>
                                             <p class="text-gray-700 text-sm whitespace-pre-wrap">${member.bio || 'No bio provided yet.'}</p>
+
+                                            ${member.role === 'partner' || member.role === 'admin' || member.role === 'founder' ? `
+                                                <div class="mt-4 flex flex-wrap justify-center sm:justify-start gap-3">
+                                                    ${Object.entries(member.partnerInfo?.links || {}).map(([platform, link]) => link ? `
+                                                        <a href="${link}" target="_blank" rel="noopener noreferrer" class="text-gray-700 hover:text-blue-600 transition duration-200 flex items-center space-x-2">
+                                                            <i class="${linkIcons[platform]} text-lg"></i>
+                                                            <span class="text-sm capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                                        </a>
+                                                    ` : '').join('')}
+                                                </div>
+                                            ` : ''}
+
                                             ${isCurrentUser ? `
                                                 <button class="mt-4 py-2 px-4 rounded-full bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg"
-                                                        id="edit-my-bio-btn">
-                                                    Edit My Bio
+                                                        id="edit-my-card-btn">
+                                                    Edit My Card
                                                 </button>
                                             ` : ''}
                                         </div>
@@ -1919,13 +2076,212 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
         `;
 
-        // Add event listener for "Edit My Bio" button if present
-        const editMyBioBtn = document.getElementById('edit-my-bio-btn');
-        if (editMyBioBtn) {
-            editMyBioBtn.addEventListener('click', () => {
-                navigateTo('profile'); // Redirect to profile page to edit bio
+        // Add event listener for "Edit My Card" button if present
+        const editMyCardBtn = document.getElementById('edit-my-card-btn');
+        if (editMyCardBtn) {
+            editMyCardBtn.addEventListener('click', () => {
+                navigateTo('profile'); // Redirect to profile page to edit partner info
             });
         }
+    }
+
+    /**
+     * Renders the "Partners" page, displaying all partner cards.
+     */
+    async function renderPartnersPage() {
+        if (!currentUser) {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">Please sign in to view our partners.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        showLoadingSpinner();
+        let allUsers = [];
+        try {
+            allUsers = await fetchAllUsersFirestore();
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+            allUsers = [];
+        } finally {
+            hideLoadingSpinner();
+        }
+
+        const partners = allUsers.filter(user => user.role === 'partner');
+        const isAdminOrFounder = userData.role === 'admin' || userData.role === 'founder';
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Our Valued Partners</h2>
+
+                    ${partners.length === 0 ? `
+                        <p class="text-center text-gray-600">No partners listed yet. Check back soon!</p>
+                    ` : `
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            ${partners.map(partner => {
+                                const profilePicSrc = partner.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(partner.username || partner.email || 'U').charAt(0).toUpperCase()}`;
+                                const isCurrentUserPartner = currentUser && partner.id === currentUser.uid && partner.role === 'partner';
+
+                                const linkIcons = {
+                                    discord: 'fab fa-discord',
+                                    roblox: 'fab fa-roblox',
+                                    fivem: 'fas fa-gamepad',
+                                    codingCommunity: 'fas fa-code',
+                                    minecraft: 'fas fa-cube'
+                                };
+
+                                return `
+                                    <div class="bg-gray-100 p-6 rounded-lg shadow-md border border-gray-200 flex flex-col items-center text-center">
+                                        <img src="${profilePicSrc}" alt="${partner.username}'s Profile" class="w-28 h-28 rounded-full object-cover border-4 border-indigo-500 shadow-lg mb-4"
+                                             onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(partner.username || partner.email || 'U').charAt(0).toUpperCase()}'">
+                                        <h3 class="text-2xl font-bold text-gray-900 mb-2">${partner.username}</h3>
+                                        <p class="text-md text-indigo-600 font-semibold mb-3">Official Partner</p>
+                                        <p class="text-gray-700 text-sm mb-4 whitespace-pre-wrap">${partner.partnerInfo?.description || 'No description provided yet.'}</p>
+
+                                        <div class="flex flex-wrap justify-center gap-3 mb-4">
+                                            ${Object.entries(partner.partnerInfo?.links || {}).map(([platform, link]) => link ? `
+                                                <a href="${link}" target="_blank" rel="noopener noreferrer" class="text-gray-700 hover:text-blue-600 transition duration-200 flex items-center space-x-2">
+                                                    <i class="${linkIcons[platform]} text-lg"></i>
+                                                    <span class="text-sm capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                                </a>
+                                            ` : '').join('')}
+                                        </div>
+
+                                        ${(isCurrentUserPartner || isAdminOrFounder) ? `
+                                            <button class="mt-auto py-2 px-5 rounded-full bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition duration-300 transform hover:scale-105 shadow-lg"
+                                                    data-partner-id="${partner.id}" data-action="edit-partner-card">
+                                                Edit Card
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+
+        // Add event listeners for "Edit Card" buttons
+        contentArea.querySelectorAll('[data-action="edit-partner-card"]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const partnerId = e.target.dataset.partnerId;
+                const partnerToEdit = allUsers.find(user => user.id === partnerId);
+                if (partnerToEdit) {
+                    showEditPartnerCardModal(partnerToEdit);
+                }
+            });
+        });
+    }
+
+    /**
+     * Shows a modal for editing a partner's card information (description and links).
+     * This modal is used by partners to edit their own, and by admins/founders to edit others.
+     * @param {object} partnerUser - The user object (who has the 'partner' role) to edit.
+     */
+    function showEditPartnerCardModal(partnerUser) {
+        if (currentModal) {
+            currentModal.remove();
+        }
+
+        const modal = document.createElement('div');
+        modal.id = 'edit-partner-card-modal';
+        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+
+        const currentPartnerInfo = partnerUser.partnerInfo || { description: '', links: {} };
+
+        modal.innerHTML = `
+            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 border border-gray-200 relative">
+                <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold" id="close-edit-partner-card-modal">&times;</button>
+                <h2 class="text-2xl font-extrabold text-center text-gray-800 mb-6">Edit Partner Card for ${partnerUser.username}</h2>
+                <form id="edit-partner-card-form" class="space-y-4">
+                    <div>
+                        <label for="modal-partner-description" class="block text-gray-700 text-sm font-semibold mb-2">Partner Description</label>
+                        <textarea id="modal-partner-description" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="A short description for their partner card...">${currentPartnerInfo.description || ''}</textarea>
+                    </div>
+
+                    <div class="space-y-3">
+                        <h3 class="text-lg font-semibold text-gray-800">Partner Links</h3>
+                        ${['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft'].map(platform => `
+                            <div>
+                                <label for="modal-partner-link-${platform}" class="block text-gray-700 text-sm font-semibold mb-2 capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()} Link</label>
+                                <input type="url" id="modal-partner-link-${platform}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter URL for ${platform} profile/community" value="${currentPartnerInfo.links[platform] || ''}">
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <div class="flex justify-end space-x-4 mt-6">
+                        <button type="button" id="cancel-edit-partner-card-modal" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Cancel
+                        </button>
+                        <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        currentModal = modal;
+
+        document.getElementById('close-edit-partner-card-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+            // If opened from admin panel, re-render admin panel, else re-render partners page
+            if (contentArea.dataset.currentPage === 'admin') {
+                renderAdminPanelPage();
+            } else {
+                renderPartnersPage();
+            }
+        });
+        document.getElementById('cancel-edit-partner-card-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+            if (contentArea.dataset.currentPage === 'admin') {
+                renderAdminPanelPage();
+            } else {
+                renderPartnersPage();
+            }
+        });
+
+        document.getElementById('edit-partner-card-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newDescription = document.getElementById('modal-partner-description').value;
+            const newLinks = {};
+            ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft'].forEach(platform => {
+                newLinks[platform] = document.getElementById(`modal-partner-link-${platform}`).value;
+            });
+
+            showLoadingSpinner();
+            try {
+                const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, partnerUser.id);
+                await updateDoc(userDocRef, {
+                    partnerInfo: {
+                        description: newDescription,
+                        links: newLinks
+                    }
+                });
+                showMessageModal('Partner card updated successfully!');
+                currentModal.remove();
+                currentModal = null;
+                // Re-render the page it was opened from
+                if (contentArea.dataset.currentPage === 'admin') {
+                    renderAdminPanelPage();
+                } else {
+                    renderPartnersPage();
+                }
+            } catch (error) {
+                showMessageModal("Failed to update partner card: " + error.message, 'error');
+            } finally {
+                hideLoadingSpinner();
+            }
+        });
     }
 
 
@@ -2028,6 +2384,118 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    /**
+     * Renders the Partner TOS page.
+     */
+    async function renderPartnerTOSPage() {
+        if (!currentUser) {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700">Please sign in to view the Partner Terms of Service.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let tosContent = '';
+        try {
+            tosContent = await fetchPartnerTOSFirestore();
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+            tosContent = "Error loading terms of service.";
+        }
+
+        const isAdminOrFounder = userData.role === 'admin' || userData.role === 'founder';
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 border border-gray-200">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 mb-8">Partner Terms of Service</h2>
+                    <div id="tos-content" class="prose max-w-none text-gray-700 leading-relaxed mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                        <p class="whitespace-pre-wrap">${tosContent}</p>
+                    </div>
+                    ${isAdminOrFounder ? `
+                        <div class="text-center">
+                            <button id="edit-tos-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                                Edit Rules
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+
+        if (isAdminOrFounder) {
+            document.getElementById('edit-tos-btn').addEventListener('click', () => {
+                showEditPartnerTOSModal(tosContent);
+            });
+        }
+    }
+
+    /**
+     * Shows a modal for editing the Partner TOS content.
+     * @param {string} currentContent - The current TOS content.
+     */
+    function showEditPartnerTOSModal(currentContent) {
+        if (currentModal) {
+            currentModal.remove();
+        }
+
+        const modal = document.createElement('div');
+        modal.id = 'edit-tos-modal';
+        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+
+        modal.innerHTML = `
+            <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 border border-gray-200 relative">
+                <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold" id="close-edit-tos-modal">&times;</button>
+                <h2 class="text-2xl font-extrabold text-center text-gray-800 mb-6">Edit Partner Terms of Service</h2>
+                <form id="edit-tos-form" class="space-y-4">
+                    <div>
+                        <label for="modal-tos-content" class="block text-gray-700 text-sm font-semibold mb-2">Terms of Service Content</label>
+                        <textarea id="modal-tos-content" rows="15" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>${currentContent}</textarea>
+                    </div>
+                    <div class="flex justify-end space-x-4 mt-6">
+                        <button type="button" id="cancel-edit-tos-modal" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Cancel
+                        </button>
+                        <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Save Rules
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        currentModal = modal;
+
+        document.getElementById('close-edit-tos-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+            renderPartnerTOSPage(); // Re-render to show updated content
+        });
+        document.getElementById('cancel-edit-tos-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+            renderPartnerTOSPage(); // Re-render to show updated content
+        });
+
+        document.getElementById('edit-tos-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newContent = document.getElementById('modal-tos-content').value;
+            try {
+                await updatePartnerTOSFirestore(newContent);
+                currentModal.remove();
+                currentModal = null;
+                renderPartnerTOSPage(); // Re-render to show updated content
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+    }
+
 
     // --- Navigation and Initialization ---
 
@@ -2049,7 +2517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team', 'send-email').
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'about', 'admin', 'create-post', 'edit-post', 'forum', 'logout', 'team', 'send-email', 'partners', 'partner-tos').
      * @param {string} [id=null] - Optional: postId for edit-post route, userId for send-email route, or any other ID.
      */
     async function navigateTo(page, id = null) {
@@ -2117,6 +2585,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'send-email': // New Send Email page
                 renderSendEmailPage(id); // Pass the user ID to pre-fill recipient
                 break;
+            case 'partners': // New Partners page
+                renderPartnersPage();
+                break;
+            case 'partner-tos': // New Partner TOS page
+                renderPartnerTOSPage();
+                break;
             default:
                 renderHomePage();
         }
@@ -2173,7 +2647,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         role: 'member',
                         profilePicUrl: defaultProfilePic,
                         backgroundUrl: defaultBackground,
-                        bio: '' // Initialize empty bio for new users
+                        bio: '',
+                        partnerInfo: { // Initialize empty partner info for new users
+                            description: '',
+                            links: {}
+                        }
                     });
                     userData = {
                         email: user.email,
@@ -2181,7 +2659,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         role: 'member',
                         profilePicUrl: defaultProfilePic,
                         backgroundUrl: defaultBackground,
-                        bio: ''
+                        bio: '',
+                        partnerInfo: {
+                            description: '',
+                            links: {}
+                        }
                     };
                 }
                 updateBodyBackground(); // Apply user's saved background
@@ -2222,7 +2704,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateBodyBackground(); // Reset to default background
             renderNavbar(); // Update navbar to logged out state
             // Only redirect if current page is not home or about, or if it was a protected page
-            if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about' && contentArea.dataset.currentPage !== 'team') {
+            if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about' && contentArea.dataset.currentPage !== 'team' && contentArea.dataset.currentPage !== 'partners' && contentArea.dataset.currentPage !== 'partner-tos') {
                  navigateTo('home'); // Redirect to home if logged out from a protected page
             }
         }
