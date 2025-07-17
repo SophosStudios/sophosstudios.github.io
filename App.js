@@ -801,6 +801,70 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
+     * Fetches the partner application questions from Firestore.
+     * @returns {Promise<Array<object>>} - An array of question objects.
+     */
+    async function fetchPartnerApplicationQuestionsFirestore() {
+        showLoadingSpinner();
+        try {
+            const questionsDocRef = doc(db, `/artifacts/${APP_ID}/public/data/settings`, 'partnerApplicationQuestions');
+            const docSnap = await getDoc(questionsDocRef);
+            if (docSnap.exists() && docSnap.data().questions) {
+                return docSnap.data().questions;
+            }
+            // Default questions if none are set
+            return [
+                { id: 'q_name', type: 'text', label: 'Your Full Name', required: true },
+                { id: 'q_email', type: 'email', label: 'Your Contact Email', required: true },
+                { id: 'q_birthday', type: 'date', label: 'Your Birthday', required: true },
+                { id: 'q_why_partner', type: 'textarea', label: 'Why do you want to be a partner?', required: true },
+                { id: 'q_information', type: 'textarea', label: 'Any other information you\'d like to share?', required: false }
+            ];
+        } catch (error) {
+            console.error("Error fetching partner application questions:", error.message);
+            showMessageModal("Failed to load application questions. Using default.", 'error');
+            return [
+                { id: 'q_name', type: 'text', label: 'Your Full Name', required: true },
+                { id: 'q_email', type: 'email', label: 'Your Contact Email', required: true },
+                { id: 'q_birthday', type: 'date', label: 'Your Birthday', required: true },
+                { id: 'q_why_partner', type: 'textarea', label: 'Why do you want to be a partner?', required: true },
+                { id: 'q_information', type: 'textarea', label: 'Any other information you\'d like to share?', required: false }
+            ];
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Updates the partner application questions in Firestore.
+     * Only callable by founders.
+     * @param {Array<object>} questions - An array of question objects to save.
+     * @returns {Promise<void>}
+     */
+    async function updatePartnerApplicationQuestionsFirestore(questions) {
+        if (!currentUser || userData.role !== 'founder') {
+            throw new Error("Only founders can manage partner application questions.");
+        }
+        showLoadingSpinner();
+        try {
+            const questionsDocRef = doc(db, `/artifacts/${APP_ID}/public/data/settings`, 'partnerApplicationQuestions');
+            await setDoc(questionsDocRef, {
+                questions: questions,
+                lastUpdated: serverTimestamp(),
+                updatedBy: currentUser.uid,
+                updatedByUsername: userData.username || currentUser.displayName || currentUser.email
+            }, { merge: true });
+            showMessageModal('Partner application questions updated successfully!');
+        } catch (error) {
+            console.error("Error updating partner application questions:", error.message);
+            throw new Error("Failed to update questions: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+
+    /**
      * Submits a partner application to Firestore.
      * @param {object} applicationData - The application data including answers to questions.
      * @returns {Promise<void>}
@@ -817,7 +881,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 applicantUsername: userData.username || currentUser.displayName || currentUser.email,
                 applicantEmail: currentUser.email,
                 status: 'pending', // Initial status
-                applicationQuestions: applicationData,
+                applicationAnswers: applicationData, // Store answers as a map
                 timestamp: serverTimestamp()
             });
             showMessageModal('Partner application submitted successfully! We will review it soon.');
@@ -973,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 items: [
                     { id: 'nav-partners', text: 'Check Out Partners', page: 'partners' },
                     { id: 'nav-partner-tos', text: 'Partner TOS', page: 'partner-tos' },
-                    { id: 'nav-apply-partner', text: 'Apply for Partnership', page: 'apply-partner', roles: ['member'] } // Only members can apply
+                    { id: 'nav-apply-partner', text: 'Become a Partner', page: 'apply-partner', roles: ['member'] } // Only members can apply
                 ],
                 authRequired: true // Partnership features require login
             },
@@ -981,7 +1045,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 name: 'Administration',
                 items: [
                     { id: 'nav-admin', text: 'Admin Panel', page: 'admin' },
-                    { id: 'nav-partner-applications', text: 'Partner Applications', page: 'partner-applications' } // New admin link
+                    { id: 'nav-partner-applications', text: 'Partner Applications', page: 'partner-applications' }, // New admin link
+                    { id: 'nav-manage-partner-questions', text: 'Manage Partner Questions', page: 'manage-partner-questions', roles: ['founder'] } // New founder link
                 ],
                 authRequired: true,
                 roles: ['admin', 'founder']
@@ -1182,7 +1247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             switch (role) {
                 case 'member':
-                    emoji = '�'; // User emoji
+                    emoji = '👤'; // User emoji
                     colorClass = 'text-blue-600'; // Member color
                     break;
                 case 'admin':
@@ -1768,6 +1833,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button id="view-partner-applications-btn" class="py-2 px-6 rounded-full bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             View Partner Applications
                         </button>
+                        ${userData.role === 'founder' ? `
+                            <button id="manage-partner-questions-btn" class="py-2 px-6 rounded-full bg-teal-600 text-white font-bold text-lg hover:bg-teal-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                                Manage Partner Questions
+                            </button>
+                        ` : ''}
                     </div>
 
                     <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 text-center">Manage Users</h3>
@@ -1885,6 +1955,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Removed create-post-btn from here, as it's now on the forum page
         document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins/Founders can manage from forum view
         document.getElementById('view-partner-applications-btn').addEventListener('click', () => navigateTo('partner-applications'));
+        if (userData.role === 'founder') {
+            document.getElementById('manage-partner-questions-btn').addEventListener('click', () => navigateTo('manage-partner-questions'));
+        }
     }
 
     /**
@@ -2850,24 +2923,51 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        let questions = [];
+        try {
+            questions = await fetchPartnerApplicationQuestionsFirestore();
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+            questions = []; // Fallback to empty if error
+        }
+
+        const formFieldsHtml = questions.map(q => {
+            const requiredAttr = q.required ? 'required' : '';
+            const asterisk = q.required ? '<span class="text-red-500">*</span>' : '';
+            let inputElement;
+
+            switch (q.type) {
+                case 'textarea':
+                    inputElement = `<textarea id="app-q-${q.id}" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="${q.label}" ${requiredAttr}></textarea>`;
+                    break;
+                case 'date':
+                    inputElement = `<input type="date" id="app-q-${q.id}" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" ${requiredAttr}>`;
+                    break;
+                case 'email':
+                    inputElement = `<input type="email" id="app-q-${q.id}" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="${q.label}" ${requiredAttr}>`;
+                    break;
+                case 'text':
+                default:
+                    inputElement = `<input type="text" id="app-q-${q.id}" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="${q.label}" ${requiredAttr}>`;
+                    break;
+            }
+
+            return `
+                <div>
+                    <label for="app-q-${q.id}" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">${q.label} ${asterisk}</label>
+                    ${inputElement}
+                </div>
+            `;
+        }).join('');
+
+
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Apply for Partnership</h2>
                     <p class="text-lg text-gray-700 dark:text-gray-300 text-center mb-6">Fill out the form below to submit your application to become an official partner.</p>
                     <form id="partner-application-form" class="space-y-6">
-                        <div>
-                            <label for="why-partner" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Why do you want to be a partner? <span class="text-red-500">*</span></label>
-                            <textarea id="why-partner" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Tell us about your motivation..." required></textarea>
-                        </div>
-                        <div>
-                            <label for="content-type" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">What kind of content do you create/share? <span class="text-red-500">*</span></label>
-                            <textarea id="content-type" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., gaming videos, coding tutorials, art, community management" required></textarea>
-                        </div>
-                        <div>
-                            <label for="social-links" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Links to your work/social media (optional)</label>
-                            <textarea id="social-links" rows="3" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Provide relevant links, one per line (e.g., YouTube, Twitch, GitHub, Discord server invite)"></textarea>
-                        </div>
+                        ${formFieldsHtml}
                         <div class="flex justify-end space-x-4 mt-6">
                             <button type="button" id="cancel-application-btn" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
                                 Cancel
@@ -2885,18 +2985,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.getElementById('partner-application-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const whyPartner = document.getElementById('why-partner').value;
-            const contentType = document.getElementById('content-type').value;
-            const socialLinks = document.getElementById('social-links').value;
+            const applicationAnswers = {};
+            let allRequiredFilled = true;
 
-            const applicationData = {
-                whyPartner: whyPartner,
-                contentType: contentType,
-                socialLinks: socialLinks.split('\n').map(link => link.trim()).filter(link => link !== '')
-            };
+            questions.forEach(q => {
+                const inputElement = document.getElementById(`app-q-${q.id}`);
+                if (inputElement) {
+                    applicationAnswers[q.id] = inputElement.value;
+                    if (q.required && !inputElement.value.trim()) {
+                        allRequiredFilled = false;
+                    }
+                }
+            });
+
+            if (!allRequiredFilled) {
+                showMessageModal("Please fill in all required fields.", 'error');
+                return;
+            }
 
             try {
-                await submitPartnerApplicationFirestore(applicationData);
+                await submitPartnerApplicationFirestore(applicationAnswers);
                 navigateTo('partners'); // Redirect to partners page after submission
             } catch (error) {
                 showMessageModal(error.message, 'error');
@@ -2972,7 +3080,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Shows a modal for reviewing a partner application.
      * @param {object} application - The application object to review.
      */
-    function showReviewApplicationModal(application) {
+    async function showReviewApplicationModal(application) {
         if (currentModal) {
             currentModal.remove();
         }
@@ -2980,6 +3088,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         const modal = document.createElement('div');
         modal.id = 'review-application-modal';
         modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+
+        let questions = [];
+        try {
+            questions = await fetchPartnerApplicationQuestionsFirestore();
+        } catch (error) {
+            console.error("Error fetching questions for review modal:", error.message);
+            questions = []; // Fallback to empty
+        }
+
+        const applicationAnswers = application.applicationAnswers || {};
+
+        const answersHtml = questions.map(q => {
+            const answer = applicationAnswers[q.id] || 'No answer provided.';
+            return `
+                <p><span class="font-semibold">${q.label}:</span></p>
+                <p class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md whitespace-pre-wrap">${answer}</p>
+            `;
+        }).join('');
+
 
         modal.innerHTML = `
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700 relative">
@@ -2991,16 +3118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <p><span class="font-semibold">Status:</span> <span class="capitalize ${application.status === 'pending' ? 'text-yellow-600' : (application.status === 'approved' ? 'text-green-600' : 'text-red-600')}">${application.status}</span></p>
                     <p><span class="font-semibold">Submitted:</span> ${application.timestamp ? (typeof application.timestamp === 'string' ? new Date(application.timestamp).toLocaleString() : application.timestamp.toDate().toLocaleString()) : 'N/A'}</p>
                     <hr class="border-gray-200 dark:border-gray-600">
-                    <p><span class="font-semibold">Why they want to be a partner:</span></p>
-                    <p class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md whitespace-pre-wrap">${application.applicationQuestions?.whyPartner || 'N/A'}</p>
-                    <p><span class="font-semibold">Content they create/share:</span></p>
-                    <p class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md whitespace-pre-wrap">${application.applicationQuestions?.contentType || 'N/A'}</p>
-                    <p><span class="font-semibold">Social Links:</span></p>
-                    <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md">
-                        ${(application.applicationQuestions?.socialLinks && application.applicationQuestions.socialLinks.length > 0) ?
-                            application.applicationQuestions.socialLinks.map(link => `<a href="${link}" target="_blank" rel="noopener noreferrer" class="block text-blue-600 hover:underline">${link}</a>`).join('')
-                            : 'No links provided.'}
-                    </div>
+                    ${answersHtml}
                     ${application.reviewNotes ? `
                         <p><span class="font-semibold">Review Notes:</span></p>
                         <p class="bg-gray-100 dark:bg-gray-700 p-3 rounded-md whitespace-pre-wrap">${application.reviewNotes}</p>
@@ -3071,6 +3189,264 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Renders the page for founders to manage partner application questions.
+     */
+    async function renderManagePartnerQuestionsPage() {
+        if (!currentUser || userData.role !== 'founder') {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700 dark:text-gray-300">You do not have founder privileges to manage partner questions.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let currentQuestions = [];
+        try {
+            currentQuestions = await fetchPartnerApplicationQuestionsFirestore();
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+            currentQuestions = [];
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Manage Partner Application Questions</h2>
+                    <p class="text-lg text-gray-700 dark:text-gray-300 text-center mb-6">Add, edit, or remove questions for the partner application form.</p>
+
+                    <div id="questions-list" class="space-y-4 mb-8">
+                        ${currentQuestions.length === 0 ? `
+                            <p class="text-center text-gray-600 dark:text-gray-400">No questions defined yet. Add your first question below!</p>
+                        ` : `
+                            ${currentQuestions.map((q, index) => `
+                                <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm flex flex-col md:flex-row items-center justify-between space-y-3 md:space-y-0 md:space-x-4">
+                                    <div class="flex-grow text-gray-800 dark:text-gray-100 text-left w-full md:w-auto">
+                                        <p class="font-semibold">Question ${index + 1}: ${q.label} <span class="text-sm text-gray-500 dark:text-gray-400">(${q.type}, ${q.required ? 'Required' : 'Optional'})</span></p>
+                                    </div>
+                                    <div class="flex space-x-2 w-full md:w-auto justify-end">
+                                        <button type="button" class="py-1 px-3 rounded-md bg-blue-500 text-white text-sm hover:bg-blue-600 transition duration-200" data-action="edit-question" data-index="${index}">Edit</button>
+                                        <button type="button" class="py-1 px-3 rounded-md bg-red-500 text-white text-sm hover:bg-red-600 transition duration-200" data-action="delete-question" data-index="${index}">Delete</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        `}
+                    </div>
+
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 text-center">Add New Question</h3>
+                    <form id="add-question-form" class="space-y-4">
+                        <div>
+                            <label for="new-question-label" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Question Label</label>
+                            <input type="text" id="new-question-label" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., Your Full Name" required>
+                        </div>
+                        <div>
+                            <label for="new-question-type" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Question Type</label>
+                            <select id="new-question-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                                <option value="text">Text Input</option>
+                                <option value="textarea">Long Text Area</option>
+                                <option value="email">Email Input</option>
+                                <option value="date">Date Input</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <input type="checkbox" id="new-question-required" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                            <label for="new-question-required" class="text-gray-700 dark:text-gray-300 text-sm font-semibold">Required Question</label>
+                        </div>
+                        <div class="flex justify-end space-x-4 mt-6">
+                            <button type="submit" class="py-2 px-5 rounded-full bg-green-600 text-white font-bold hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                                Add Question
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        const questionsListDiv = document.getElementById('questions-list');
+        const addQuestionForm = document.getElementById('add-question-form');
+        const newQuestionLabelInput = document.getElementById('new-question-label');
+        const newQuestionTypeSelect = document.getElementById('new-question-type');
+        const newQuestionRequiredCheckbox = document.getElementById('new-question-required');
+
+        // Function to re-render the questions list part
+        const refreshQuestionsList = () => {
+            questionsListDiv.innerHTML = currentQuestions.length === 0 ? `
+                <p class="text-center text-gray-600 dark:text-gray-400">No questions defined yet. Add your first question below!</p>
+            ` : `
+                ${currentQuestions.map((q, index) => `
+                    <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-sm flex flex-col md:flex-row items-center justify-between space-y-3 md:space-y-0 md:space-x-4">
+                        <div class="flex-grow text-gray-800 dark:text-gray-100 text-left w-full md:w-auto">
+                            <p class="font-semibold">Question ${index + 1}: ${q.label} <span class="text-sm text-gray-500 dark:text-gray-400">(${q.type}, ${q.required ? 'Required' : 'Optional'})</span></p>
+                        </div>
+                        <div class="flex space-x-2 w-full md:w-auto justify-end">
+                            <button type="button" class="py-1 px-3 rounded-md bg-blue-500 text-white text-sm hover:bg-blue-600 transition duration-200" data-action="edit-question" data-index="${index}">Edit</button>
+                            <button type="button" class="py-1 px-3 rounded-md bg-red-500 text-white text-sm hover:bg-red-600 transition duration-200" data-action="delete-question" data-index="${index}">Delete</button>
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+            // Re-attach event listeners after re-rendering
+            attachQuestionListEventListeners();
+        };
+
+        const attachQuestionListEventListeners = () => {
+            questionsListDiv.querySelectorAll('[data-action="edit-question"]').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    showEditQuestionModal(index, currentQuestions[index]);
+                });
+            });
+
+            questionsListDiv.querySelectorAll('[data-action="delete-question"]').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    showMessageModal(`Are you sure you want to delete question "${currentQuestions[index].label}"?`, 'confirm', async () => {
+                        currentQuestions.splice(index, 1);
+                        try {
+                            await updatePartnerApplicationQuestionsFirestore(currentQuestions);
+                            refreshQuestionsList();
+                        } catch (error) {
+                            showMessageModal(error.message, 'error');
+                            // Re-fetch to revert if save fails
+                            currentQuestions = await fetchPartnerApplicationQuestionsFirestore();
+                            refreshQuestionsList();
+                        }
+                    });
+                });
+            });
+        };
+
+        addQuestionForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const label = newQuestionLabelInput.value.trim();
+            const type = newQuestionTypeSelect.value;
+            const required = newQuestionRequiredCheckbox.checked;
+
+            if (!label) {
+                showMessageModal("Question label cannot be empty.", 'error');
+                return;
+            }
+
+            const newQuestion = {
+                id: `q_${Date.now()}`, // Simple unique ID
+                label: label,
+                type: type,
+                required: required
+            };
+
+            currentQuestions.push(newQuestion);
+            try {
+                await updatePartnerApplicationQuestionsFirestore(currentQuestions);
+                newQuestionLabelInput.value = '';
+                newQuestionTypeSelect.value = 'text';
+                newQuestionRequiredCheckbox.checked = false;
+                refreshQuestionsList();
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+                // Re-fetch to revert if save fails
+                currentQuestions = await fetchPartnerApplicationQuestionsFirestore();
+                refreshQuestionsList();
+            }
+        });
+
+        // Initial attachment of listeners
+        attachQuestionListEventListeners();
+    }
+
+    /**
+     * Shows a modal for editing an existing partner application question.
+     * @param {number} index - The index of the question in the currentQuestions array.
+     * @param {object} question - The question object to edit.
+     */
+    function showEditQuestionModal(index, question) {
+        if (currentModal) {
+            currentModal.remove();
+        }
+
+        const modal = document.createElement('div');
+        modal.id = 'edit-question-modal';
+        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+
+        modal.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700 relative">
+                <button class="absolute top-4 right-4 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100 text-2xl font-bold" id="close-edit-question-modal">&times;</button>
+                <h2 class="text-2xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-6">Edit Question</h2>
+                <form id="edit-question-form" class="space-y-4">
+                    <div>
+                        <label for="edit-question-label" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Question Label</label>
+                        <input type="text" id="edit-question-label" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" value="${question.label}" required>
+                    </div>
+                    <div>
+                        <label for="edit-question-type" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Question Type</label>
+                        <select id="edit-question-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                            <option value="text" ${question.type === 'text' ? 'selected' : ''}>Text Input</option>
+                            <option value="textarea" ${question.type === 'textarea' ? 'selected' : ''}>Long Text Area</option>
+                            <option value="email" ${question.type === 'email' ? 'selected' : ''}>Email Input</option>
+                            <option value="date" ${question.type === 'date' ? 'selected' : ''}>Date Input</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="checkbox" id="edit-question-required" class="form-checkbox h-5 w-5 text-blue-600 rounded" ${question.required ? 'checked' : ''}>
+                        <label for="edit-question-required" class="text-gray-700 dark:text-gray-300 text-sm font-semibold">Required Question</label>
+                    </div>
+                    <div class="flex justify-end space-x-4 mt-6">
+                        <button type="button" id="cancel-edit-question-modal" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Cancel
+                        </button>
+                        <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        currentModal = modal;
+
+        document.getElementById('close-edit-question-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+            renderManagePartnerQuestionsPage(); // Re-render the questions list
+        });
+        document.getElementById('cancel-edit-question-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+            renderManagePartnerQuestionsPage(); // Re-render the questions list
+        });
+
+        document.getElementById('edit-question-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newLabel = document.getElementById('edit-question-label').value.trim();
+            const newType = document.getElementById('edit-question-type').value;
+            const newRequired = document.getElementById('edit-question-required').checked;
+
+            if (!newLabel) {
+                showMessageModal("Question label cannot be empty.", 'error');
+                return;
+            }
+
+            let currentQuestions = await fetchPartnerApplicationQuestionsFirestore(); // Re-fetch to ensure latest
+            currentQuestions[index] = {
+                id: question.id, // Keep original ID
+                label: newLabel,
+                type: newType,
+                required: newRequired
+            };
+
+            try {
+                await updatePartnerApplicationQuestionsFirestore(currentQuestions);
+                currentModal.remove();
+                currentModal = null;
+                renderManagePartnerQuestionsPage(); // Re-render to show updated list
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+    }
 
     // --- Navigation and Initialization ---
 
@@ -3092,7 +3468,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'settings', 'about', 'admin', 'edit-post', 'forum', 'logout', 'team', 'send-email', 'partners', 'partner-tos', 'apply-partner', 'partner-applications').
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'settings', 'about', 'admin', 'edit-post', 'forum', 'logout', 'team', 'send-email', 'partners', 'partner-tos', 'apply-partner', 'partner-applications', 'manage-partner-questions').
      * @param {string} [id=null] - Optional: postId for edit-post route, userId for send-email route, or any other ID.
      */
     async function navigateTo(page, id = null) {
@@ -3173,6 +3549,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
             case 'partner-applications': // New Admin: View Partner Applications page
                 renderPartnerApplicationsAdminPage();
+                break;
+            case 'manage-partner-questions': // New Founder: Manage Partner Questions page
+                renderManagePartnerQuestionsPage();
                 break;
             default:
                 renderHomePage();
