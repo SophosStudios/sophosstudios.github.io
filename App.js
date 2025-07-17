@@ -1469,12 +1469,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const sidebar = document.getElementById('online-users-sidebar');
         if (!sidebar) return; // Exit if sidebar element doesn't exist
 
-        const onlineCount = onlineUsers.length;
-
         sidebar.innerHTML = `
-            <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 text-center">Online Members (${onlineCount})</h3>
+            <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 text-center">Online Members</h3>
             <div id="online-users-list" class="space-y-3 max-h-80 overflow-y-auto">
-                ${onlineCount === 0 ? `
+                ${onlineUsers.length === 0 ? `
                     <p class="text-center text-gray-600 dark:text-gray-400 text-sm">No members currently online.</p>
                 ` : `
                     ${onlineUsers.map(user => `
@@ -2522,7 +2520,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <div class="flex items-center space-x-4 mt-4 border-t pt-4 border-gray-300 dark:border-gray-600">
                                         <!-- Reactions Section -->
                                         <div class="flex items-center space-x-2">
-                                            ${['😀', '❤️', '😂', '🔥'].map(emoji => `
+                                            ${['😀', '❤️', '�', '🔥'].map(emoji => `
                                                 <button class="text-xl p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition duration-200 text-gray-800 dark:text-gray-100" data-post-id="${post.id}" data-emoji="${emoji}">
                                                     ${emoji} <span class="text-sm text-gray-600 dark:text-gray-300">${post.reactions[emoji] || 0}</span>
                                                 </button>
