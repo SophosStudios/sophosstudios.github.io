@@ -1,11 +1,11 @@
 // App.js
 // This script contains the entire application logic, including Firebase initialization
 // and new features like forum, post management, reactions, comments, enhanced backgrounds,
-// online user tracking, and a Discord login button (with important security notes).
+// online user tracking, and a GitHub login button.
 
 // Import Firebase functions
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, OAuthProvider } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, GithubAuthProvider } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField, addDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 import { getDatabase, ref, set, onDisconnect, onValue } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js"; // Import Realtime Database functions for presence
 
@@ -29,12 +29,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     googleProvider.addScope('profile'); // Request profile access
     googleProvider.addScope('email'); // Request email access
 
-    // Initialize Auth Provider for Discord
-    const discordProvider = new OAuthProvider('discord.com');
-    // Add necessary Discord scopes. 'identify' for user info, 'email' for email.
-    // Ensure these scopes are configured in your Discord Developer Portal for your application.
-    discordProvider.addScope('identify');
-    discordProvider.addScope('email');
+    // Initialize Auth Provider for GitHub
+    const githubProvider = new GithubAuthProvider();
+    githubProvider.addScope('user'); // Request user profile data
+
 
     // DOM Elements
     const contentArea = document.getElementById('content-area');
@@ -262,8 +260,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Authenticates a user (login or signup) with Firebase Auth and stores user data in Firestore.
-     * Handles Email/Password, Google, and Discord authentication.
-     * @param {string} type - 'login', 'signup', 'google', or 'discord'.
+     * Handles Email/Password, Google, and GitHub authentication.
+     * @param {string} type - 'login', 'signup', 'google', or 'github'.
      * @param {object} formData - { email, password, username (for signup) }.
      * @returns {Promise<object>} - User data or throws error.
      */
@@ -276,13 +274,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (type === 'google') {
                 userCredential = await signInWithPopup(auth, googleProvider);
                 user = userCredential.user;
-            } else if (type === 'discord') {
-                // IMPORTANT: For production, consider using a backend (e.g., Firebase Cloud Functions)
-                // to handle Discord OAuth to protect your client secret.
-                userCredential = await signInWithPopup(auth, discordProvider);
+            } else if (type === 'github') {
+                userCredential = await signInWithPopup(auth, githubProvider);
                 user = userCredential.user;
-                showMessageModal("Signed in with Discord successfully! Remember to configure your Discord application in Firebase Authentication and Discord Developer Portal.", 'info');
-            } else if (type === 'signup') {
+                showMessageModal("Signed in with GitHub successfully!", 'info');
+            }
+            else if (type === 'signup') {
                 userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
                 user = userCredential.user;
             } else { // login
@@ -302,7 +299,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     throw new Error("Your account has been banned. Please contact support for more information.");
                 }
             } else {
-                // Create user document if it doesn't exist (e.g., new Google/Discord user)
+                // Create user document if it doesn't exist (e.g., new Google/GitHub user)
                 const usernameToUse = formData.username || user.displayName || user.email?.split('@')[0] || 'User';
                 const profilePicToUse = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
 
@@ -822,7 +819,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Simulates sending an email by storing its content in Firestore.
      * @param {string} recipientEmail - The email address of the recipient.
      * @param {string} subject - The subject of the email.
-     * @param {string} message - The body of the email.
+     * @param {string} [message] - The body of the email.
      * @param {string} [imageUrl=null] - Optional URL of an image attachment.
      * @returns {Promise<void>}
      */
@@ -1533,9 +1530,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </svg>
                             <span>Sign in with Google</span>
                         </button>
-                        <button id="discord-auth-btn" class="w-full py-3 rounded-full bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-700 transition duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2">
-                            <i class="fab fa-discord text-2xl"></i>
-                            <span>Sign in with Discord</span>
+                        <button id="github-auth-btn" class="w-full py-3 rounded-full bg-gray-800 text-white font-bold text-lg hover:bg-gray-700 transition duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2">
+                            <i class="fab fa-github text-2xl"></i>
+                            <span>Sign in with GitHub</span>
                         </button>
                     </div>
                 </div>
@@ -1552,7 +1549,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const toggleAuthModeBtn = document.getElementById('toggle-auth-mode');
         const forgotPasswordBtn = document.getElementById('forgot-password-btn');
         const googleAuthBtn = document.getElementById('google-auth-btn');
-        const discordAuthBtn = document.getElementById('discord-auth-btn'); // Get the Discord button
+        const githubAuthBtn = document.getElementById('github-auth-btn'); // Get the GitHub button
 
         let isSignUpMode = false;
 
@@ -1609,11 +1606,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // Add event listener for Discord button
-        discordAuthBtn.addEventListener('click', async () => {
+        // Add event listener for GitHub button
+        githubAuthBtn.addEventListener('click', async () => {
             try {
-                await authenticateUser('discord');
-                // Message handled inside authenticateUser for Discord
+                await authenticateUser('github');
+                // Message handled inside authenticateUser for GitHub
             } catch (error) {
                 showMessageModal(error.message, 'error');
             }
@@ -1967,7 +1964,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         Welcome to a secure and user-friendly platform designed to streamline your online experience. We offer robust user authentication, allowing you to sign up and sign in with ease, keeping your data safe.
                     </p>
                     <p class="text-lg text-gray-700 dark:text-gray-300 mb-4">
-                        Our platform is built with a focus on personalization. You can update your profile information, choose a custom background theme, and manage your personal details within a dedicated settings section.
+                        Our platform is built with a focused on personalization. You can update your profile information, choose a custom background theme, and manage your personal details within a dedicated settings section.
                     </p>
                     <p class="text-lg text-gray-700 dark:text-gray-300 mb-4">
                         For administrators, we provide a powerful admin panel. This feature allows designated users to oversee all registered accounts, view user details, and manage roles (assigning 'admin' or 'member' status) to ensure smooth operation and access control. Admins can also create and manage forum posts.
@@ -2824,7 +2821,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <div class="bg-gray-100 dark:bg-gray-700 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-600 flex flex-col items-center text-center">
                                         <img src="${profilePicSrc}" alt="${partner.username}'s Profile" class="w-28 h-28 rounded-full object-cover border-4 border-indigo-500 shadow-lg mb-4"
                                              onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(partner.username || partner.email || 'U').charAt(0).toUpperCase()}'">
-                                        <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">${partner.username}</h3>
+                                        <h3 class="2xl font-bold text-gray-900 dark:text-gray-100 mb-2">${partner.username}</h3>
                                         <p class="text-md text-indigo-600 font-semibold mb-3">Official Partner</p>
                                         <p class="text-gray-700 dark:text-gray-200 text-sm mb-4 whitespace-pre-wrap">${partner.partnerInfo?.description || 'No description provided yet.'}</p>
 
