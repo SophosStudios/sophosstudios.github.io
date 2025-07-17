@@ -2025,10 +2025,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 <div class="space-y-4">
                     <button id="ban-user-btn" class="w-full py-3 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg ${user.isBanned ? 'hidden' : ''} ${isDisabledForSelf}">
-                        Ban Account
+                        Terminate Account
                     </button>
                     <button id="unban-user-btn" class="w-full py-3 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg ${!user.isBanned ? 'hidden' : ''} ${isDisabledForSelf}">
-                        Unban Account
+                        Revoke Termination
                     </button>
                     <button id="send-email-btn" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg ${isDisabledForSelf}">
                         Send Email
