@@ -331,30 +331,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Updates the current user's profile data in Firestore.
+     * Updates a user's profile data in Firestore.
+     * Can be used by the user themselves or by an admin/founder/co-founder for other users.
+     * @param {string} userIdToUpdate - The UID of the user whose profile is being updated.
      * @param {object} newUserData - Data to update (username, profilePicUrl, backgroundUrl, bio, partnerInfo, theme).
      * @returns {Promise<object>} - Updated user data.
      */
-    async function updateProfileData(newUserData) {
+    async function updateProfileData(userIdToUpdate, newUserData) {
         if (!currentUser) {
-            throw new Error("You must be logged in to update your profile.");
+            throw new Error("You must be logged in to update profiles.");
+        }
+
+        // Check if the current user is authorized to update this specific user's profile.
+        // Users can update their own profile. Admins/Founders/Co-founders can update any profile.
+        const isAuthorized = (currentUser.uid === userIdToUpdate) ||
+                             (userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder');
+
+        if (!isAuthorized) {
+            throw new Error("Not authorized to update this profile.");
         }
 
         showLoadingSpinner();
         try {
-            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
+            const userDocRef = doc(db, `/artifacts/${APP_ID}/public/data/users`, userIdToUpdate);
 
-            // Update Firebase Auth display name if username changed
-            if (auth.currentUser && newUserData.username && auth.currentUser.displayName !== newUserData.username) {
+            // If updating current user's own profile and username changed, update Firebase Auth display name
+            if (currentUser.uid === userIdToUpdate && auth.currentUser && newUserData.username && auth.currentUser.displayName !== newUserData.username) {
                 await updateProfile(auth.currentUser, { displayName: newUserData.username });
             }
 
-            // Update Firestore document
+            // If an admin/founder/co-founder is changing another user's email, update Firebase Auth email
+            // Note: This is a sensitive operation and requires re-authentication for the target user.
+            // For this client-side implementation, we'll only update the Firestore record for email.
+            // A more robust solution would involve Firebase Admin SDK on a backend.
+            if (currentUser.uid !== userIdToUpdate && newUserData.email) {
+                // For security, Firebase Auth email changes should ideally be done by the user themselves
+                // or via a backend with Firebase Admin SDK. Here, we'll just update the Firestore record.
+                console.warn("Admin/Founder/Co-founder is attempting to change another user's email. This only updates the Firestore record, not Firebase Auth directly for security reasons.");
+            }
+
             await updateDoc(userDocRef, newUserData);
 
-            // Fetch the updated document to return the latest state
-            const docSnap = await getDoc(userDocRef);
-            return docSnap.exists() ? docSnap.data() : null;
+            // If the current user's own profile was updated, update the global userData
+            if (currentUser.uid === userIdToUpdate) {
+                const docSnap = await getDoc(userDocRef);
+                return docSnap.exists() ? docSnap.data() : null;
+            } else {
+                // If another user's profile was updated, just return success indication
+                return { success: true };
+            }
         } catch (error) {
             console.error("Error updating profile in Firestore:", error.message);
             throw new Error("Failed to update profile. Please try again: " + error.message);
@@ -396,23 +421,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Updates a user's role by an admin/founder in Firestore.
+     * Updates a user's role by an admin/founder/co-founder in Firestore.
      * @param {string} userId - ID of the user to update.
-     * @param {string} newRole - The new role ('member', 'admin', 'founder', 'partner').
+     * @param {string} newRole - The new role ('member', 'admin', 'founder', 'co-founder', 'partner').
      * @returns {Promise<boolean>} - True on success.
      */
     async function updateUserRoleFirestore(userId, newRole) {
-        // Only admins can change roles, but founders can change any role.
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        // Only admins/founders/co-founders can change roles.
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
             throw new Error("Not authorized to change roles.");
         }
 
-        // Prevent admins from setting founder role (only founders can do this)
-        if (newRole === 'founder' && userData.role !== 'founder') {
-            throw new Error("Only a founder can assign the 'founder' role.");
+        // Prevent admins from setting founder/co-founder role (only founders/co-founders can do this)
+        if ((newRole === 'founder' || newRole === 'co-founder') && (userData.role !== 'founder' && userData.role !== 'co-founder')) {
+            throw new Error("Only a founder or co-founder can assign the 'founder' or 'co-founder' role.");
         }
 
-        // Prevent self-demotion from founder/admin, or self-deletion from any role via the panel.
+        // Prevent self-demotion from founder/admin/co-founder, or self-deletion from any role via the panel.
         if (userId === currentUser.uid) {
             showMessageModal("You cannot change your own role or delete your own account from the admin panel. Please manage your own profile in the 'Profile' section.", 'info');
             return false; // Indicate operation was not performed due to safety check
@@ -438,7 +463,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<boolean>} - True on success.
      */
     async function setUserBanStatusFirestore(userId, isBanned) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
             throw new Error("Not authorized to ban/unban users.");
         }
         if (userId === currentUser.uid) {
@@ -461,14 +486,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     /**
-     * Deletes a user's data from Firestore by an admin/founder.
+     * Deletes a user's data from Firestore by an admin/founder/co-founder.
      * Note: This does NOT delete the user from Firebase Authentication.
      * For full deletion, server-side code (e.g., using Firebase Admin SDK) is required.
      * @param {string} userId - ID of the user to delete.
      * @returns {Promise<boolean>} - True on success.
      */
     async function deleteUserFirestore(userId) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
             throw new Error("Not authorized to delete users.");
         }
         if (userId === currentUser.uid) {
@@ -497,8 +522,8 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<void>}
      */
     async function createPostFirestore(title, content) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
-            throw new Error("Only admins and founders can create posts.");
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
+            throw new Error("Only admins, founders, and co-founders can create posts.");
         }
         showLoadingSpinner();
         try {
@@ -530,8 +555,8 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<void>}
      */
     async function updatePostFirestore(postId, title, content) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
-            throw new Error("Only admins and founders can edit posts.");
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
+            throw new Error("Only admins, founders, and co-founders can edit posts.");
         }
         showLoadingSpinner();
         try {
@@ -557,8 +582,8 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<void>}
      */
     async function deletePostFirestore(postId) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
-            throw new Error("Only admins and founders can delete posts.");
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
+            throw new Error("Only admins, founders, and co-founders can delete posts.");
         }
         showLoadingSpinner();
         try {
@@ -727,7 +752,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<void>}
      */
     async function sendEmailToUserFirestore(recipientEmail, subject, message, imageUrl = null) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
             throw new Error("Not authorized to send emails.");
         }
         showLoadingSpinner();
@@ -774,12 +799,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Updates the Partner TOS content in Firestore.
-     * Only callable by admins and founders.
+     * Only callable by admins, founders, and co-founders.
      * @param {string} newContent - The new TOS content.
      * @returns {Promise<void>}
      */
     async function updatePartnerTOSFirestore(newContent) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
             throw new Error("Not authorized to update Partner TOS.");
         }
         showLoadingSpinner();
@@ -837,13 +862,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Updates the partner application questions in Firestore.
-     * Only callable by founders.
+     * Only callable by founders and co-founders.
      * @param {Array<object>} questions - An array of question objects to save.
      * @returns {Promise<void>}
      */
     async function updatePartnerApplicationQuestionsFirestore(questions) {
-        if (!currentUser || userData.role !== 'founder') {
-            throw new Error("Only founders can manage partner application questions.");
+        if (!currentUser || (userData.role !== 'founder' && userData.role !== 'co-founder')) {
+            throw new Error("Only founders and co-founders can manage partner application questions.");
         }
         showLoadingSpinner();
         try {
@@ -898,7 +923,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<Array<object>>} - List of partner applications.
      */
     async function fetchAllPartnerApplicationsFirestore() {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
             throw new Error("Not authorized to view partner applications.");
         }
         showLoadingSpinner();
@@ -937,7 +962,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {Promise<void>}
      */
     async function updatePartnerApplicationStatusFirestore(applicationId, status, reviewNotes, applicantId) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
             throw new Error("Not authorized to review partner applications.");
         }
         showLoadingSpinner();
@@ -1046,10 +1071,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 items: [
                     { id: 'nav-admin', text: 'Admin Panel', page: 'admin' },
                     { id: 'nav-partner-applications', text: 'Partner Applications', page: 'partner-applications' }, // New admin link
-                    { id: 'nav-manage-partner-questions', text: 'Manage Partner Questions', page: 'manage-partner-questions', roles: ['founder'] } // New founder link
+                    { id: 'nav-manage-partner-questions', text: 'Manage Partner Questions', page: 'manage-partner-questions', roles: ['founder', 'co-founder'] } // New founder/co-founder link
                 ],
                 authRequired: true,
-                roles: ['admin', 'founder']
+                roles: ['admin', 'founder', 'co-founder']
             },
             {
                 name: 'Account',
@@ -1258,6 +1283,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     emoji = '✨'; // Sparkles emoji
                     colorClass = 'text-purple-600'; // Founder color
                     break;
+                case 'co-founder': // New co-founder role
+                    emoji = '🌟'; // Star emoji
+                    colorClass = 'text-yellow-600'; // Co-founder color
+                    break;
                 case 'partner': // New partner role
                     emoji = '🤝'; // Handshake emoji
                     colorClass = 'text-indigo-600'; // Partner color
@@ -1267,7 +1296,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     colorClass = 'text-gray-800';
             }
             // Apply a subtle animation for all roles, or only privileged ones
-            const animationClass = (role === 'admin' || role === 'founder' || role === 'partner') ? 'animate-pulse' : '';
+            const animationClass = (role === 'admin' || role === 'founder' || role === 'co-founder' || role === 'partner') ? 'animate-pulse' : '';
             return `<span class="font-semibold ${colorClass} ${animationClass}">${emoji} ${role}</span>`;
         };
 
@@ -1292,7 +1321,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button id="go-to-forum-btn" class="py-3 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Visit Forum
                         </button>
-                        ${userData.role === 'admin' || userData.role === 'founder' ? `
+                        ${userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder' ? `
                         <button id="go-to-admin-btn" class="py-3 px-6 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Admin Panel
                         </button>` : ''}
@@ -1311,7 +1340,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (currentUser && userData) {
             document.getElementById('go-to-profile-btn').addEventListener('click', () => navigateTo('profile'));
             document.getElementById('go-to-forum-btn').addEventListener('click', () => navigateTo('forum'));
-            if (userData.role === 'admin' || userData.role === 'founder') {
+            if (userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder') {
                 document.getElementById('go-to-admin-btn').addEventListener('click', () => navigateTo('admin'));
             }
         } else {
@@ -1483,7 +1512,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const newUsername = usernameInput.value;
 
             try {
-                const updatedData = await updateProfileData({
+                const updatedData = await updateProfileData(currentUser.uid, {
                     username: newUsername
                 });
                 if (updatedData) {
@@ -1526,7 +1555,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             { name: 'Orange-Red Gradient', class: 'bg-gradient-to-r from-orange-600 to-red-600' },
         ];
 
-        const isPartnerOrAdmin = userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder';
+        const isPartnerOrAdmin = userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder';
         const partnerLinks = userData.partnerInfo?.links || {};
 
         contentArea.innerHTML = `
@@ -1705,7 +1734,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         darkModeToggle.addEventListener('change', async () => {
             const newTheme = darkModeToggle.checked ? 'dark' : 'light';
             try {
-                const updatedData = await updateProfileData({ theme: newTheme });
+                const updatedData = await updateProfileData(currentUser.uid, { theme: newTheme });
                 if (updatedData) {
                     userData = updatedData;
                     updateBodyBackground(); // Re-apply theme and background
@@ -1748,7 +1777,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             try {
-                const updatedData = await updateProfileData({
+                const updatedData = await updateProfileData(currentUser.uid, {
                     profilePicUrl: newProfilePicUrl,
                     backgroundUrl: newBackgroundUrl,
                     bio: newBio,
@@ -1801,7 +1830,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Renders the Admin Panel page.
      */
     async function renderAdminPanelPage() {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
@@ -1833,7 +1862,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button id="view-partner-applications-btn" class="py-2 px-6 rounded-full bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             View Partner Applications
                         </button>
-                        ${userData.role === 'founder' ? `
+                        ${userData.role === 'founder' || userData.role === 'co-founder' ? `
                             <button id="manage-partner-questions-btn" class="py-2 px-6 rounded-full bg-teal-600 text-white font-bold text-lg hover:bg-teal-700 transition duration-300 transform hover:scale-105 shadow-lg">
                                 Manage Partner Questions
                             </button>
@@ -1882,9 +1911,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
                 // Disable controls for the current user to prevent self-demotion/deletion via UI
                 const isDisabled = user.id === currentUser.uid ? 'disabled' : '';
-                // Only founders can assign the 'founder' role
-                const canAssignFounder = userData.role === 'founder';
-                const showFounderOption = canAssignFounder || user.role === 'founder'; // Show founder option if current user is founder or if target user is already a founder
+                // Only founders/co-founders can assign the 'founder' or 'co-founder' role
+                const canAssignFounderOrCoFounder = userData.role === 'founder' || userData.role === 'co-founder';
+                const showFounderOption = canAssignFounderOrCoFounder || user.role === 'founder'; // Show founder option if current user is founder/co-founder or if target user is already a founder
+                const showCoFounderOption = canAssignFounderOrCoFounder || user.role === 'co-founder'; // Show co-founder option if current user is founder/co-founder or if target user is already a co-founder
+
 
                 return `
                     <tr data-user-id="${user.id}" class="hover:bg-gray-50 dark:hover:bg-gray-700">
@@ -1906,6 +1937,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
                                 <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
                                 <option value="partner" ${user.role === 'partner' ? 'selected' : ''}>Partner</option>
+                                ${showCoFounderOption ? `<option value="co-founder" ${user.role === 'co-founder' ? 'selected' : ''}>Co-Founder</option>` : ''}
                                 ${showFounderOption ? `<option value="founder" ${user.role === 'founder' ? 'selected' : ''}>Founder</option>` : ''}
                             </select>
                         </td>
@@ -1953,15 +1985,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         // Removed create-post-btn from here, as it's now on the forum page
-        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins/Founders can manage from forum view
+        document.getElementById('view-forum-admin-btn').addEventListener('click', () => navigateTo('forum')); // Admins/Founders/Co-founders can manage from forum view
         document.getElementById('view-partner-applications-btn').addEventListener('click', () => navigateTo('partner-applications'));
-        if (userData.role === 'founder') {
+        if (userData.role === 'founder' || userData.role === 'co-founder') {
             document.getElementById('manage-partner-questions-btn').addEventListener('click', () => navigateTo('manage-partner-questions'));
         }
     }
 
     /**
-     * Shows a modal for taking action on a user (Ban/Unban/Delete/Send Email/Edit Partner Card).
+     * Shows a modal for taking action on a user (Ban/Unban/Delete/Send Email/Edit Partner Card/Edit User Info).
      * @param {object} user - The user object to display and act upon.
      */
     function showTakeActionModal(user) {
@@ -1976,7 +2008,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const profileIconSrc = user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`;
         const isDisabledForSelf = user.id === currentUser.uid ? 'disabled' : '';
         const isPartner = user.role === 'partner';
-        const isAdminOrFounder = userData.role === 'admin' || userData.role === 'founder';
+        const isAdminOrFounderOrCoFounder = userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder';
 
         modal.innerHTML = `
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl text-center max-w-md w-full relative">
@@ -2001,7 +2033,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button id="send-email-btn" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg ${isDisabledForSelf}">
                         Send Email
                     </button>
-                    ${(isPartner && isAdminOrFounder) ? `
+                    ${isAdminOrFounderOrCoFounder ? `
+                        <button id="edit-user-info-admin-btn" class="w-full py-3 rounded-full bg-orange-600 text-white font-bold text-lg hover:bg-orange-700 transition duration-300 transform hover:scale-105 shadow-lg ${isDisabledForSelf}">
+                            Edit User Info
+                        </button>
+                    ` : ''}
+                    ${(isPartner && isAdminOrFounderOrCoFounder) ? `
                         <button id="edit-partner-card-admin-btn" class="w-full py-3 rounded-full bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-700 transition duration-300 transform hover:scale-105 shadow-lg ${isDisabledForSelf}">
                             Edit Partner Card
                         </button>
@@ -2024,7 +2061,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const banBtn = document.getElementById('ban-user-btn');
         const unbanBtn = document.getElementById('unban-user-btn');
         const sendEmailBtn = document.getElementById('send-email-btn');
-        const editPartnerCardAdminBtn = document.getElementById('edit-partner-card-admin-btn'); // New button
+        const editUserInfoAdminBtn = document.getElementById('edit-user-info-admin-btn'); // New button
+        const editPartnerCardAdminBtn = document.getElementById('edit-partner-card-admin-btn');
         const deleteBtn = document.getElementById('delete-user-btn');
 
         if (banBtn) {
@@ -2072,7 +2110,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // Event listener for "Edit Partner Card" button (for admins/founders)
+        // Event listener for "Edit User Info" button (for admins/founders/co-founders)
+        if (editUserInfoAdminBtn) {
+            editUserInfoAdminBtn.addEventListener('click', () => {
+                currentModal.remove(); // Close the current modal
+                currentModal = null;
+                showEditUserInfoModal(user); // Open the user info edit modal for this user
+            });
+        }
+
+        // Event listener for "Edit Partner Card" button (for admins/founders/co-founders)
         if (editPartnerCardAdminBtn) {
             editPartnerCardAdminBtn.addEventListener('click', () => {
                 currentModal.remove(); // Close the current modal
@@ -2100,6 +2147,89 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Shows a modal for admins/founders/co-founders to edit a user's basic info.
+     * @param {object} userToEdit - The user object whose info is being edited.
+     */
+    function showEditUserInfoModal(userToEdit) {
+        if (currentModal) {
+            currentModal.remove();
+        }
+
+        const modal = document.createElement('div');
+        modal.id = 'edit-user-info-modal';
+        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+
+        modal.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700 relative">
+                <button class="absolute top-4 right-4 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100 text-2xl font-bold" id="close-edit-user-info-modal">&times;</button>
+                <h2 class="text-2xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-6">Edit User Info: ${userToEdit.username}</h2>
+                <form id="edit-user-info-form" class="space-y-4">
+                    <div>
+                        <label for="edit-user-username" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Username</label>
+                        <input type="text" id="edit-user-username" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" value="${userToEdit.username || ''}" required>
+                    </div>
+                    <div>
+                        <label for="edit-user-email" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Email</label>
+                        <input type="email" id="edit-user-email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" value="${userToEdit.email || ''}" required>
+                    </div>
+                    <div>
+                        <label for="edit-user-profile-pic-url" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Profile Picture URL</label>
+                        <input type="url" id="edit-user-profile-pic-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., https://example.com/image.jpg" value="${userToEdit.profilePicUrl || ''}">
+                    </div>
+                    <div>
+                        <label for="edit-user-background-url" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Background URL (or Tailwind Class)</label>
+                        <input type="text" id="edit-user-background-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., bg-red-500 or https://example.com/bg.gif" value="${userToEdit.backgroundUrl || ''}">
+                    </div>
+                    <div class="flex justify-end space-x-4 mt-6">
+                        <button type="button" id="cancel-edit-user-info-modal" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Cancel
+                        </button>
+                        <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        currentModal = modal;
+
+        document.getElementById('close-edit-user-info-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+            renderAdminPanelPage(); // Re-render admin panel
+        });
+        document.getElementById('cancel-edit-user-info-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+            renderAdminPanelPage(); // Re-render admin panel
+        });
+
+        document.getElementById('edit-user-info-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newUsername = document.getElementById('edit-user-username').value.trim();
+            const newEmail = document.getElementById('edit-user-email').value.trim();
+            const newProfilePicUrl = document.getElementById('edit-user-profile-pic-url').value.trim();
+            const newBackgroundUrl = document.getElementById('edit-user-background-url').value.trim();
+
+            try {
+                // Call updateProfileData with the userToEdit.id
+                await updateProfileData(userToEdit.id, {
+                    username: newUsername,
+                    email: newEmail, // Note: This updates Firestore, not Firebase Auth email directly
+                    profilePicUrl: newProfilePicUrl,
+                    backgroundUrl: newBackgroundUrl
+                });
+                showMessageModal('User info updated successfully!');
+                currentModal.remove();
+                currentModal = null;
+                renderAdminPanelPage(); // Re-render admin panel to show changes
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+    }
 
     /**
      * Renders the Create Post page for admins/founders.
@@ -2112,7 +2242,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @param {string} postId - The ID of the post to edit.
      */
     async function renderEditPostPage(postId) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
@@ -2212,7 +2342,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
                 <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Forum & Announcements</h2>
-                    ${userData.role === 'admin' || userData.role === 'founder' ? `
+                    ${userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder' ? `
                         <div class="mb-6 text-center">
                             <button id="create-post-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
                                 Create New Post
@@ -2243,7 +2373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         </div>
 
                                         <!-- Admin Actions (Edit/Delete) -->
-                                        ${userData.role === 'admin' || userData.role === 'founder' ? `
+                                        ${userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder' ? `
                                             <div class="ml-auto space-x-2">
                                                 <button class="text-blue-600 hover:text-blue-800 font-semibold" data-post-id="${post.id}" data-action="edit">Edit</button>
                                                 <button class="text-red-600 hover:text-red-800 font-semibold" data-post-id="${post.id}" data-action="delete">Delete</button>
@@ -2407,8 +2537,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             hideLoadingSpinner();
         }
 
-        // Filter users to only include admins, founders, and partners
-        const teamMembers = allUsers.filter(user => user.role === 'admin' || user.role === 'founder' || user.role === 'partner');
+        // Filter users to only include admins, founders, co-founders, and partners
+        const teamMembers = allUsers.filter(user => user.role === 'admin' || user.role === 'founder' || user.role === 'co-founder' || user.role === 'partner');
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
@@ -2426,7 +2556,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 // Link icons and their corresponding Font Awesome classes
                                 const linkIcons = {
                                     discord: 'fab fa-discord',
-                                    roblox: 'fab fa-gamepad',
+                                    roblox: 'fab fa-roblox',
                                     fivem: 'fas fa-gamepad', // Generic gamepad for FiveM
                                     codingCommunity: 'fas fa-code', // Generic code for coding community
                                     minecraft: 'fas fa-cube', // Generic cube for Minecraft
@@ -2442,7 +2572,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                             <p class="text-md text-gray-600 dark:text-gray-300 mb-2">${member.role.charAt(0).toUpperCase() + member.role.slice(1)}</p>
                                             <p class="text-gray-700 dark:text-gray-200 text-sm whitespace-pre-wrap">${member.bio || 'No bio provided yet.'}</p>
 
-                                            ${member.role === 'partner' || member.role === 'admin' || member.role === 'founder' ? `
+                                            ${member.role === 'partner' || member.role === 'admin' || member.role === 'founder' || member.role === 'co-founder' ? `
                                                 <div class="mt-4 flex flex-wrap justify-center sm:justify-start gap-3">
                                                     ${Object.entries(member.partnerInfo?.links || {}).map(([platform, link]) => link ? `
                                                         <a href="${link}" target="_blank" rel="noopener noreferrer" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 transition duration-200 flex items-center space-x-2">
@@ -2506,7 +2636,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const partners = allUsers.filter(user => user.role === 'partner');
-        const isAdminOrFounder = userData.role === 'admin' || userData.role === 'founder';
+        const isAdminOrFounderOrCoFounder = userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder';
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
@@ -2523,7 +2653,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                                 const linkIcons = {
                                     discord: 'fab fa-discord',
-                                    roblox: 'fab fa-gamepad',
+                                    roblox: 'fab fa-roblox',
                                     fivem: 'fas fa-gamepad',
                                     codingCommunity: 'fas fa-code',
                                     minecraft: 'fas fa-cube',
@@ -2547,7 +2677,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                             ` : '').join('')}
                                         </div>
 
-                                        ${(isCurrentUserPartner || isAdminOrFounder) ? `
+                                        ${(isCurrentUserPartner || isAdminOrFounderOrCoFounder) ? `
                                             <button class="mt-auto py-2 px-5 rounded-full bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition duration-300 transform hover:scale-105 shadow-lg"
                                                     data-partner-id="${partner.id}" data-action="edit-partner-card">
                                                 Edit Card
@@ -2576,7 +2706,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Shows a modal for editing a partner's card information (description and links).
-     * This modal is used by partners to edit their own, and by admins/founders to edit others.
+     * This modal is used by partners to edit their own, and by admins/founders/co-founders to edit others.
      * @param {object} partnerUser - The user object (who has the 'partner' role) to edit.
      */
     function showEditPartnerCardModal(partnerUser) {
@@ -2680,11 +2810,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
     /**
-     * Renders the Send Email page for admins/founders.
+     * Renders the Send Email page for admins/founders/co-founders.
      * @param {string} [recipientUserId=null] - The ID of the user to pre-fill the recipient email.
      */
     async function renderSendEmailPage(recipientUserId = null) {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
@@ -2802,7 +2932,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             tosContent = "Error loading terms of service.";
         }
 
-        const isAdminOrFounder = userData.role === 'admin' || userData.role === 'founder';
+        const isAdminOrFounderOrCoFounder = userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder';
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
@@ -2811,7 +2941,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div id="tos-content" class="prose max-w-none text-gray-700 dark:text-gray-200 leading-relaxed mb-6 p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
                         <p class="whitespace-pre-wrap">${tosContent}</p>
                     </div>
-                    ${isAdminOrFounder ? `
+                    ${isAdminOrFounderOrCoFounder ? `
                         <div class="text-center">
                             <button id="edit-tos-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
                                 Edit Rules
@@ -2822,7 +2952,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
         `;
 
-        if (isAdminOrFounder) {
+        if (isAdminOrFounderOrCoFounder) {
             document.getElementById('edit-tos-btn').addEventListener('click', () => {
                 showEditPartnerTOSModal(tosContent);
             });
@@ -2906,8 +3036,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Prevent partners, admins, founders from applying
-        if (userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder') {
+        // Prevent partners, admins, founders, co-founders from applying
+        if (userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder') {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
@@ -3016,7 +3146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Renders the admin page to view and manage partner applications.
      */
     async function renderPartnerApplicationsAdminPage() {
-        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder')) {
+        if (!currentUser || (userData.role !== 'admin' && userData.role !== 'founder' && userData.role !== 'co-founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
@@ -3190,15 +3320,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Renders the page for founders to manage partner application questions.
+     * Renders the page for founders and co-founders to manage partner application questions.
      */
     async function renderManagePartnerQuestionsPage() {
-        if (!currentUser || userData.role !== 'founder') {
+        if (!currentUser || (userData.role !== 'founder' && userData.role !== 'co-founder')) {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                         <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                        <p class="text-lg text-gray-700 dark:text-gray-300">You do not have founder privileges to manage partner questions.</p>
+                        <p class="text-lg text-gray-700 dark:text-gray-300">You do not have founder or co-founder privileges to manage partner questions.</p>
                     </div>
                 </div>
             `;
@@ -3550,7 +3680,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'partner-applications': // New Admin: View Partner Applications page
                 renderPartnerApplicationsAdminPage();
                 break;
-            case 'manage-partner-questions': // New Founder: Manage Partner Questions page
+            case 'manage-partner-questions': // New Founder/Co-founder: Manage Partner Questions page
                 renderManagePartnerQuestionsPage();
                 break;
             default:
