@@ -1293,7 +1293,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                                 <div class="space-y-4 mt-4">
                                     <h4 class="text-lg font-semibold text-gray-800">Partner Links</h4>
-                                    ${['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft'].map(platform => `
+                                    ${['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', "website"].map(platform => `
                                         <div>
                                             <label for="partner-link-${platform}" class="block text-gray-700 text-sm font-semibold mb-2 capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()} Link</label>
                                             <input type="url" id="partner-link-${platform}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter URL for ${platform} profile/community" value="${partnerLinks[platform] || ''}">
@@ -1322,7 +1322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Partner specific elements
         const partnerDescriptionInput = document.getElementById('partner-description');
         const partnerLinkInputs = {};
-        ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft'].forEach(platform => {
+        ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', "website"].forEach(platform => {
             partnerLinkInputs[platform] = document.getElementById(`partner-link-${platform}`);
         });
 
@@ -1355,7 +1355,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
 
             if (isPartnerOrAdmin) {
-                ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft'].forEach(platform => {
+                ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', "website"].forEach(platform => {
                     if (partnerLinkInputs[platform]) {
                         updatedPartnerInfo.links[platform] = partnerLinkInputs[platform].value;
                     }
@@ -2037,7 +2037,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     roblox: 'fab fa-roblox',
                                     fivem: 'fas fa-gamepad', // Generic gamepad for FiveM
                                     codingCommunity: 'fas fa-code', // Generic code for coding community
-                                    minecraft: 'fas fa-cube' // Generic cube for Minecraft
+                                    minecraft: 'fas fa-cube', // Generic cube for Minecraft
+                                    website: 'fas fa-globe'
                                 };
 
                                 return `
@@ -2133,7 +2134,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     roblox: 'fab fa-roblox',
                                     fivem: 'fas fa-gamepad',
                                     codingCommunity: 'fas fa-code',
-                                    minecraft: 'fas fa-cube'
+                                    minecraft: 'fas fa-cube', // Generic cube for Minecraft
+                                    website: 'fas fa-globe',
                                 };
 
                                 return `
@@ -2208,7 +2210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     <div class="space-y-3">
                         <h3 class="text-lg font-semibold text-gray-800">Partner Links</h3>
-                        ${['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft'].map(platform => `
+                        ${['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', 'website'].map(platform => `
                             <div>
                                 <label for="modal-partner-link-${platform}" class="block text-gray-700 text-sm font-semibold mb-2 capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()} Link</label>
                                 <input type="url" id="modal-partner-link-${platform}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter URL for ${platform} profile/community" value="${currentPartnerInfo.links[platform] || ''}">
@@ -2254,7 +2256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             const newDescription = document.getElementById('modal-partner-description').value;
             const newLinks = {};
-            ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft'].forEach(platform => {
+            ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', 'website'].forEach(platform => {
                 newLinks[platform] = document.getElementById(`modal-partner-link-${platform}`).value;
             });
 
