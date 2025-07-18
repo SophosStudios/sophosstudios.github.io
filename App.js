@@ -1,13 +1,11 @@
 // App.js
 // This script contains the entire application logic, including Firebase initialization
-// and new features like forum, post management, reactions, comments, enhanced backgrounds,
-// online user tracking, and a GitHub login button.
+// and new features like forum, post management, reactions, comments, and enhanced backgrounds.
 
 // Import Firebase functions
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, GithubAuthProvider } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField, addDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
-import { getDatabase, ref, set, onDisconnect, onValue } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js"; // Import Realtime Database functions for presence
 
 // Import configuration from config.js
 import CONFIG from './config.js'; // Make sure config.js is in the same directory
@@ -20,7 +18,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const rtdb = getDatabase(app); // Initialize Realtime Database
     // Use the projectId as the APP_ID for consistent Firestore collection paths and rules
     const APP_ID = firebaseConfig.projectId;
 
@@ -28,11 +25,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const googleProvider = new GoogleAuthProvider();
     googleProvider.addScope('profile'); // Request profile access
     googleProvider.addScope('email'); // Request email access
-
-    // Initialize Auth Provider for GitHub
-    const githubProvider = new GithubAuthProvider();
-    githubProvider.addScope('user'); // Request user profile data
-
 
     // DOM Elements
     const contentArea = document.getElementById('content-area');
@@ -52,8 +44,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     let userData = null; // Firestore user document data (role, background, etc.)
     let usersList = []; // List of all users for admin panel
     let currentModal = null; // To manage active message modal
-    let onlineUsers = []; // List of currently online users
-    let onlineUsersListener = null; // Realtime Database listener for online users
 
     // --- Utility Functions ---
 
@@ -203,65 +193,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Firebase Integration Functions ---
 
     /**
-     * Sets or updates user presence in Realtime Database.
-     * @param {string} uid - User ID.
-     * @param {boolean} isOnline - True if online, false if offline.
-     */
-    async function updateUserPresence(uid, isOnline) {
-        const userPresenceRef = ref(rtdb, `/artifacts/${APP_ID}/public/data/presence/${uid}`);
-        const timestamp = Date.now();
-
-        if (isOnline) {
-            await set(userPresenceRef, { isOnline: true, lastActive: timestamp });
-            // Set up onDisconnect to automatically set offline when user disconnects
-            onDisconnect(userPresenceRef).set({ isOnline: false, lastActive: Date.now() });
-        } else {
-            await set(userPresenceRef, { isOnline: false, lastActive: timestamp });
-        }
-    }
-
-    /**
-     * Listens for changes in online users from Realtime Database.
-     */
-    function setupOnlineUsersListener() {
-        if (onlineUsersListener) {
-            // Detach previous listener if it exists to prevent duplicates
-            onValue(ref(rtdb, `/artifacts/${APP_ID}/public/data/presence`), onlineUsersListener);
-        }
-
-        const presenceRef = ref(rtdb, `/artifacts/${APP_ID}/public/data/presence`);
-        onlineUsersListener = onValue(presenceRef, async (snapshot) => {
-            const presenceData = snapshot.val();
-            const currentOnlineUsers = [];
-            const fiveMinutesAgo = Date.now() - (5 * 60 * 1000); // 5 minutes in milliseconds
-
-            if (presenceData) {
-                const userIds = Object.keys(presenceData);
-                const userDocsPromises = userIds.map(uid => getDoc(doc(db, `/artifacts/${APP_ID}/public/data/users`, uid)));
-
-                const userDocs = await Promise.all(userDocsPromises);
-
-                userDocs.forEach((docSnap, index) => {
-                    if (docSnap.exists()) {
-                        const uid = userIds[index];
-                        const presence = presenceData[uid];
-                        // Consider user online if isOnline is true AND lastActive is within the last 5 minutes
-                        if (presence.isOnline && presence.lastActive && presence.lastActive > fiveMinutesAgo) {
-                            currentOnlineUsers.push({ id: uid, ...docSnap.data() });
-                        }
-                    }
-                });
-            }
-            onlineUsers = currentOnlineUsers;
-            renderOnlineUsersSidebar(); // Update the sidebar whenever online users change
-        });
-    }
-
-
-    /**
      * Authenticates a user (login or signup) with Firebase Auth and stores user data in Firestore.
-     * Handles Email/Password, Google, and GitHub authentication.
-     * @param {string} type - 'login', 'signup', 'google', or 'github'.
+     * Handles Email/Password and Google authentication.
+     * @param {string} type - 'login', 'signup', or 'google'.
      * @param {object} formData - { email, password, username (for signup) }.
      * @returns {Promise<object>} - User data or throws error.
      */
@@ -274,12 +208,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (type === 'google') {
                 userCredential = await signInWithPopup(auth, googleProvider);
                 user = userCredential.user;
-            } else if (type === 'github') {
-                userCredential = await signInWithPopup(auth, githubProvider);
-                user = userCredential.user;
-                showMessageModal("Signed in with GitHub successfully!", 'info');
-            }
-            else if (type === 'signup') {
+            } else if (type === 'signup') {
                 userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
                 user = userCredential.user;
             } else { // login
@@ -294,13 +223,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             let fetchedUserData;
             if (docSnap.exists()) {
                 fetchedUserData = docSnap.data();
+                // --- START ADDITION FOR BAN FUNCTIONALITY ---
                 if (fetchedUserData.isBanned) {
                     await signOut(auth); // Log out the user from Firebase Auth
                     throw new Error("Your account has been banned. Please contact support for more information.");
                 }
+                // --- END ADDITION FOR BAN FUNCTIONALITY ---
             } else {
-                // Create user document if it doesn't exist (e.g., new Google/GitHub user)
+                // Create user document if it doesn't exist (e.g., new Google user)
                 const usernameToUse = formData.username || user.displayName || user.email?.split('@')[0] || 'User';
+                // Prioritize user.photoURL from auth provider, fallback to placeholder
                 const profilePicToUse = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
 
                 await setDoc(userDocRef, {
@@ -319,10 +251,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const newDocSnap = await getDoc(userDocRef);
                 fetchedUserData = newDocSnap.data();
             }
-
-            // Update user presence in Realtime Database
-            await updateUserPresence(user.uid, true);
-
             return fetchedUserData;
 
         } catch (error) {
@@ -495,7 +423,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     /**
      * Updates a user's role by an admin/founder/co-founder in Firestore.
      * @param {string} userId - ID of the user to update.
-     * @param {string} newRole - The new role ('member', 'admin', 'founder', 'co-founder', 'partner', 'vip').
+     * @param {string} newRole - The new role ('member', 'admin', 'founder', 'co-founder', 'partner').
      * @returns {Promise<boolean>} - True on success.
      */
     async function updateUserRoleFirestore(userId, newRole) {
@@ -819,7 +747,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Simulates sending an email by storing its content in Firestore.
      * @param {string} recipientEmail - The email address of the recipient.
      * @param {string} subject - The subject of the email.
-     * @param {string} [message] - The body of the email.
+     * @param {string} message - The body of the email.
      * @param {string} [imageUrl=null] - Optional URL of an image attachment.
      * @returns {Promise<void>}
      */
@@ -1339,110 +1267,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderHomePage() {
         // Function to get VFX and color for role
         const getRoleVFX = (role) => {
-            let emoji = '✨'; // Sparkles for all roles now
+            let emoji = '';
             let colorClass = 'text-gray-800'; // Default color
 
             switch (role) {
                 case 'member':
+                    emoji = '👤'; // User emoji
                     colorClass = 'text-blue-600'; // Member color
                     break;
                 case 'admin':
+                    emoji = '🛡️'; // Shield emoji
                     colorClass = 'text-red-600'; // Admin color
                     break;
                 case 'founder':
+                    emoji = '✨'; // Sparkles emoji
                     colorClass = 'text-purple-600'; // Founder color
                     break;
                 case 'co-founder': // New co-founder role
+                    emoji = '🌟'; // Star emoji
                     colorClass = 'text-yellow-600'; // Co-founder color
                     break;
                 case 'partner': // New partner role
+                    emoji = '🤝'; // Handshake emoji
                     colorClass = 'text-indigo-600'; // Partner color
                     break;
-                case 'vip': // New VIP role
-                    colorClass = 'text-pink-600'; // VIP color
-                    break;
                 default:
+                    emoji = '';
                     colorClass = 'text-gray-800';
             }
-            // Apply a subtle animation for all roles
-            const animationClass = 'animate-pulse';
-            return `<span class="font-semibold ${colorClass} ${animationClass}">${emoji} ${role.charAt(0).toUpperCase() + role.slice(1)}</span>`;
+            // Apply a subtle animation for all roles, or only privileged ones
+            const animationClass = (role === 'admin' || role === 'founder' || role === 'co-founder' || role === 'partner') ? 'animate-pulse' : '';
+            return `<span class="font-semibold ${colorClass} ${animationClass}">${emoji} ${role}</span>`;
         };
 
 
         contentArea.innerHTML = `
-            <div class="flex flex-col md:flex-row items-start justify-center w-full min-h-[calc(100vh-64px)] p-4">
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700 md:mr-4 mb-4 md:mb-0">
-                    <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-green-600 mb-6">
-                        Welcome to ${CONFIG.websiteTitle}!
-                    </h1>
-                    ${currentUser && userData ? `
-                        <p class="text-xl text-gray-700 dark:text-gray-300 mb-4">
-                            Hello, <span class="font-semibold text-blue-600">${userData.username || currentUser.email}</span>!
-                            You are logged in as a ${getRoleVFX(userData.role)}.
-                        </p>
-                        <p class="text-lg text-gray-600 dark:text-gray-400 mb-6">
-                            Explore your profile settings, check out the forum, or visit the admin panel if you have the permissions.
-                        </p>
-                        <div class="flex flex-col sm:flex-row justify-center gap-4">
-                            <button id="go-to-profile-btn" class="py-3 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                                Go to Profile
-                            </button>
-                            <button id="go-to-forum-btn" class="py-3 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                                Visit Forum
-                            </button>
-                            ${userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder' ? `
-                            <button id="go-to-admin-btn" class="py-3 px-6 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                                Admin Panel
-                            </button>` : ''}
-                        </div>
-                    ` : `
-                        <p class="text-lg text-gray-700 dark:text-gray-300 mb-6">
-                            Sign in or create an account to unlock full features and personalize your experience.
-                        </p>
-                        <button id="go-to-auth-btn" class="py-3 px-8 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                            Sign In / Sign Up
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-green-600 mb-6">
+                    Welcome to ${CONFIG.websiteTitle}!
+                </h1>
+                ${currentUser && userData ? `
+                    <p class="text-xl text-gray-700 dark:text-gray-300 mb-4">
+                        Hello, <span class="font-semibold text-blue-600">${userData.username || currentUser.email}</span>!
+                        You are logged in as a ${getRoleVFX(userData.role)}.
+                    </p>
+                    <p class="text-lg text-gray-600 dark:text-gray-400 mb-6">
+                        Explore your profile settings, check out the forum, or visit the admin panel if you have the permissions.
+                    </p>
+                    <div class="flex flex-col sm:flex-row justify-center gap-4">
+                        <button id="go-to-profile-btn" class="py-3 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Go to Profile
                         </button>
-                    `}
-                </div>
-                <!-- Online Users Sidebar -->
-                <div id="online-users-sidebar" class="hidden md:block bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl w-full md:w-64 backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                    <!-- Content will be rendered by renderOnlineUsersSidebar() -->
-                </div>
+                        <button id="go-to-forum-btn" class="py-3 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Visit Forum
+                        </button>
+                        ${userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder' ? `
+                        <button id="go-to-admin-btn" class="py-3 px-6 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Admin Panel
+                        </button>` : ''}
+                    </div>
+                ` : `
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-6">
+                        Sign in or create an account to unlock full features and personalize your experience.
+                    </p>
+                    <button id="go-to-auth-btn" class="py-3 px-8 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                        Sign In / Sign Up
+                    </button>
+                `}
             </div>
-            <style>
-                /* Custom Scrollbar for Online Users Sidebar */
-                #online-users-list::-webkit-scrollbar {
-                    width: 8px;
-                }
-
-                #online-users-list::-webkit-scrollbar-track {
-                    background: #f1f1f1; /* Light gray track */
-                    border-radius: 10px;
-                }
-
-                #online-users-list::-webkit-scrollbar-thumb {
-                    background: #888; /* Dark gray thumb */
-                    border-radius: 10px;
-                }
-
-                #online-users-list::-webkit-scrollbar-thumb:hover {
-                    background: #555; /* Darker gray on hover */
-                }
-
-                /* Dark mode scrollbar */
-                .dark #online-users-list::-webkit-scrollbar-track {
-                    background: #333; /* Darker track for dark mode */
-                }
-
-                .dark #online-users-list::-webkit-scrollbar-thumb {
-                    background: #666; /* Lighter thumb for dark mode */
-                }
-
-                .dark #online-users-list::-webkit-scrollbar-thumb:hover {
-                    background: #888; /* Even lighter on hover for dark mode */
-                }
-            </style>
         `;
 
         if (currentUser && userData) {
@@ -1454,36 +1346,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             document.getElementById('go-to-auth-btn').addEventListener('click', () => navigateTo('auth'));
         }
-
-        // Initial render of the sidebar
-        renderOnlineUsersSidebar();
     }
-
-    /**
-     * Renders the sidebar showing online users.
-     */
-    function renderOnlineUsersSidebar() {
-        const sidebar = document.getElementById('online-users-sidebar');
-        if (!sidebar) return; // Exit if sidebar element doesn't exist
-
-        sidebar.innerHTML = `
-            <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 text-center">Online Members</h3>
-            <div id="online-users-list" class="space-y-3 max-h-80 overflow-y-auto">
-                ${onlineUsers.length === 0 ? `
-                    <p class="text-center text-gray-600 dark:text-gray-400 text-sm">No members currently online.</p>
-                ` : `
-                    ${onlineUsers.map(user => `
-                        <div class="flex items-center space-x-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-700">
-                            <img src="${user.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}`}" alt="Profile" class="w-8 h-8 rounded-full object-cover border-2 border-green-500"
-                                 onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}'">
-                            <span class="text-gray-800 dark:text-gray-100 font-medium text-sm">${user.username || user.email}</span>
-                        </div>
-                    `).join('')}
-                `}
-            </div>
-        `;
-    }
-
 
     /**
      * Renders the Auth (Sign In / Sign Up) page.
@@ -1518,16 +1381,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                             Forgot Password?
                         </button>
                     </div>
-                    <div class="mt-6 space-y-4">
+                    <div class="mt-6">
                         <button id="google-auth-btn" class="w-full py-3 rounded-full bg-red-500 text-white font-bold text-lg hover:bg-red-600 transition duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2">
                             <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M12.24 10.26v3.29h6.14c-.26 1.63-1.4 3.01-3.23 3.91l-.01.01-2.58 2.02c-1.52 1.19-3.4 1.83-5.32 1.83-4.8 0-8.72-3.86-8.72-8.62s3.92-8.62 8.72-8.62c2.81 0 4.67 1.19 5.86 2.36L18.42 5c-.71-.69-2.09-1.83-5.46-1.83-3.69 0-6.73 2.97-6.73 6.64s3.04 6.64 6.73 6.64c2.86 0 4.69-1.22 5.56-2.26l.01-.01-4.73-3.71z" fill="#FFFFFF"></path>
                             </svg>
                             <span>Sign in with Google</span>
-                        </button>
-                        <button id="github-auth-btn" class="w-full py-3 rounded-full bg-gray-800 text-white font-bold text-lg hover:bg-gray-700 transition duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2">
-                            <i class="fab fa-github text-2xl"></i>
-                            <span>Sign in with GitHub</span>
                         </button>
                     </div>
                 </div>
@@ -1543,8 +1402,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const authSubmitBtn = document.getElementById('auth-submit-btn');
         const toggleAuthModeBtn = document.getElementById('toggle-auth-mode');
         const forgotPasswordBtn = document.getElementById('forgot-password-btn');
-        const googleAuthBtn = document.getElementById('google-auth-btn');
-        const githubAuthBtn = document.getElementById('github-auth-btn'); // Get the GitHub button
+        const googleAuthBtn = document.getElementById('google-auth-btn'); // Get the Google button
 
         let isSignUpMode = false;
 
@@ -1595,17 +1453,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         googleAuthBtn.addEventListener('click', async () => {
             try {
                 await authenticateUser('google');
-                // Message handled inside authenticateUser for Google
-            } catch (error) {
-                showMessageModal(error.message, 'error');
-            }
-        });
-
-        // Add event listener for GitHub button
-        githubAuthBtn.addEventListener('click', async () => {
-            try {
-                await authenticateUser('github');
-                // Message handled inside authenticateUser for GitHub
+                showMessageModal('Signed in with Google successfully!');
             } catch (error) {
                 showMessageModal(error.message, 'error');
             }
@@ -1707,7 +1555,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             { name: 'Orange-Red Gradient', class: 'bg-gradient-to-r from-orange-600 to-red-600' },
         ];
 
-        const isPartnerOrAdmin = userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder' || userData.role === 'vip';
+        const isPartnerOrAdmin = userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder';
         const partnerLinks = userData.partnerInfo?.links || {};
 
         contentArea.innerHTML = `
@@ -1959,7 +1807,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         Welcome to a secure and user-friendly platform designed to streamline your online experience. We offer robust user authentication, allowing you to sign up and sign in with ease, keeping your data safe.
                     </p>
                     <p class="text-lg text-gray-700 dark:text-gray-300 mb-4">
-                        Our platform is built with a focused on personalization. You can update your profile information, choose a custom background theme, and manage your personal details within a dedicated settings section.
+                        Our platform is built with a focus on personalization. You can update your profile information, choose a custom background theme, and manage your personal details within a dedicated settings section.
                     </p>
                     <p class="text-lg text-gray-700 dark:text-gray-300 mb-4">
                         For administrators, we provide a powerful admin panel. This feature allows designated users to oversee all registered accounts, view user details, and manage roles (assigning 'admin' or 'member' status) to ensure smooth operation and access control. Admins can also create and manage forum posts.
@@ -2087,9 +1935,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 data-role-select-id="${user.id}"
                             >
                                 <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
-                                <option value="vip" ${user.role === 'vip' ? 'selected' : ''}>VIP</option>
-                                <option value="partner" ${user.role === 'partner' ? 'selected' : ''}>Partner</option>
                                 <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                <option value="partner" ${user.role === 'partner' ? 'selected' : ''}>Partner</option>
                                 ${showCoFounderOption ? `<option value="co-founder" ${user.role === 'co-founder' ? 'selected' : ''}>Co-Founder</option>` : ''}
                                 ${showFounderOption ? `<option value="founder" ${user.role === 'founder' ? 'selected' : ''}>Founder</option>` : ''}
                             </select>
@@ -2681,6 +2528,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showLoadingSpinner();
         let allUsers = [];
         try {
+            // Fetch all users to determine who are admins/founders
             allUsers = await fetchAllUsersFirestore();
         } catch (error) {
             showMessageModal(error.message, 'error');
@@ -2689,88 +2537,64 @@ document.addEventListener('DOMContentLoaded', async () => {
             hideLoadingSpinner();
         }
 
-        // Filter users to only include relevant roles and sort them
-        const foundationTeam = allUsers.filter(user => user.role === 'founder' || user.role === 'co-founder')
-                                      .sort((a, b) => {
-                                          if (a.role === 'founder' && b.role === 'co-founder') return -1;
-                                          if (a.role === 'co-founder' && b.role === 'founder') return 1;
-                                          return a.username.localeCompare(b.username); // Alphabetical for same role
-                                      });
-        const administrationTeam = allUsers.filter(user => user.role === 'admin')
-                                          .sort((a, b) => a.username.localeCompare(b.username));
-        const partnersTeam = allUsers.filter(user => user.role === 'partner')
-                                    .sort((a, b) => a.username.localeCompare(b.username));
-        const vipTeam = allUsers.filter(user => user.role === 'vip')
-                                .sort((a, b) => a.username.localeCompare(b.username));
-        const membersTeam = allUsers.filter(user => user.role === 'member')
-                                   .sort((a, b) => a.username.localeCompare(b.username));
-
-        // Helper to render a section of team members
-        const renderTeamSection = (title, members) => {
-            if (members.length === 0) return '';
-            return `
-                <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mt-8 mb-6 text-center">${title}</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    ${members.map(member => {
-                        const profilePicSrc = member.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(member.username || member.email || 'U').charAt(0).toUpperCase()}`;
-                        const isCurrentUser = currentUser && member.id === currentUser.uid;
-
-                        const linkIcons = {
-                            discord: 'fab fa-discord',
-                            roblox: 'fas fa-gamepad',
-                            fivem: 'fas fa-car', // More specific icon for FiveM
-                            codingCommunity: 'fas fa-code',
-                            minecraft: 'fas fa-cube',
-                            website: 'fas fa-globe'
-                        };
-
-                        return `
-                            <div class="flex flex-col items-center text-center p-6 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-md border border-gray-200 dark:border-gray-600">
-                                <img src="${profilePicSrc}" alt="${member.username}'s Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-4"
-                                     onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(member.username || member.email || 'U').charAt(0).toUpperCase()}'">
-                                <h4 class="text-xl font-bold text-gray-900 dark:text-gray-100">${member.username}</h4>
-                                <p class="text-md text-gray-600 dark:text-gray-300 mb-2">✨ ${member.role.charAt(0).toUpperCase() + member.role.slice(1)}</p>
-                                <p class="text-gray-700 dark:text-gray-200 text-sm mb-4 whitespace-pre-wrap">${member.bio || 'No bio provided yet.'}</p>
-
-                                ${(member.role === 'partner' || member.role === 'admin' || member.role === 'founder' || member.role === 'co-founder' || member.role === 'vip') ? `
-                                    <div class="mt-auto flex flex-wrap justify-center gap-3">
-                                        ${Object.entries(member.partnerInfo?.links || {}).map(([platform, link]) => link ? `
-                                            <a href="${link}" target="_blank" rel="noopener noreferrer" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 transition duration-200 flex items-center space-x-2">
-                                                <i class="${linkIcons[platform]} text-lg"></i>
-                                                <span class="text-sm capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()}</span>
-                                            </a>
-                                        ` : '').join('')}
-                                    </div>
-                                ` : ''}
-
-                                ${isCurrentUser ? `
-                                    <button class="mt-4 py-2 px-4 rounded-full bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg"
-                                            id="edit-my-card-btn">
-                                        Edit My Card
-                                    </button>
-                                ` : ''}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-        };
-
+        // Filter users to only include admins, founders, co-founders, and partners
+        const teamMembers = allUsers.filter(user => user.role === 'admin' || user.role === 'founder' || user.role === 'co-founder' || user.role === 'partner');
 
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-5xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-3xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Meet the Team</h2>
 
-                    ${renderTeamSection('Foundation Team', foundationTeam)}
-                    ${renderTeamSection('Administration', administrationTeam)}
-                    ${renderTeamSection('Partners', partnersTeam)}
-                    ${renderTeamSection('VIPs', vipTeam)}
-                    ${renderTeamSection('Members', membersTeam)}
-
-                    ${allUsers.length === 0 ? `
+                    ${teamMembers.length === 0 ? `
                         <p class="text-center text-gray-600 dark:text-gray-400">No team members listed yet.</p>
-                    ` : ''}
+                    ` : `
+                        <div class="space-y-6">
+                            ${teamMembers.map(member => {
+                                const profilePicSrc = member.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(member.username || member.email || 'U').charAt(0).toUpperCase()}`;
+                                const isCurrentUser = currentUser && member.id === currentUser.uid;
+
+                                // Link icons and their corresponding Font Awesome classes
+                                const linkIcons = {
+                                    discord: 'fab fa-discord',
+                                    roblox: 'fab fa-roblox',
+                                    fivem: 'fas fa-gamepad', // Generic gamepad for FiveM
+                                    codingCommunity: 'fas fa-code', // Generic code for coding community
+                                    minecraft: 'fas fa-cube', // Generic cube for Minecraft
+                                    website: 'fas fa-globe'
+                                };
+
+                                return `
+                                    <div class="flex flex-col sm:flex-row items-center sm:items-start p-6 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-md border border-gray-200 dark:border-gray-600">
+                                        <img src="${profilePicSrc}" alt="${member.username}'s Profile" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md mb-4 sm:mb-0 sm:mr-6"
+                                             onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(member.username || member.email || 'U').charAt(0).toUpperCase()}'">
+                                        <div class="flex-grow text-center sm:text-left">
+                                            <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">${member.username}</h3>
+                                            <p class="text-md text-gray-600 dark:text-gray-300 mb-2">${member.role.charAt(0).toUpperCase() + member.role.slice(1)}</p>
+                                            <p class="text-gray-700 dark:text-gray-200 text-sm whitespace-pre-wrap">${member.bio || 'No bio provided yet.'}</p>
+
+                                            ${member.role === 'partner' || member.role === 'admin' || member.role === 'founder' || member.role === 'co-founder' ? `
+                                                <div class="mt-4 flex flex-wrap justify-center sm:justify-start gap-3">
+                                                    ${Object.entries(member.partnerInfo?.links || {}).map(([platform, link]) => link ? `
+                                                        <a href="${link}" target="_blank" rel="noopener noreferrer" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 transition duration-200 flex items-center space-x-2">
+                                                            <i class="${linkIcons[platform]} text-lg"></i>
+                                                            <span class="text-sm capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                                        </a>
+                                                    ` : '').join('')}
+                                                </div>
+                                            ` : ''}
+
+                                            ${isCurrentUser ? `
+                                                <button class="mt-4 py-2 px-4 rounded-full bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg"
+                                                        id="edit-my-card-btn">
+                                                    Edit My Card
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `}
                 </div>
             </div>
         `;
@@ -2829,8 +2653,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                                 const linkIcons = {
                                     discord: 'fab fa-discord',
-                                    roblox: 'fas fa-gamepad',
-                                    fivem: 'fas fa-car',
+                                    roblox: 'fab fa-roblox',
+                                    fivem: 'fas fa-gamepad',
                                     codingCommunity: 'fas fa-code',
                                     minecraft: 'fas fa-cube',
                                     website: 'fas fa-globe',
@@ -2840,7 +2664,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <div class="bg-gray-100 dark:bg-gray-700 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-600 flex flex-col items-center text-center">
                                         <img src="${profilePicSrc}" alt="${partner.username}'s Profile" class="w-28 h-28 rounded-full object-cover border-4 border-indigo-500 shadow-lg mb-4"
                                              onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(partner.username || partner.email || 'U').charAt(0).toUpperCase()}'">
-                                        <h3 class="2xl font-bold text-gray-900 dark:text-gray-100 mb-2">${partner.username}</h3>
+                                        <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">${partner.username}</h3>
                                         <p class="text-md text-indigo-600 font-semibold mb-3">Official Partner</p>
                                         <p class="text-gray-700 dark:text-gray-200 text-sm mb-4 whitespace-pre-wrap">${partner.partnerInfo?.description || 'No description provided yet.'}</p>
 
@@ -3212,8 +3036,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Prevent partners, admins, founders, co-founders, VIPs from applying
-        if (userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder' || userData.role === 'vip') {
+        // Prevent partners, admins, founders, co-founders from applying
+        if (userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder') {
             contentArea.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-4">
                     <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
@@ -3793,9 +3617,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (page === 'logout') {
             showLoadingSpinner();
             try {
-                if (currentUser) {
-                    await updateUserPresence(currentUser.uid, false); // Set user offline
-                }
                 await signOut(auth);
                 currentUser = null;
                 userData = null;
