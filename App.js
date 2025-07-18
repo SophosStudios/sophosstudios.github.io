@@ -190,6 +190,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         applyThemeClasses(); // Apply theme classes after background
     }
 
+    /**
+     * Extracts the YouTube video ID from a given YouTube URL.
+     * @param {string} url - The YouTube URL.
+     * @returns {string|null} The YouTube video ID or null if not found.
+     */
+    function extractYouTubeVideoId(url) {
+        const regExp = /(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=|embed\/|v\/|)([\w-]{11})(?:\S+)?/;
+        const match = url.match(regExp);
+        return (match && match[1].length === 11) ? match[1] : null;
+    }
+
     // --- Firebase Integration Functions ---
 
     /**
@@ -990,6 +1001,144 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Adds a new video to Firestore.
+     * @param {string} name - The name of the video.
+     * @param {string} description - The description of the video.
+     * @param {string} iconUrl - URL for the video's icon.
+     * @param {string} thumbnailUrl - URL for the video's thumbnail.
+     * @param {string} youtubeLink - The YouTube link of the video.
+     * @param {string} youtubeVideoId - The extracted YouTube video ID.
+     * @returns {Promise<void>}
+     */
+    async function addVideoFirestore(name, description, iconUrl, thumbnailUrl, youtubeLink, youtubeVideoId) {
+        if (!currentUser) {
+            throw new Error("You must be logged in to add videos.");
+        }
+        showLoadingSpinner();
+        try {
+            const videosCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/videos`);
+            await addDoc(videosCollectionRef, {
+                name: name,
+                description: description,
+                iconUrl: iconUrl,
+                thumbnailUrl: thumbnailUrl,
+                youtubeLink: youtubeLink,
+                youtubeVideoId: youtubeVideoId,
+                authorId: currentUser.uid,
+                authorUsername: userData.username || currentUser.displayName || currentUser.email,
+                timestamp: serverTimestamp()
+            });
+            showMessageModal('Video added successfully!');
+        } catch (error) {
+            console.error("Error adding video:", error.message);
+            throw new Error("Failed to add video: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Fetches all videos from Firestore, ordered by timestamp.
+     * @returns {Promise<Array<object>>} - List of all videos.
+     */
+    async function fetchVideosFirestore() {
+        showLoadingSpinner();
+        try {
+            const videosCollectionRef = collection(db, `/artifacts/${APP_ID}/public/data/videos`);
+            const q = query(videosCollectionRef, orderBy('timestamp', 'desc'));
+
+            const querySnapshot = await new Promise((resolve, reject) => {
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    unsubscribe();
+                    resolve(snapshot);
+                }, (error) => {
+                    reject(error);
+                });
+            });
+
+            const videosData = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                videosData.push({
+                    id: doc.id,
+                    name: data.name,
+                    description: data.description,
+                    iconUrl: data.iconUrl,
+                    thumbnailUrl: data.thumbnailUrl,
+                    youtubeLink: data.youtubeLink,
+                    youtubeVideoId: data.youtubeVideoId,
+                    authorUsername: data.authorUsername,
+                    timestamp: data.timestamp ? (typeof data.timestamp === 'string' ? new Date(data.timestamp).toLocaleString() : data.timestamp.toDate().toLocaleString()) : 'N/A',
+                });
+            });
+            return videosData;
+        } catch (error) {
+            console.error("Error fetching videos:", error.message);
+            throw new Error("Failed to fetch videos: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Updates an existing video in Firestore.
+     * @param {string} videoId - The ID of the video to update.
+     * @param {string} name - The new name.
+     * @param {string} description - The new description.
+     * @param {string} iconUrl - The new icon URL.
+     * @param {string} thumbnailUrl - The new thumbnail URL.
+     * @param {string} youtubeLink - The new YouTube link.
+     * @param {string} youtubeVideoId - The new YouTube video ID.
+     * @returns {Promise<void>}
+     */
+    async function updateVideoFirestore(videoId, name, description, iconUrl, thumbnailUrl, youtubeLink, youtubeVideoId) {
+        if (!currentUser) {
+            throw new Error("You must be logged in to update videos.");
+        }
+        showLoadingSpinner();
+        try {
+            const videoDocRef = doc(db, `/artifacts/${APP_ID}/public/data/videos`, videoId);
+            await updateDoc(videoDocRef, {
+                name: name,
+                description: description,
+                iconUrl: iconUrl,
+                thumbnailUrl: thumbnailUrl,
+                youtubeLink: youtubeLink,
+                youtubeVideoId: youtubeVideoId,
+                // Do not update author or timestamp here
+            });
+            showMessageModal('Video updated successfully!');
+        } catch (error) {
+            console.error("Error updating video:", error.message);
+            throw new Error("Failed to update video: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
+    /**
+     * Deletes a video from Firestore.
+     * @param {string} videoId - The ID of the video to delete.
+     * @returns {Promise<void>}
+     */
+    async function deleteVideoFirestore(videoId) {
+        if (!currentUser) {
+            throw new Error("You must be logged in to delete videos.");
+        }
+        showLoadingSpinner();
+        try {
+            const videoDocRef = doc(db, `/artifacts/${APP_ID}/public/data/videos`, videoId);
+            await deleteDoc(videoDocRef);
+            showMessageModal('Video deleted successfully!');
+        } catch (error) {
+            console.error("Error deleting video:", error.message);
+            throw new Error("Failed to delete video: " + error.message);
+        } finally {
+            hideLoadingSpinner();
+        }
+    }
+
 
     // --- UI Rendering Functions ---
 
@@ -1053,7 +1202,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 name: 'Community',
                 items: [
                     { id: 'nav-forum', text: 'Forum', page: 'forum' },
-                    { id: 'nav-team', text: 'Meet the Team', page: 'team' }
+                    { id: 'nav-team', text: 'Meet the Team', page: 'team' },
+                    { id: 'nav-videos', text: 'Videos', page: 'videos' } // New Videos link
                 ],
                 authRequired: true
             },
@@ -3578,6 +3728,203 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    /**
+     * Renders the Videos page, displaying all videos.
+     */
+    async function renderVideosPage() {
+        if (!currentUser) {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-4">
+                    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                        <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
+                        <p class="text-lg text-gray-700 dark:text-gray-300">Please sign in to view and manage videos.</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let videos = [];
+        try {
+            videos = await fetchVideosFirestore();
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+            videos = [];
+        }
+
+        contentArea.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Manage Videos</h2>
+                    <div class="mb-6 text-center">
+                        <button id="add-video-btn" class="py-2 px-6 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Add New Video
+                        </button>
+                    </div>
+
+                    ${videos.length === 0 ? `
+                        <p class="text-center text-gray-600 dark:text-gray-400">No videos added yet. Add your first video!</p>
+                    ` : `
+                        <div id="videos-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            ${videos.map(video => `
+                                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-600 flex flex-col">
+                                    <div class="relative w-full aspect-video mb-4 rounded-md overflow-hidden">
+                                        ${video.youtubeVideoId ? `
+                                            <iframe
+                                                class="absolute inset-0 w-full h-full"
+                                                src="https://www.youtube.com/embed/${video.youtubeVideoId}"
+                                                frameborder="0"
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                allowfullscreen
+                                            ></iframe>
+                                        ` : `
+                                            <img src="${video.thumbnailUrl || 'https://placehold.co/480x270/FF0000/FFFFFF?text=No+Thumbnail'}"
+                                                 alt="Video Thumbnail" class="w-full h-full object-cover"
+                                                 onerror="this.onerror=null; this.src='https://placehold.co/480x270/FF0000/FFFFFF?text=No+Thumbnail';">
+                                        `}
+                                    </div>
+                                    <div class="flex items-center mb-2">
+                                        ${video.iconUrl ? `<img src="${video.iconUrl}" alt="Icon" class="w-8 h-8 rounded-full object-cover mr-2" onerror="this.onerror=null; this.src='https://placehold.co/32x32/000000/FFFFFF?text=Icon';">` : `<div class="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-xs text-gray-700 dark:text-gray-200 mr-2">?</div>`}
+                                        <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100 flex-grow">${video.name}</h3>
+                                    </div>
+                                    <p class="text-sm text-gray-700 dark:text-gray-200 mb-2">${video.description}</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Added by ${video.authorUsername} on ${video.timestamp}</p>
+                                    <div class="mt-4 flex justify-end space-x-2">
+                                        <button class="py-1 px-3 rounded-md bg-yellow-500 text-white text-sm hover:bg-yellow-600 transition duration-200" data-video-id="${video.id}" data-action="edit-video">Edit</button>
+                                        <button class="py-1 px-3 rounded-md bg-red-500 text-white text-sm hover:bg-red-600 transition duration-200" data-video-id="${video.id}" data-action="delete-video">Delete</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+
+        document.getElementById('add-video-btn').addEventListener('click', () => {
+            showAddEditVideoModal(); // Open modal for adding a new video
+        });
+
+        contentArea.querySelectorAll('[data-action="edit-video"]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const videoId = e.target.dataset.videoId;
+                const videoToEdit = videos.find(v => v.id === videoId);
+                if (videoToEdit) {
+                    showAddEditVideoModal(videoToEdit); // Open modal for editing existing video
+                }
+            });
+        });
+
+        contentArea.querySelectorAll('[data-action="delete-video"]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const videoId = e.target.dataset.videoId;
+                showMessageModal('Are you sure you want to delete this video?', 'confirm', async () => {
+                    try {
+                        await deleteVideoFirestore(videoId);
+                        renderVideosPage(); // Re-render to show updated list
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
+                });
+            });
+        });
+    }
+
+    /**
+     * Shows a modal for adding or editing a video.
+     * @param {object} [videoToEdit=null] - The video object to edit, or null for adding a new video.
+     */
+    function showAddEditVideoModal(videoToEdit = null) {
+        if (currentModal) {
+            currentModal.remove();
+        }
+
+        const isEditing = videoToEdit !== null;
+        const modalTitle = isEditing ? 'Edit Video' : 'Add New Video';
+        const submitButtonText = isEditing ? 'Save Changes' : 'Add Video';
+
+        const modal = document.createElement('div');
+        modal.id = 'add-edit-video-modal';
+        modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+
+        modal.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700 relative">
+                <button class="absolute top-4 right-4 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100 text-2xl font-bold" id="close-add-edit-video-modal">&times;</button>
+                <h2 class="text-2xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-6">${modalTitle}</h2>
+                <form id="add-edit-video-form" class="space-y-4">
+                    <div>
+                        <label for="video-name" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Video Name</label>
+                        <input type="text" id="video-name" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Enter video name" value="${videoToEdit?.name || ''}" required>
+                    </div>
+                    <div>
+                        <label for="video-description" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Description</label>
+                        <textarea id="video-description" rows="4" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Enter video description">${videoToEdit?.description || ''}</textarea>
+                    </div>
+                    <div>
+                        <label for="video-icon-url" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Icon URL (Optional)</label>
+                        <input type="url" id="video-icon-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., https://example.com/icon.png" value="${videoToEdit?.iconUrl || ''}">
+                    </div>
+                    <div>
+                        <label for="video-thumbnail-url" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Thumbnail URL (Optional)</label>
+                        <input type="url" id="video-thumbnail-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., https://example.com/thumbnail.jpg" value="${videoToEdit?.thumbnailUrl || ''}">
+                    </div>
+                    <div>
+                        <label for="youtube-link" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">YouTube Link</label>
+                        <input type="url" id="youtube-link" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., https://www.youtube.com/watch?v=VIDEO_ID" value="${videoToEdit?.youtubeLink || ''}" required>
+                    </div>
+                    <div class="flex justify-end space-x-4 mt-6">
+                        <button type="button" id="cancel-add-edit-video-modal" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                            Cancel
+                        </button>
+                        <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                            ${submitButtonText}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        currentModal = modal;
+
+        document.getElementById('close-add-edit-video-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+        });
+        document.getElementById('cancel-add-edit-video-modal').addEventListener('click', () => {
+            currentModal.remove();
+            currentModal = null;
+        });
+
+        document.getElementById('add-edit-video-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('video-name').value.trim();
+            const description = document.getElementById('video-description').value.trim();
+            const iconUrl = document.getElementById('video-icon-url').value.trim();
+            const thumbnailUrl = document.getElementById('video-thumbnail-url').value.trim();
+            const youtubeLink = document.getElementById('youtube-link').value.trim();
+            const youtubeVideoId = extractYouTubeVideoId(youtubeLink);
+
+            if (!youtubeVideoId) {
+                showMessageModal("Invalid YouTube link. Please provide a valid YouTube video URL.", 'error');
+                return;
+            }
+
+            try {
+                if (isEditing) {
+                    await updateVideoFirestore(videoToEdit.id, name, description, iconUrl, thumbnailUrl, youtubeLink, youtubeVideoId);
+                } else {
+                    await addVideoFirestore(name, description, iconUrl, thumbnailUrl, youtubeLink, youtubeVideoId);
+                }
+                currentModal.remove();
+                currentModal = null;
+                renderVideosPage(); // Re-render videos page to show updates
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+            }
+        });
+    }
+
+
     // --- Navigation and Initialization ---
 
     /**
@@ -3598,7 +3945,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /**
      * Navigates to a specific page and renders its content.
-     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'settings', 'about', 'admin', 'edit-post', 'forum', 'logout', 'team', 'send-email', 'partners', 'partner-tos', 'apply-partner', 'partner-applications', 'manage-partner-questions').
+     * @param {string} page - The page to navigate to ('home', 'auth', 'profile', 'settings', 'about', 'admin', 'edit-post', 'forum', 'logout', 'team', 'send-email', 'partners', 'partner-tos', 'apply-partner', 'partner-applications', 'manage-partner-questions', 'videos').
      * @param {string} [id=null] - Optional: postId for edit-post route, userId for send-email route, or any other ID.
      */
     async function navigateTo(page, id = null) {
@@ -3682,6 +4029,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 break;
             case 'manage-partner-questions': // New Founder/Co-founder: Manage Partner Questions page
                 renderManagePartnerQuestionsPage();
+                break;
+            case 'videos': // New Videos page
+                renderVideosPage();
                 break;
             default:
                 renderHomePage();
@@ -3801,7 +4151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateBodyBackground(); // Reset to default background (light theme default)
             renderNavbar(); // Update navbar to logged out state
             // Only redirect if current page is not home or about, or if it was a protected page
-            if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about' && contentArea.dataset.currentPage !== 'team' && contentArea.dataset.currentPage !== 'partners' && contentArea.dataset.currentPage !== 'partner-tos') {
+            if (contentArea.dataset.currentPage !== 'home' && contentArea.dataset.currentPage !== 'about' && contentArea.dataset.currentPage !== 'team' && contentArea.dataset.currentPage !== 'partners' && contentArea.dataset.currentPage !== 'partner-tos' && contentArea.dataset.currentPage !== 'videos') {
                  navigateTo('home'); // Redirect to home if logged out from a protected page
             }
         }
