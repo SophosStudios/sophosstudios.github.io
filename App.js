@@ -3530,6 +3530,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <option value="textarea">Long Text Area</option>
                                 <option value="email">Email Input</option>
                                 <option value="date">Date Input</option>
+                                <option value="number">Number Input</option>
                             </select>
                         </div>
                         <div class="flex items-center space-x-2">
