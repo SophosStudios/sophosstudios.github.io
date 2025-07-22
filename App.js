@@ -3668,6 +3668,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <option value="textarea" ${question.type === 'textarea' ? 'selected' : ''}>Long Text Area</option>
                             <option value="email" ${question.type === 'email' ? 'selected' : ''}>Email Input</option>
                             <option value="date" ${question.type === 'date' ? 'selected' : ''}>Date Input</option>
+                            <option value="number" ${question.type === 'number' ? 'selected' : ''}>Number Input</option>
                         </select>
                     </div>
                     <div class="flex items-center space-x-2">
