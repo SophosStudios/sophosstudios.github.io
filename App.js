@@ -244,7 +244,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Create user document if it doesn't exist (e.g., new Google user)
                 const usernameToUse = formData.username || user.displayName || user.email?.split('@')[0] || 'User';
                 // Prioritize user.photoURL from auth provider, fallback to placeholder
-                const profilePicToUse = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
+                const profilePicToUse = user.photoURL || `https://placehold.co/100x100/1e1e1e/F0F0F0?text=${usernameToUse.charAt(0).toUpperCase()}`;
 
                 await setDoc(userDocRef, {
                     email: user.email,
