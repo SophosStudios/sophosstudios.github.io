@@ -69,7 +69,7 @@ export function renderHomePage() {
                     Hello, <span class="font-semibold text-blue-600">${_userData.username || _currentUser.email}</span>!
                     You are logged in as a ${getRoleVFX(_userData.role)}.
                 </p>
-                <p class="text-lg text-gray-600 dark:text-gray-400 mb-6">
+                <p class="text-lg text-white dark:text-gray-400 mb-6">
                     Explore your profile settings, check out the forum, or visit the admin panel if you have the permissions.
                 </p>
                 <div class="flex flex-col sm:flex-row justify-center gap-4">
@@ -370,7 +370,7 @@ export function renderSettingsPage() {
                     ${isPartnerOrAdmin ? `
                         <div class="border-b border-gray-200 dark:border-gray-700 pb-8 pt-8">
                             <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Partner Card Information</h3>
-                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">This information will be displayed on your public partner card.</p>
+                            <p class="text-sm text-white dark:text-gray-400 mb-4">This information will be displayed on your public partner card.</p>
 
                             <div class="mb-4">
                                 <label for="partner-description" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Partner Description</label>
@@ -560,7 +560,7 @@ export async function renderAdminPanelPage() {
 
                 <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 text-center">Manage Users</h3>
                 ${_usersList.length === 0 ? `
-                    <p class="text-center text-gray-600 dark:text-gray-400">No users found.</p>
+                    <p class="text-center text-white dark:text-gray-400">No users found.</p>
                 ` : `
                     <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -612,7 +612,7 @@ export async function renderAdminPanelPage() {
                         ${user.username}
                         ${user.isBanned ? '<span class="ml-2 text-red-500 text-xs">(Banned)</span>' : ''}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-300 text-sm">
+                    <td class="px-6 py-4 whitespace-nowrap text-white dark:text-gray-300 text-sm">
                         ${user.email}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
@@ -718,7 +718,7 @@ export async function renderForumPage() {
 
                 <div id="posts-list" class="space-y-6">
                     ${posts.length === 0 ? `
-                        <p class="text-center text-gray-600 dark:text-gray-400">No posts yet. Be the first to post!</p>
+                        <p class="text-center text-white dark:text-gray-400">No posts yet. Be the first to post!</p>
                     ` : posts.map(post => `
                         <div class="post-card bg-gray-50 dark:bg-gray-700 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-600">
                             <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">${post.title}</h3>
@@ -746,7 +746,7 @@ export async function renderForumPage() {
                                     </span>
                                 `).join('')}
                                 <div class="relative inline-block text-left">
-                                    <button class="add-reaction-btn text-gray-600 dark:text-gray-300 hover:text-blue-600 transition duration-200" data-post-id="${post.id}">
+                                    <button class="add-reaction-btn text-white dark:text-gray-300 hover:text-blue-600 transition duration-200" data-post-id="${post.id}">
                                         <i class="fas fa-smile"></i> Add Reaction
                                     </button>
                                     <div class="reaction-picker hidden absolute z-10 bg-white dark:bg-gray-700 rounded-md shadow-lg p-2 mt-1 border border-gray-200 dark:border-gray-600">
@@ -764,7 +764,7 @@ export async function renderForumPage() {
                                 <h4 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-3">Comments (${post.comments.length})</h4>
                                 <div class="space-y-3 mb-4">
                                     ${post.comments.length === 0 ? `
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">No comments yet.</p>
+                                        <p class="text-sm text-white dark:text-gray-400">No comments yet.</p>
                                     ` : post.comments.map(comment => `
                                         <div class="bg-gray-100 dark:bg-gray-600 p-3 rounded-md">
                                             <p class="text-gray-800 dark:text-gray-200 text-sm">${comment.text}</p>
@@ -951,7 +951,7 @@ export async function renderTeamPage() {
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Meet the Team</h2>
                 ${teamMembers.length === 0 ? `
-                    <p class="text-center text-gray-600 dark:text-gray-400">No team members found yet.</p>
+                    <p class="text-center text-white dark:text-gray-400">No team members found yet.</p>
                 ` : `
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         ${teamMembers.map(member => `
@@ -959,7 +959,7 @@ export async function renderTeamPage() {
                                 <img src="${member.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(member.username || 'U').charAt(0).toUpperCase()}`}" alt="${member.username}" class="w-24 h-24 rounded-full object-cover mx-auto mb-4 border-4 border-blue-400">
                                 <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">${member.username}</h3>
                                 <p class="text-md font-semibold text-gray-700 dark:text-gray-300 mb-3">${getRoleVFX(member.role)}</p>
-                                <p class="text-gray-600 dark:text-gray-400 text-sm mb-4">${member.bio || 'No bio provided.'}</p>
+                                <p class="text-white dark:text-gray-400 text-sm mb-4">${member.bio || 'No bio provided.'}</p>
                                 ${member.role === 'partner' && member.partnerInfo?.links ? `
                                     <div class="flex justify-center space-x-3 mt-3">
                                         ${member.partnerInfo.links.discord ? `<a href="${member.partnerInfo.links.discord}" target="_blank" class="text-blue-500 hover:text-blue-700 text-2xl"><i class="fab fa-discord"></i></a>` : ''}
@@ -1079,7 +1079,7 @@ export async function renderPartnersPage() {
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Our Partners</h2>
                 ${partners.length === 0 ? `
-                    <p class="text-center text-gray-600 dark:text-gray-400">No partners found yet. Check back later!</p>
+                    <p class="text-center text-white dark:text-gray-400">No partners found yet. Check back later!</p>
                 ` : `
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         ${partners.map(partner => `
@@ -1087,7 +1087,7 @@ export async function renderPartnersPage() {
                                 <img src="${partner.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(partner.username || 'P').charAt(0).toUpperCase()}`}" alt="${partner.username}" class="w-24 h-24 rounded-full object-cover mx-auto mb-4 border-4 border-indigo-400">
                                 <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">${partner.username}</h3>
                                 <p class="text-md font-semibold text-indigo-600 mb-3">${getRoleVFX(partner.role)}</p>
-                                <p class="text-gray-600 dark:text-gray-400 text-sm mb-4">${partner.partnerInfo?.description || 'No description provided.'}</p>
+                                <p class="text-white dark:text-gray-400 text-sm mb-4">${partner.partnerInfo?.description || 'No description provided.'}</p>
                                 ${partner.partnerInfo?.links ? `
                                     <div class="flex justify-center space-x-3 mt-3">
                                         ${partner.partnerInfo.links.discord ? `<a href="${partner.partnerInfo.links.discord}" target="_blank" class="text-blue-500 hover:text-blue-700 text-2xl"><i class="fab fa-discord"></i></a>` : ''}
@@ -1284,7 +1284,7 @@ export async function renderPartnerApplicationsAdminPage() {
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Partner Applications</h2>
                 ${_partnerApplicationsList.length === 0 ? `
-                    <p class="text-center text-gray-600 dark:text-gray-400">No partner applications found.</p>
+                    <p class="text-center text-white dark:text-gray-400">No partner applications found.</p>
                 ` : `
                     <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -1324,7 +1324,7 @@ export async function renderPartnerApplicationsAdminPage() {
                 <td class="px-6 py-4 whitespace-nowrap text-gray-900 dark:text-gray-100 font-medium">
                     ${app.applicantUsername}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-300 text-sm">
+                <td class="px-6 py-4 whitespace-nowrap text-white dark:text-gray-300 text-sm">
                     ${app.applicantEmail}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap capitalize">
@@ -1335,7 +1335,7 @@ export async function renderPartnerApplicationsAdminPage() {
                         ${app.status}
                     </span>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-300 text-sm">
+                <td class="px-6 py-4 whitespace-nowrap text-white dark:text-gray-300 text-sm">
                     ${app.timestamp ? (typeof app.timestamp === 'string' ? new Date(app.timestamp).toLocaleString() : app.timestamp.toDate().toLocaleString()) : 'N/A'}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1396,12 +1396,12 @@ export async function renderManagePartnerQuestionsPage() {
 
                 <div id="questions-list" class="space-y-4">
                     ${_currentPartnerQuestions.length === 0 ? `
-                        <p class="text-center text-gray-600 dark:text-gray-400">No questions defined yet. Add your first question!</p>
+                        <p class="text-center text-white dark:text-gray-400">No questions defined yet. Add your first question!</p>
                     ` : _currentPartnerQuestions.map((q, index) => `
                         <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-md flex items-center justify-between border border-gray-200 dark:border-gray-600">
                             <div class="flex-grow">
                                 <p class="text-lg font-semibold text-gray-900 dark:text-gray-100">${index + 1}. ${q.label}</p>
-                                <p class="text-sm text-gray-600 dark:text-gray-300">Type: <span class="font-medium capitalize">${q.type}</span> | Required: <span class="font-medium ${q.required ? 'text-green-600' : 'text-red-600'}">${q.required ? 'Yes' : 'No'}</span></p>
+                                <p class="text-sm text-white dark:text-gray-300">Type: <span class="font-medium capitalize">${q.type}</span> | Required: <span class="font-medium ${q.required ? 'text-green-600' : 'text-red-600'}">${q.required ? 'Yes' : 'No'}</span></p>
                             </div>
                             <div class="space-x-2">
                                 <button class="edit-question-btn text-blue-500 hover:text-blue-700 font-semibold py-1 px-3 rounded-full" data-index="${index}">
@@ -1472,14 +1472,14 @@ export async function renderVideosPage() {
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Videos</h2>
                 ${videos.length === 0 ? `
-                    <p class="text-center text-gray-600 dark:text-gray-400">No videos available yet.</p>
+                    <p class="text-center text-white dark:text-gray-400">No videos available yet.</p>
                 ` : `
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         ${videos.map(video => `
                             <div class="video-card bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-600 cursor-pointer" data-video-id="${video.youtubeVideoId}">
                                 <img src="${video.thumbnailUrl || `https://i.ytimg.com/vi/${video.youtubeVideoId}/hqdefault.jpg`}" alt="${video.name}" class="w-full h-40 object-cover rounded-md mb-3">
                                 <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">${video.name}</h3>
-                                <p class="text-gray-600 dark:text-gray-400 text-sm mb-2">${video.description || 'No description provided.'}</p>
+                                <p class="text-white dark:text-gray-400 text-sm mb-2">${video.description || 'No description provided.'}</p>
                                 <p class="text-xs text-gray-500 dark:text-gray-400">By ${video.authorUsername} on ${video.timestamp}</p>
                             </div>
                         `).join('')}
@@ -1538,12 +1538,12 @@ export async function renderManageVideosPage() {
 
                 <div id="videos-list" class="space-y-4">
                     ${_videosList.length === 0 ? `
-                        <p class="text-center text-gray-600 dark:text-gray-400">No videos found yet. Add your first video!</p>
+                        <p class="text-center text-white dark:text-gray-400">No videos found yet. Add your first video!</p>
                     ` : _videosList.map(video => `
                         <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-md flex flex-col md:flex-row items-center justify-between border border-gray-200 dark:border-gray-600">
                             <div class="flex-grow text-center md:text-left mb-4 md:mb-0">
                                 <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">${video.name}</h3>
-                                <p class="text-sm text-gray-600 dark:text-gray-300">${video.youtubeLink}</p>
+                                <p class="text-sm text-white dark:text-gray-300">${video.youtubeLink}</p>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Added by ${video.authorUsername} on ${video.timestamp}</p>
                             </div>
                             <div class="space-x-2 flex justify-center md:justify-end w-full md:w-auto">
