@@ -69,7 +69,7 @@ export function showMessageModal(message, type = 'info', onConfirm = null) {
 
     modal.innerHTML = `
         <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl text-center max-w-sm w-full">
-            <p class="text-xl mb-6 ${type === 'error' ? 'text-red-600' : 'text-white-800'}">${message}</p>
+            <p class="text-xl mb-6 ${type === 'error' ? 'text-red-600' : 'text-white'}">${message}</p>
             ${buttonHtml}
         </div>
     `;
@@ -170,7 +170,7 @@ export function extractYouTubeVideoId(url) {
  */
 export function getRoleVFX(role) {
     let emoji = '';
-    let colorClass = 'text-white-800'; // Default color
+    let colorClass = 'text-white'; // Default color
 
     switch (role) {
         case 'member':
@@ -195,7 +195,7 @@ export function getRoleVFX(role) {
             break;
         default:
             emoji = '';
-            colorClass = 'text-white-800';
+            colorClass = 'text-white';
     }
     // Apply a subtle animation for all roles, or only privileged ones
     const animationClass = (role === 'admin' || role === 'founder' || role === 'co-founder' || role === 'partner') ? 'animate-pulse' : '';
