@@ -16,7 +16,9 @@ let userData = null; // Firestore user document data (role, background, etc.)
 
 // DOM Elements
 const contentArea = document.getElementById('content-area');
-const auth = getFirebaseAuth(); // Get auth instance from firebase-service
+
+// Firebase Auth instance (will be initialized after Firebase services)
+let auth = null;
 
 /**
  * Navigates to a specific page and renders its content.
@@ -38,7 +40,9 @@ async function navigateTo(page, id = null) {
         try {
             // No need to update presence here, Realtime DB is not implemented in this version.
             // If you add Realtime DB, ensure you update presence before signOut.
-            await auth.signOut();
+            if (auth) { // Ensure auth is defined before signing out
+                await auth.signOut();
+            }
             currentUser = null;
             userData = null;
             showMessageModal('You have been signed out.');
@@ -123,6 +127,8 @@ async function navigateTo(page, id = null) {
 document.addEventListener('DOMContentLoaded', async () => {
     // Initialize Firebase services first
     initializeFirebaseServices(CONFIG.firebaseConfig, CONFIG);
+    // Now that Firebase app is initialized, get the auth instance
+    auth = getFirebaseAuth();
 
     // Initialize other modules, passing necessary dependencies
     initializeNavigation(currentUser, userData, navigateTo, CONFIG);
@@ -200,7 +206,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 // Check if the user is banned before allowing them to proceed
                 if (userData.isBanned) {
-                    await auth.signOut(); // Ensure they are signed out from Firebase Auth
+                    if (auth) { // Ensure auth is defined before signing out
+                        await auth.signOut();
+                    }
                     currentUser = null;
                     userData = null;
                     showMessageModal("Your account has been banned. Please contact support for more information.", 'error');
@@ -220,7 +228,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             } catch (error) {
                 console.error("Error setting up user data after auth state change:", error);
-                await auth.signOut();
+                if (auth) { // Ensure auth is defined before signing out
+                    await auth.signOut();
+                }
                 currentUser = null;
                 userData = null;
                 showMessageModal("Failed to load user data. Please try signing in again.", 'error');
