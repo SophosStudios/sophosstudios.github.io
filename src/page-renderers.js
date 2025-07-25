@@ -9,8 +9,7 @@ import {
     sendEmailToUserFirestore, fetchPartnerTOSFirestore,
     fetchPartnerApplicationQuestionsFirestore, submitPartnerApplicationFirestore,
     fetchAllPartnerApplicationsFirestore, updatePartnerApplicationStatusFirestore,
-    fetchVideosFirestore, addVideoFirestore, updateVideoFirestore, deleteVideoFirestore,
-    submitCodeSnippet, fetchAllCodeSubmissions, updateCodeSubmissionStatus, fetchAllApprovedCodeSnippets
+    fetchVideosFirestore, addVideoFirestore, updateVideoFirestore, deleteVideoFirestore
 } from './firebase-service.js';
 import { showMessageModal, showLoadingSpinner, hideLoadingSpinner, applyThemeClasses, updateBodyBackground, extractYouTubeVideoId, getRoleVFX } from './utils.js';
 import {
@@ -28,7 +27,6 @@ let _usersList = []; // Cache for users list in admin panel
 let _partnerApplicationsList = []; // Cache for partner applications list
 let _currentPartnerQuestions = []; // Cache for partner application questions
 let _videosList = []; // Cache for videos list
-let _codeSubmissionsList = []; // Cache for code submissions list
 
 /**
  * Initializes the page renderers module with necessary global state and functions.
@@ -62,7 +60,7 @@ export function updatePageRendererState(currentUser, userData) {
 export function renderHomePage() {
     const contentArea = document.getElementById('content-area');
     contentArea.innerHTML = `
-        <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl mx-auto text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
             <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-green-600 mb-6">
                 Welcome to ${_CONFIG.websiteTitle}!
             </h1>
@@ -115,7 +113,7 @@ export function renderAuthPage() {
     const contentArea = document.getElementById('content-area');
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 id="auth-title" class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Sign In</h2>
                 <form id="auth-form" class="space-y-6">
                     <div>
@@ -232,7 +230,7 @@ export function renderProfilePage() {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Your Profile</h2>
 
                 <div class="flex flex-col items-center mb-6">
@@ -322,7 +320,7 @@ export function renderSettingsPage() {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Account Settings</h2>
 
                 <form id="settings-form" class="space-y-8">
@@ -488,7 +486,7 @@ export function renderAboutPage() {
     const contentArea = document.getElementById('content-area');
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl mx-auto text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-600 mb-6">About ${_CONFIG.websiteTitle}</h2>
                 <p class="text-lg text-gray-700 dark:text-gray-300 mb-4">
                     Welcome to a secure and user-friendly platform designed to streamline your online experience. We offer robust user authentication, allowing you to sign up and sign in with ease, keeping your data safe.
@@ -521,7 +519,7 @@ export async function renderAdminPanelPage() {
     if (!_currentUser || (_userData.role !== 'admin' && _userData.role !== 'founder' && _userData.role !== 'co-founder')) {
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
                     <p class="text-lg text-gray-700 dark:text-gray-300">You do not have administrative privileges to access this page.</p>
                 </div>
@@ -540,10 +538,10 @@ export async function renderAdminPanelPage() {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-full lg:max-w-4xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Admin Panel</h2>
                 <p class="text-lg text-gray-700 dark:text-gray-300 text-center mb-6">Manage user roles and accounts, and create forum posts.</p>
-                <div class="mb-6 text-center space-x-4 flex flex-wrap justify-center gap-2">
+                <div class="mb-6 text-center space-x-4">
                     <button id="view-forum-admin-btn" class="py-2 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
                         Manage Posts (Forum)
                     </button>
@@ -557,9 +555,6 @@ export async function renderAdminPanelPage() {
                     ` : ''}
                     <button id="manage-videos-admin-btn" class="py-2 px-6 rounded-full bg-orange-600 text-white font-bold text-lg hover:bg-orange-700 transition duration-300 transform hover:scale-105 shadow-lg">
                         Manage Videos
-                    </button>
-                    <button id="review-code-submissions-btn" class="py-2 px-6 rounded-full bg-red-500 text-white font-bold text-lg hover:bg-red-600 transition duration-300 transform hover:scale-105 shadow-lg">
-                        Review Code Submissions
                     </button>
                 </div>
 
@@ -676,7 +671,6 @@ export async function renderAdminPanelPage() {
         document.getElementById('manage-partner-questions-btn').addEventListener('click', () => _navigateTo('manage-partner-questions'));
     }
     document.getElementById('manage-videos-admin-btn').addEventListener('click', () => _navigateTo('manage-videos'));
-    document.getElementById('review-code-submissions-btn').addEventListener('click', () => _navigateTo('review-code-submissions'));
 }
 
 /**
@@ -687,7 +681,7 @@ export async function renderForumPage() {
     if (!_currentUser) {
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
                     <p class="text-lg text-gray-700 dark:text-gray-300">You must be logged in to view the forum.</p>
                     <button id="go-to-auth-from-forum-btn" class="mt-6 py-3 px-8 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -712,7 +706,7 @@ export async function renderForumPage() {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-full lg:max-w-4xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Community Forum</h2>
                 ${canCreatePost ? `
                     <div class="text-center mb-6">
@@ -866,7 +860,7 @@ export async function renderEditPostPage(postId) {
     if (!_currentUser || (_userData.role !== 'admin' && _userData.role !== 'founder' && _userData.role !== 'co-founder')) {
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
                     <p class="text-lg text-gray-700 dark:text-gray-300">You do not have permission to edit posts.</p>
                 </div>
@@ -894,7 +888,7 @@ export async function renderEditPostPage(postId) {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-2xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-6">Edit Post</h2>
                 <form id="edit-post-form" class="space-y-4">
                     <div>
@@ -954,7 +948,7 @@ export async function renderTeamPage() {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-full lg:max-w-4xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Meet the Team</h2>
                 ${teamMembers.length === 0 ? `
                     <p class="text-center text-gray-600 dark:text-gray-400">No team members found yet.</p>
@@ -966,7 +960,7 @@ export async function renderTeamPage() {
                                 <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">${member.username}</h3>
                                 <p class="text-md font-semibold text-gray-700 dark:text-gray-300 mb-3">${getRoleVFX(member.role)}</p>
                                 <p class="text-gray-600 dark:text-gray-400 text-sm mb-4">${member.bio || 'No bio provided.'}</p>
-                                ${member.partnerInfo?.links ? `
+                                ${member.role === 'partner' && member.partnerInfo?.links ? `
                                     <div class="flex justify-center space-x-3 mt-3">
                                         ${member.partnerInfo.links.discord ? `<a href="${member.partnerInfo.links.discord}" target="_blank" class="text-blue-500 hover:text-blue-700 text-2xl"><i class="fab fa-discord"></i></a>` : ''}
                                         ${member.partnerInfo.links.roblox ? `<a href="${member.partnerInfo.links.roblox}" target="_blank" class="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 text-2xl"><i class="fab fa-roblox"></i></a>` : ''}
@@ -994,7 +988,7 @@ export async function renderSendEmailPage(recipientUserId) {
     if (!_currentUser || (_userData.role !== 'admin' && _userData.role !== 'founder' && _userData.role !== 'co-founder')) {
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
                     <p class="text-lg text-gray-700 dark:text-gray-300">You do not have permission to send emails.</p>
                 </div>
@@ -1019,7 +1013,7 @@ export async function renderSendEmailPage(recipientUserId) {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-2xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-6">Send Email to ${recipientUser.username}</h2>
                 <form id="send-email-form" class="space-y-4">
                     <div>
@@ -1082,7 +1076,7 @@ export async function renderPartnersPage() {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-full lg:max-w-4xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Our Partners</h2>
                 ${partners.length === 0 ? `
                     <p class="text-center text-gray-600 dark:text-gray-400">No partners found yet. Check back later!</p>
@@ -1145,7 +1139,7 @@ export async function renderPartnerTOSPage() {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Partner Terms of Service</h2>
                 <div class="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
                     ${tosContent}
@@ -1174,7 +1168,7 @@ export async function renderApplyPartnerPage() {
     if (!_currentUser || _userData.role !== 'member') { // Only members can apply
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
                     <p class="text-lg text-gray-700 dark:text-gray-300">Only members can apply to be a partner. If you are already a partner, admin, or founder, you do not need to apply.</p>
                     ${!_currentUser ? `
@@ -1201,7 +1195,7 @@ export async function renderApplyPartnerPage() {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Apply to be a Partner</h2>
                 <p class="text-gray-700 dark:text-gray-300 text-center mb-6">Please fill out the form below to apply for a partnership role.</p>
 
@@ -1255,8 +1249,7 @@ export async function renderApplyPartnerPage() {
         try {
             await submitPartnerApplicationFirestore(applicationData, _currentUser, _userData);
             _navigateTo('home'); // Or a confirmation page
-        }
-        catch (error) {
+        } catch (error) {
             showMessageModal(error.message, 'error');
         }
     });
@@ -1270,7 +1263,7 @@ export async function renderPartnerApplicationsAdminPage() {
     if (!_currentUser || (_userData.role !== 'admin' && _userData.role !== 'founder' && _userData.role !== 'co-founder')) {
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
                     <p class="text-lg text-gray-700 dark:text-gray-300">You do not have permission to view partner applications.</p>
                 </div>
@@ -1288,7 +1281,7 @@ export async function renderPartnerApplicationsAdminPage() {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-full lg:max-w-4xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Partner Applications</h2>
                 ${_partnerApplicationsList.length === 0 ? `
                     <p class="text-center text-gray-600 dark:text-gray-400">No partner applications found.</p>
@@ -1373,7 +1366,7 @@ export async function renderManagePartnerQuestionsPage() {
     if (!_currentUser || (_userData.role !== 'founder' && _userData.role !== 'co-founder')) {
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
                     <p class="text-lg text-gray-700 dark:text-gray-300">Only founders and co-founders can manage partner application questions.</p>
                 </div>
@@ -1391,7 +1384,7 @@ export async function renderManagePartnerQuestionsPage() {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-full lg:max-w-4xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Manage Partner Application Questions</h2>
                 <p class="text-lg text-gray-700 dark:text-gray-300 text-center mb-6">Define the questions applicants will answer to become a partner.</p>
 
@@ -1437,7 +1430,7 @@ export async function renderManagePartnerQuestionsPage() {
             const index = parseInt(e.target.dataset.index);
             const questionToEdit = _currentPartnerQuestions[index];
             if (questionToEdit) {
-                showEditQuestionModal(index, questionToEdit, _currentPartnerQuestions); // Pass currentQuestions
+                showEditQuestionModal(index, questionToEdit, _currentPartnerQuestions, renderManagePartnerQuestionsPage);
             }
         });
     });
@@ -1476,7 +1469,7 @@ export async function renderVideosPage() {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-full lg:max-w-4xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Videos</h2>
                 ${videos.length === 0 ? `
                     <p class="text-center text-gray-600 dark:text-gray-400">No videos available yet.</p>
@@ -1515,7 +1508,7 @@ export async function renderManageVideosPage() {
     if (!_currentUser || (_userData.role !== 'admin' && _userData.role !== 'founder' && _userData.role !== 'co-founder')) {
         contentArea.innerHTML = `
             <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
                     <p class="text-lg text-gray-700 dark:text-gray-300">You do not have permission to manage videos.</p>
                 </div>
@@ -1533,7 +1526,7 @@ export async function renderManageVideosPage() {
 
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-full lg:max-w-4xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Manage Videos</h2>
                 <p class="text-lg text-gray-700 dark:text-gray-300 text-center mb-6">Add, edit, or delete videos displayed on the Videos page.</p>
 
@@ -1593,276 +1586,4 @@ export async function renderManageVideosPage() {
             });
         });
     });
-}
-
-/**
- * Renders the page for submitting code snippets.
- */
-export function renderSubmitCodePage() {
-    const contentArea = document.getElementById('content-area');
-    if (!_currentUser) {
-        contentArea.innerHTML = `
-            <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                    <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                    <p class="text-lg text-gray-700 dark:text-gray-300">You must be logged in to submit code.</p>
-                    <button id="go-to-auth-from-code-submit-btn" class="mt-6 py-3 px-8 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                        Sign In / Sign Up
-                    </button>
-                </div>
-            </div>
-        `;
-        document.getElementById('go-to-auth-from-code-submit-btn').addEventListener('click', () => _navigateTo('auth'));
-        return;
-    }
-
-    contentArea.innerHTML = `
-        <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Submit Your Code</h2>
-                <p class="text-gray-700 dark:text-gray-300 text-center mb-6">Share your awesome code snippets with the community! Submissions will be reviewed by an admin before being published.</p>
-
-                <form id="code-submission-form" class="space-y-6">
-                    <div>
-                        <label for="code-title" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Code Title</label>
-                        <input type="text" id="code-title" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., Simple JavaScript Calculator" required>
-                    </div>
-                    <div>
-                        <label for="code-platform" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Platform/Language</label>
-                        <select id="code-platform" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
-                            <option value="">Select a language/platform</option>
-                            <option value="javascript">JavaScript</option>
-                            <option value="python">Python</option>
-                            <option value="html">HTML</option>
-                            <option value="css">CSS</option>
-                            <option value="java">Java</option>
-                            <option value="csharp">C#</option>
-                            <option value="cpp">C++</option>
-                            <option value="react">React</option>
-                            <option value="swift">Swift</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="code-content" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Code Content</label>
-                        <textarea id="code-content" rows="15" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100 font-mono" placeholder="Paste your code here..." required></textarea>
-                    </div>
-                    <div class="flex justify-end mt-6">
-                        <button type="submit" class="py-3 px-8 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                            Submit Code
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-
-    document.getElementById('code-submission-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const title = document.getElementById('code-title').value;
-        const platform = document.getElementById('code-platform').value;
-        const code = document.getElementById('code-content').value;
-
-        if (!title.trim() || !platform.trim() || !code.trim()) {
-            showMessageModal("Please fill in all fields.", 'error');
-            return;
-        }
-
-        try {
-            await submitCodeSnippet(title, code, platform, _currentUser, _userData);
-            _navigateTo('home'); // Redirect after submission
-        } catch (error) {
-            showMessageModal(error.message, 'error');
-        }
-    });
-}
-
-/**
- * Renders the Admin page for reviewing code submissions.
- */
-export async function renderReviewCodeSubmissionsPage() {
-    const contentArea = document.getElementById('content-area');
-    if (!_currentUser || (_userData.role !== 'admin' && _userData.role !== 'founder' && _userData.role !== 'co-founder')) {
-        contentArea.innerHTML = `
-            <div class="flex flex-col items-center justify-center p-4">
-                <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                    <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                    <p class="text-lg text-gray-700 dark:text-gray-300">You do not have permission to review code submissions.</p>
-                </div>
-            </div>
-        `;
-        return;
-    }
-
-    try {
-        _codeSubmissionsList = await fetchAllCodeSubmissions(_currentUser, _userData);
-    } catch (error) {
-        showMessageModal(error.message, 'error');
-        _codeSubmissionsList = [];
-    }
-
-    contentArea.innerHTML = `
-        <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-full lg:max-w-4xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Review Code Submissions</h2>
-                <p class="text-lg text-gray-700 dark:text-gray-300 text-center mb-6">Review pending code submissions and decide to approve or deny them.</p>
-
-                <div id="code-submissions-list" class="space-y-6">
-                    ${_codeSubmissionsList.length === 0 ? `
-                        <p class="text-center text-gray-600 dark:text-gray-400">No code submissions to review.</p>
-                    ` : _codeSubmissionsList.map(submission => `
-                        <div class="bg-gray-100 dark:bg-gray-700 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-600">
-                            <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">${submission.title}</h3>
-                            <p class="text-gray-700 dark:text-gray-300 mb-2">Platform: <span class="font-semibold capitalize">${submission.platform}</span></p>
-                            <p class="text-gray-700 dark:text-gray-300 mb-4">Submitted by <span class="font-semibold">${submission.authorUsername}</span> on ${submission.timestamp ? new Date(submission.timestamp.toDate()).toLocaleString() : 'N/A'}</p>
-                            
-                            <div class="bg-gray-200 dark:bg-gray-900 p-4 rounded-md overflow-x-auto font-mono text-sm text-gray-900 dark:text-gray-100 mb-4">
-                                <pre><code>${escapeHtml(submission.code)}</code></pre>
-                            </div>
-
-                            <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4 border-t border-b border-gray-200 dark:border-gray-600 py-2">
-                                <span>Status: <span class="font-semibold capitalize
-                                    ${submission.status === 'pending' ? 'text-yellow-600' :
-                                      submission.status === 'approved' ? 'text-green-600' : 'text-red-600'}">
-                                    ${submission.status}
-                                </span></span>
-                                ${submission.status === 'pending' ? `
-                                    <div class="space-x-2">
-                                        <button class="approve-code-btn bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 transform hover:scale-105 shadow-md" data-submission-id="${submission.id}">
-                                            Approve
-                                        </button>
-                                        <button class="deny-code-btn bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 transform hover:scale-105 shadow-md" data-submission-id="${submission.id}">
-                                            Deny
-                                        </button>
-                                    </div>
-                                ` : `
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">Reviewed by ${submission.reviewerUsername || 'N/A'} on ${submission.reviewTimestamp ? new Date(submission.reviewTimestamp.toDate()).toLocaleString() : 'N/A'}</span>
-                                `}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        </div>
-    `;
-
-    document.querySelectorAll('.approve-code-btn').forEach(button => {
-        button.addEventListener('click', async (e) => {
-            const submissionId = e.target.dataset.submissionId;
-            showMessageModal('Are you sure you want to approve this code snippet?', 'confirm', async () => {
-                try {
-                    await updateCodeSubmissionStatus(submissionId, 'approved', _currentUser, _userData);
-                    renderReviewCodeSubmissionsPage(); // Re-render to update UI
-                } catch (error) {
-                    showMessageModal(error.message, 'error');
-                }
-            });
-        });
-    });
-
-    document.querySelectorAll('.deny-code-btn').forEach(button => {
-        button.addEventListener('click', async (e) => {
-            const submissionId = e.target.dataset.submissionId;
-            showMessageModal('Are you sure you want to deny this code snippet?', 'confirm', async () => {
-                try {
-                    await updateCodeSubmissionStatus(submissionId, 'denied', _currentUser, _userData);
-                    renderReviewCodeSubmissionsPage(); // Re-render to update UI
-                } catch (error) {
-                    showMessageModal(error.message, 'error');
-                }
-            });
-        });
-    });
-}
-
-/**
- * Renders the page displaying approved code snippets.
- */
-export async function renderApprovedCodePage() {
-    const contentArea = document.getElementById('content-area');
-    let approvedCodeSnippets = [];
-    try {
-        approvedCodeSnippets = await fetchAllApprovedCodeSnippets();
-    } catch (error) {
-        showMessageModal(error.message, 'error');
-        approvedCodeSnippets = [];
-    }
-
-    contentArea.innerHTML = `
-        <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-full lg:max-w-4xl mx-auto backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Approved Code Showcase</h2>
-                <p class="text-lg text-gray-700 dark:text-gray-300 text-center mb-6">Browse code snippets submitted and approved by our community!</p>
-
-                <div id="approved-code-list" class="space-y-6">
-                    ${approvedCodeSnippets.length === 0 ? `
-                        <p class="text-center text-gray-600 dark:text-gray-400">No approved code snippets yet. Check back later!</p>
-                    ` : approvedCodeSnippets.map(snippet => `
-                        <div class="bg-gray-100 dark:bg-gray-700 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-600">
-                            <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">${snippet.title}</h3>
-                            <p class="text-gray-700 dark:text-gray-300 mb-2">Platform: <span class="font-semibold capitalize">${snippet.platform}</span></p>
-                            <p class="text-gray-700 dark:text-gray-300 mb-4">Submitted by <span class="font-semibold">${snippet.authorUsername}</span> on ${snippet.timestamp ? new Date(snippet.timestamp.toDate()).toLocaleString() : 'N/A'}</p>
-                            
-                            <div class="bg-gray-200 dark:bg-gray-900 p-4 rounded-md overflow-x-auto font-mono text-sm text-gray-900 dark:text-gray-100 mb-4">
-                                <pre><code>${escapeHtml(snippet.code)}</code></pre>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-/**
- * Helper function to escape HTML for displaying code safely.
- * @param {string} text - The text to escape.
- * @returns {string} The escaped HTML string.
- */
-function escapeHtml(text) {
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
-}
-
-/**
- * Renders a simple game page. (Placeholder)
- */
-export function renderSimpleGamePage() {
-    const contentArea = document.getElementById('content-area');
-    contentArea.innerHTML = `
-        <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-gray-800 dark:text-gray-100 mb-8">Simple Game</h2>
-                <p class="text-lg text-gray-700 dark:text-gray-300 mb-4">
-                    This is a placeholder for a simple interactive game.
-                </p>
-                <p class="text-gray-600 dark:text-gray-400">
-                    You can replace this content with your game's HTML, CSS, and JavaScript.
-                </p>
-                <!-- Game content would go here -->
-                <div class="mt-6 p-4 border border-dashed border-gray-400 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400">
-                    <p>Example: A simple "Click Me!" button game.</p>
-                    <button id="game-button" class="mt-4 py-2 px-6 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition">Click Me!</button>
-                    <p id="click-count" class="mt-2 text-xl font-bold">Clicks: 0</p>
-                </div>
-            </div>
-        </div>
-    `;
-
-    let clicks = 0;
-    const gameButton = document.getElementById('game-button');
-    const clickCountDisplay = document.getElementById('click-count');
-
-    if (gameButton) {
-        gameButton.addEventListener('click', () => {
-            clicks++;
-            clickCountDisplay.textContent = `Clicks: ${clicks}`;
-        });
-    }
 }
