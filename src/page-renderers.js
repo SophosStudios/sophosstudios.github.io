@@ -65,11 +65,11 @@ export function renderHomePage() {
                 Welcome to ${_CONFIG.websiteTitle}!
             </h1>
             ${_currentUser && _userData ? `
-                <p class="text-xl text-white-700 dark:text-white-300 mb-4">
+                <p class="text-xl text-white dark:text-white mb-4">
                     Hello, <span class="font-semibold text-blue-600">${_userData.username || _currentUser.email}</span>!
                     You are logged in as a ${getRoleVFX(_userData.role)}.
                 </p>
-                <p class="text-lg text-white dark:text-white-400 mb-6">
+                <p class="text-lg text-white dark:text-white mb-6">
                     Explore your profile settings, check out the forum, or visit the admin panel if you have the permissions.
                 </p>
                 <div class="flex flex-col sm:flex-row justify-center gap-4">
@@ -85,7 +85,7 @@ export function renderHomePage() {
                     </button>` : ''}
                 </div>
             ` : `
-                <p class="text-lg text-white-700 dark:text-white-300 mb-6">
+                <p class="text-lg text-white dark:text-white mb-6">
                     Sign in or create an account to unlock full features and personalize your experience.
                 </p>
                 <button id="go-to-auth-btn" class="py-3 px-8 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -114,19 +114,19 @@ export function renderAuthPage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 id="auth-title" class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Sign In</h2>
+                <h2 id="auth-title" class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Sign In</h2>
                 <form id="auth-form" class="space-y-6">
                     <div>
-                        <label for="email" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Email</label>
-                        <input type="email" id="email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="your@example.com" required>
+                        <label for="email" class="block text-white dark:text-white text-sm font-semibold mb-2">Email</label>
+                        <input type="email" id="email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="your@example.com" required>
                     </div>
                     <div id="username-field" class="hidden">
-                        <label for="username" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Username</label>
-                        <input type="text" id="username" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="Choose a username">
+                        <label for="username" class="block text-white dark:text-white text-sm font-semibold mb-2">Username</label>
+                        <input type="text" id="username" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="Choose a username">
                     </div>
                     <div>
-                        <label for="password" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Password</label>
-                        <input type="password" id="password" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="Minimum 6 characters" required>
+                        <label for="password" class="block text-white dark:text-white text-sm font-semibold mb-2">Password</label>
+                        <input type="password" id="password" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="Minimum 6 characters" required>
                     </div>
                     <button type="submit" id="auth-submit-btn" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
                         Sign In
@@ -231,7 +231,7 @@ export function renderProfilePage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Your Profile</h2>
+                <h2 class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Your Profile</h2>
 
                 <div class="flex flex-col items-center mb-6">
                     <img id="profile-pic-display" src="${_userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(_userData.username || _currentUser.email || 'U').charAt(0).toUpperCase()}`}" alt="Profile" class="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-md">
@@ -239,12 +239,12 @@ export function renderProfilePage() {
 
                 <form id="profile-form" class="space-y-6">
                     <div>
-                        <label for="profile-username" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Username</label>
-                        <input type="text" id="profile-username" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${_userData.username || ''}" required>
+                        <label for="profile-username" class="block text-white dark:text-white text-sm font-semibold mb-2">Username</label>
+                        <input type="text" id="profile-username" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${_userData.username || ''}" required>
                     </div>
                     <div>
-                        <label for="profile-email" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Email</label>
-                        <input type="email" id="profile-email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 dark:text-white-100 cursor-not-allowed" value="${_currentUser.email}" disabled>
+                        <label for="profile-email" class="block text-white dark:text-white text-sm font-semibold mb-2">Email</label>
+                        <input type="email" id="profile-email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 dark:text-white cursor-not-allowed" value="${_currentUser.email}" disabled>
                     </div>
                     <button type="button" id="reset-password-btn" class="w-full py-3 rounded-full bg-yellow-600 text-white font-bold text-lg hover:bg-yellow-700 transition duration-300 transform hover:scale-105 shadow-lg">
                         Reset Password
@@ -321,37 +321,37 @@ export function renderSettingsPage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Account Settings</h2>
+                <h2 class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Account Settings</h2>
 
                 <form id="settings-form" class="space-y-8">
                     <!-- Profile Picture & Bio Section -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start border-b border-gray-200 dark:border-gray-700 pb-8">
                         <div class="flex flex-col items-center justify-center">
                             <img id="profile-pic-display" src="${_userData.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(_userData.username || _currentUser.email || 'U').charAt(0).toUpperCase()}`}" alt="Profile" class="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-md mb-4">
-                            <label for="profile-pic-url" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Profile Picture URL</label>
-                            <input type="url" id="profile-pic-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="e.g., https://example.com/your-image.jpg" value="${_userData.profilePicUrl || ''}">
-                            <p class="text-xs text-white-500 dark:text-white-400 mt-1 text-center">Provide a direct image URL.</p>
+                            <label for="profile-pic-url" class="block text-white dark:text-white text-sm font-semibold mb-2">Profile Picture URL</label>
+                            <input type="url" id="profile-pic-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="e.g., https://example.com/your-image.jpg" value="${_userData.profilePicUrl || ''}">
+                            <p class="text-xs text-white dark:text-white mt-1 text-center">Provide a direct image URL.</p>
                         </div>
                         <div>
-                            <label for="profile-bio" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Your Bio</label>
-                            <textarea id="profile-bio" rows="6" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="Tell us about yourself...">${_userData.bio || ''}</textarea>
+                            <label for="profile-bio" class="block text-white dark:text-white text-sm font-semibold mb-2">Your Bio</label>
+                            <textarea id="profile-bio" rows="6" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="Tell us about yourself...">${_userData.bio || ''}</textarea>
                         </div>
                     </div>
 
                     <!-- Theme & Background Section -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start border-b border-gray-200 dark:border-gray-700 pb-8 pt-8">
                         <div>
-                            <h3 class="text-xl font-bold text-white-800 dark:text-white-100 mb-4">Display Options</h3>
+                            <h3 class="text-xl font-bold text-white dark:text-white mb-4">Display Options</h3>
                             <div class="flex items-center space-x-3 mb-4">
-                                <label for="dark-mode-toggle" class="text-white-700 dark:text-white-300 text-md font-semibold">Dark Mode</label>
+                                <label for="dark-mode-toggle" class="text-white dark:text-white text-md font-semibold">Dark Mode</label>
                                 <label class="switch">
                                     <input type="checkbox" id="dark-mode-toggle" ${_userData.theme === 'dark' ? 'checked' : ''}>
                                     <span class="slider round"></span>
                                 </label>
                             </div>
 
-                            <label for="profile-background-select" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Website Background Theme</label>
-                            <select id="profile-background-select" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-gray-50 dark:bg-gray-700 dark:text-white-100">
+                            <label for="profile-background-select" class="block text-white dark:text-white text-sm font-semibold mb-2">Website Background Theme</label>
+                            <select id="profile-background-select" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-gray-50 dark:bg-gray-700 dark:text-white">
                                 ${backgroundOptions.map(option => `
                                     <option value="${option.class}" ${_userData.backgroundUrl === option.class ? 'selected' : ''}>
                                         ${option.name}
@@ -360,29 +360,29 @@ export function renderSettingsPage() {
                             </select>
                         </div>
                         <div>
-                            <label for="custom-background-url" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Custom Background Image/GIF URL (Overrides Theme)</label>
-                            <input type="url" id="custom-background-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="e.g., https://example.com/your-animated.gif" value="${(_userData.backgroundUrl && (_userData.backgroundUrl.startsWith('http') || _userData.backgroundUrl.startsWith('https'))) ? _userData.backgroundUrl : ''}">
-                            <p class="text-xs text-white-500 dark:text-white-400 mt-1">For GIFs, choose a subtle or abstract one for a formal look. This will override the theme selection above.</p>
+                            <label for="custom-background-url" class="block text-white dark:text-white text-sm font-semibold mb-2">Custom Background Image/GIF URL (Overrides Theme)</label>
+                            <input type="url" id="custom-background-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="e.g., https://example.com/your-animated.gif" value="${(_userData.backgroundUrl && (_userData.backgroundUrl.startsWith('http') || _userData.backgroundUrl.startsWith('https'))) ? _userData.backgroundUrl : ''}">
+                            <p class="text-xs text-white dark:text-white mt-1">For GIFs, choose a subtle or abstract one for a formal look. This will override the theme selection above.</p>
                         </div>
                     </div>
 
                     <!-- Partner Card Information Section -->
                     ${isPartnerOrAdmin ? `
                         <div class="border-b border-gray-200 dark:border-gray-700 pb-8 pt-8">
-                            <h3 class="text-xl font-bold text-white-800 dark:text-white-100 mb-4">Partner Card Information</h3>
-                            <p class="text-sm text-white dark:text-white-400 mb-4">This information will be displayed on your public partner card.</p>
+                            <h3 class="text-xl font-bold text-white dark:text-white mb-4">Partner Card Information</h3>
+                            <p class="text-sm text-white dark:text-white mb-4">This information will be displayed on your public partner card.</p>
 
                             <div class="mb-4">
-                                <label for="partner-description" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Partner Description</label>
-                                <textarea id="partner-description" rows="4" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="A short description for your partner card...">${_userData.partnerInfo?.description || ''}</textarea>
+                                <label for="partner-description" class="block text-white dark:text-white text-sm font-semibold mb-2">Partner Description</label>
+                                <textarea id="partner-description" rows="4" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="A short description for your partner card...">${_userData.partnerInfo?.description || ''}</textarea>
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <h4 class="col-span-full text-lg font-semibold text-white-800 dark:text-white-100 mt-4">Partner Links</h4>
+                                <h4 class="col-span-full text-lg font-semibold text-white dark:text-white mt-4">Partner Links</h4>
                                 ${['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', 'website'].map(platform => `
                                     <div>
-                                        <label for="partner-link-${platform}" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2 capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()} Link</label>
-                                        <input type="url" id="partner-link-${platform}" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="Enter URL for ${platform} profile/community" value="${partnerLinks[platform] || ''}">
+                                        <label for="partner-link-${platform}" class="block text-white dark:text-white text-sm font-semibold mb-2 capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()} Link</label>
+                                        <input type="url" id="partner-link-${platform}" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="Enter URL for ${platform} profile/community" value="${partnerLinks[platform] || ''}">
                                     </div>
                                 `).join('')}
                             </div>
@@ -488,22 +488,22 @@ export function renderAboutPage() {
         <div class="flex flex-col items-center justify-center p-4">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-600 mb-6">About ${_CONFIG.websiteTitle}</h2>
-                <p class="text-lg text-white-700 dark:text-white-300 mb-4">
+                <p class="text-lg text-white dark:text-white mb-4">
                     Welcome to a secure and user-friendly platform designed to streamline your online experience. We offer robust user authentication, allowing you to sign up and sign in with ease, keeping your data safe.
                 </p>
-                <p class="text-lg text-white-700 dark:text-white-300 mb-4">
+                <p class="text-lg text-white dark:text-white mb-4">
                     Our platform is built with a focus on personalization. You can update your profile information, choose a custom background theme, and manage your personal details within a dedicated settings section.
                 </p>
-                <p class="text-lg text-white-700 dark:text-white-300 mb-4">
+                <p class="text-lg text-white dark:text-white mb-4">
                     For administrators, we provide a powerful admin panel. This feature allows designated users to oversee all registered accounts, view user details, and manage roles (assigning 'admin' or 'member' status) to ensure smooth operation and access control. Admins can also create and manage forum posts.
                 </p>
-                <p class="text-lg text-white-700 dark:text-white-300 mb-4">
+                <p class="text-lg text-white dark:text-white mb-4">
                     Members can engage with forum posts by adding reactions and comments, fostering a dynamic community environment.
                 </p>
-                <p class="text-lg text-white-700 dark:text-white-300 mb-4">
+                <p class="text-lg text-white dark:text-white mb-4">
                     We prioritize responsive design, ensuring that our website looks great and functions perfectly on any device, from desktops to mobile phones. Our clean, modern interface is powered by efficient technologies to provide a seamless browsing experience.
                 </p>
-                <p class="text-lg text-white-700 dark:text-white-300">
+                <p class="text-lg text-white dark:text-white">
                     Thank you for choosing our platform. We're committed to providing a reliable and enjoyable service.
                 </p>
             </div>
@@ -521,7 +521,7 @@ export async function renderAdminPanelPage() {
             <div class="flex flex-col items-center justify-center p-4">
                 <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                    <p class="text-lg text-white-700 dark:text-white-300">You do not have administrative privileges to access this page.</p>
+                    <p class="text-lg text-white dark:text-white">You do not have administrative privileges to access this page.</p>
                 </div>
             </div>
         `;
@@ -539,8 +539,8 @@ export async function renderAdminPanelPage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Admin Panel</h2>
-                <p class="text-lg text-white-700 dark:text-white-300 text-center mb-6">Manage user roles and accounts, and create forum posts.</p>
+                <h2 class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Admin Panel</h2>
+                <p class="text-lg text-white dark:text-white text-center mb-6">Manage user roles and accounts, and create forum posts.</p>
                 <div class="mb-6 text-center space-x-4">
                     <button id="view-forum-admin-btn" class="py-2 px-6 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
                         Manage Posts (Forum)
@@ -558,27 +558,27 @@ export async function renderAdminPanelPage() {
                     </button>
                 </div>
 
-                <h3 class="text-2xl font-bold text-white-800 dark:text-white-100 mb-4 text-center">Manage Users</h3>
+                <h3 class="text-2xl font-bold text-white dark:text-white mb-4 text-center">Manage Users</h3>
                 ${_usersList.length === 0 ? `
-                    <p class="text-center text-white dark:text-white-400">No users found.</p>
+                    <p class="text-center text-white dark:text-white">No users found.</p>
                 ` : `
                     <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead class="bg-gray-100 dark:bg-gray-700">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white-500 dark:text-white-300 uppercase tracking-wider">
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white dark:text-white uppercase tracking-wider">
                                         Icon
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white-500 dark:text-white-300 uppercase tracking-wider">
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white dark:text-white uppercase tracking-wider">
                                         Username
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white-500 dark:text-white-300 uppercase tracking-wider">
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white dark:text-white uppercase tracking-wider">
                                         Email
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white-500 dark:text-white-300 uppercase tracking-wider">
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white dark:text-white uppercase tracking-wider">
                                         Role
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white-500 dark:text-white-300 uppercase tracking-wider">
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white dark:text-white uppercase tracking-wider">
                                         Actions
                                     </th>
                                 </tr>
@@ -608,15 +608,15 @@ export async function renderAdminPanelPage() {
                     <td class="px-6 py-4 whitespace-nowrap">
                         <img src="${profileIconSrc}" alt="User Icon" class="w-10 h-10 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600" onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(user.username || user.email || 'U').charAt(0).toUpperCase()}'">
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-white-900 dark:text-white-100 font-medium">
+                    <td class="px-6 py-4 whitespace-nowrap text-white dark:text-white font-medium">
                         ${user.username}
                         ${user.isBanned ? '<span class="ml-2 text-red-500 text-xs">(Banned)</span>' : ''}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-white dark:text-white-300 text-sm">
+                    <td class="px-6 py-4 whitespace-nowrap text-white dark:text-white text-sm">
                         ${user.email}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <select class="role-select bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-white-900 dark:text-white-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 ${isDisabled}" ${isDisabled}>
+                        <select class="role-select bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-white dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 ${isDisabled}" ${isDisabled}>
                             <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
                             <option value="partner" ${user.role === 'partner' ? 'selected' : ''}>Partner</option>
                             <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
@@ -683,7 +683,7 @@ export async function renderForumPage() {
             <div class="flex flex-col items-center justify-center p-4">
                 <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                    <p class="text-lg text-white-700 dark:text-white-300">You must be logged in to view the forum.</p>
+                    <p class="text-lg text-white dark:text-white">You must be logged in to view the forum.</p>
                     <button id="go-to-auth-from-forum-btn" class="mt-6 py-3 px-8 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
                         Sign In / Sign Up
                     </button>
@@ -707,7 +707,7 @@ export async function renderForumPage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Community Forum</h2>
+                <h2 class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Community Forum</h2>
                 ${canCreatePost ? `
                     <div class="text-center mb-6">
                         <button id="create-post-btn" class="py-3 px-8 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -718,12 +718,12 @@ export async function renderForumPage() {
 
                 <div id="posts-list" class="space-y-6">
                     ${posts.length === 0 ? `
-                        <p class="text-center text-white dark:text-white-400">No posts yet. Be the first to post!</p>
+                        <p class="text-center text-white dark:text-white">No posts yet. Be the first to post!</p>
                     ` : posts.map(post => `
                         <div class="post-card bg-gray-50 dark:bg-gray-700 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-600">
-                            <h3 class="text-2xl font-bold text-white-900 dark:text-white-100 mb-2">${post.title}</h3>
-                            <p class="text-white-700 dark:text-white-300 mb-4 whitespace-pre-wrap">${post.content}</p>
-                            <div class="flex items-center justify-between text-sm text-white-500 dark:text-white-400 mb-4 border-t border-b border-gray-200 dark:border-gray-600 py-2">
+                            <h3 class="text-2xl font-bold text-white dark:text-white mb-2">${post.title}</h3>
+                            <p class="text-white dark:text-white mb-4 whitespace-pre-wrap">${post.content}</p>
+                            <div class="flex items-center justify-between text-sm text-white dark:text-white mb-4 border-t border-b border-gray-200 dark:border-gray-600 py-2">
                                 <span>Posted by <span class="font-semibold">${post.authorUsername}</span> on ${post.timestamp}</span>
                                 ${canCreatePost ? `
                                     <div class="space-x-2">
@@ -739,14 +739,14 @@ export async function renderForumPage() {
 
                             <!-- Reactions Section -->
                             <div class="flex items-center space-x-4 mb-4">
-                                <span class="text-white-700 dark:text-white-300 font-semibold">Reactions:</span>
+                                <span class="text-white dark:text-white font-semibold">Reactions:</span>
                                 ${Object.entries(post.reactions).map(([emoji, count]) => `
                                     <span class="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium px-2.5 py-0.5 rounded-full">
                                         ${emoji} ${count}
                                     </span>
                                 `).join('')}
                                 <div class="relative inline-block text-left">
-                                    <button class="add-reaction-btn text-white dark:text-white-300 hover:text-blue-600 transition duration-200" data-post-id="${post.id}">
+                                    <button class="add-reaction-btn text-white dark:text-white hover:text-blue-600 transition duration-200" data-post-id="${post.id}">
                                         <i class="fas fa-smile"></i> Add Reaction
                                     </button>
                                     <div class="reaction-picker hidden absolute z-10 bg-white dark:bg-gray-700 rounded-md shadow-lg p-2 mt-1 border border-gray-200 dark:border-gray-600">
@@ -761,21 +761,21 @@ export async function renderForumPage() {
 
                             <!-- Comments Section -->
                             <div class="comments-section mt-4 border-t border-gray-200 dark:border-gray-600 pt-4">
-                                <h4 class="text-lg font-semibold text-white-800 dark:text-white-100 mb-3">Comments (${post.comments.length})</h4>
+                                <h4 class="text-lg font-semibold text-white dark:text-white mb-3">Comments (${post.comments.length})</h4>
                                 <div class="space-y-3 mb-4">
                                     ${post.comments.length === 0 ? `
-                                        <p class="text-sm text-white dark:text-white-400">No comments yet.</p>
+                                        <p class="text-sm text-white dark:text-white">No comments yet.</p>
                                     ` : post.comments.map(comment => `
                                         <div class="bg-gray-100 dark:bg-gray-600 p-3 rounded-md">
-                                            <p class="text-white-800 dark:text-white-200 text-sm">${comment.text}</p>
-                                            <p class="text-xs text-white-500 dark:text-white-400 mt-1">
+                                            <p class="text-white dark:text-white text-sm">${comment.text}</p>
+                                            <p class="text-xs text-white dark:text-white mt-1">
                                                 By <span class="font-medium">${comment.authorUsername}</span> on ${new Date(comment.timestamp).toLocaleString()}
                                             </p>
                                         </div>
                                     `).join('')}
                                 </div>
                                 <div class="flex items-center space-x-2">
-                                    <input type="text" class="comment-input w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:text-white-100" placeholder="Add a comment..." data-post-id="${post.id}">
+                                    <input type="text" class="comment-input w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 dark:text-white" placeholder="Add a comment..." data-post-id="${post.id}">
                                     <button class="submit-comment-btn bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition duration-300 transform hover:scale-105 shadow-md" data-post-id="${post.id}">
                                         Post
                                     </button>
@@ -862,7 +862,7 @@ export async function renderEditPostPage(postId) {
             <div class="flex flex-col items-center justify-center p-4">
                 <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                    <p class="text-lg text-white-700 dark:text-white-300">You do not have permission to edit posts.</p>
+                    <p class="text-lg text-white dark:text-white">You do not have permission to edit posts.</p>
                 </div>
             </div>
         `;
@@ -889,15 +889,15 @@ export async function renderEditPostPage(postId) {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-2xl font-extrabold text-center text-white-800 dark:text-white-100 mb-6">Edit Post</h2>
+                <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Edit Post</h2>
                 <form id="edit-post-form" class="space-y-4">
                     <div>
-                        <label for="edit-post-title" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Title</label>
-                        <input type="text" id="edit-post-title" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${post.title}" required>
+                        <label for="edit-post-title" class="block text-white dark:text-white text-sm font-semibold mb-2">Title</label>
+                        <input type="text" id="edit-post-title" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${post.title}" required>
                     </div>
                     <div>
-                        <label for="edit-post-content" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Content</label>
-                        <textarea id="edit-post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" required>${post.content}</textarea>
+                        <label for="edit-post-content" class="block text-white dark:text-white text-sm font-semibold mb-2">Content</label>
+                        <textarea id="edit-post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" required>${post.content}</textarea>
                     </div>
                     <div class="flex justify-end space-x-4 mt-6">
                         <button type="button" id="cancel-edit-post-btn" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -949,21 +949,21 @@ export async function renderTeamPage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Meet the Team</h2>
+                <h2 class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Meet the Team</h2>
                 ${teamMembers.length === 0 ? `
-                    <p class="text-center text-white dark:text-white-400">No team members found yet.</p>
+                    <p class="text-center text-white dark:text-white">No team members found yet.</p>
                 ` : `
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         ${teamMembers.map(member => `
                             <div class="bg-gray-100 dark:bg-gray-700 p-6 rounded-lg shadow-md text-center border border-gray-200 dark:border-gray-600">
                                 <img src="${member.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(member.username || 'U').charAt(0).toUpperCase()}`}" alt="${member.username}" class="w-24 h-24 rounded-full object-cover mx-auto mb-4 border-4 border-blue-400">
-                                <h3 class="text-xl font-bold text-white-900 dark:text-white-100 mb-1">${member.username}</h3>
-                                <p class="text-md font-semibold text-white-700 dark:text-white-300 mb-3">${getRoleVFX(member.role)}</p>
-                                <p class="text-white dark:text-white-400 text-sm mb-4">${member.bio || 'No bio provided.'}</p>
+                                <h3 class="text-xl font-bold text-white dark:text-white mb-1">${member.username}</h3>
+                                <p class="text-md font-semibold text-white dark:text-white mb-3">${getRoleVFX(member.role)}</p>
+                                <p class="text-white dark:text-white text-sm mb-4">${member.bio || 'No bio provided.'}</p>
                                 ${member.role === 'partner' && member.partnerInfo?.links ? `
                                     <div class="flex justify-center space-x-3 mt-3">
                                         ${member.partnerInfo.links.discord ? `<a href="${member.partnerInfo.links.discord}" target="_blank" class="text-blue-500 hover:text-blue-700 text-2xl"><i class="fab fa-discord"></i></a>` : ''}
-                                        ${member.partnerInfo.links.roblox ? `<a href="${member.partnerInfo.links.roblox}" target="_blank" class="text-white-700 dark:text-white-300 hover:text-white-900 dark:hover:text-white-100 text-2xl"><i class="fab fa-roblox"></i></a>` : ''}
+                                        ${member.partnerInfo.links.roblox ? `<a href="${member.partnerInfo.links.roblox}" target="_blank" class="text-white dark:text-white hover:text-white dark:hover:text-white text-2xl"><i class="fab fa-roblox"></i></a>` : ''}
                                         ${member.partnerInfo.links.fivem ? `<a href="${member.partnerInfo.links.fivem}" target="_blank" class="text-purple-500 hover:text-purple-700 text-2xl"><i class="fas fa-gamepad"></i></a>` : ''}
                                         ${member.partnerInfo.links.codingCommunity ? `<a href="${member.partnerInfo.links.codingCommunity}" target="_blank" class="text-yellow-500 hover:text-yellow-700 text-2xl"><i class="fas fa-code"></i></a>` : ''}
                                         ${member.partnerInfo.links.minecraft ? `<a href="${member.partnerInfo.links.minecraft}" target="_blank" class="text-green-500 hover:text-green-700 text-2xl"><i class="fas fa-cube"></i></a>` : ''}
@@ -990,7 +990,7 @@ export async function renderSendEmailPage(recipientUserId) {
             <div class="flex flex-col items-center justify-center p-4">
                 <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                    <p class="text-lg text-white-700 dark:text-white-300">You do not have permission to send emails.</p>
+                    <p class="text-lg text-white dark:text-white">You do not have permission to send emails.</p>
                 </div>
             </div>
         `;
@@ -1014,23 +1014,23 @@ export async function renderSendEmailPage(recipientUserId) {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-2xl font-extrabold text-center text-white-800 dark:text-white-100 mb-6">Send Email to ${recipientUser.username}</h2>
+                <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Send Email to ${recipientUser.username}</h2>
                 <form id="send-email-form" class="space-y-4">
                     <div>
-                        <label for="recipient-email" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Recipient Email</label>
-                        <input type="email" id="recipient-email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 dark:text-white-100 cursor-not-allowed" value="${recipientUser.email}" disabled>
+                        <label for="recipient-email" class="block text-white dark:text-white text-sm font-semibold mb-2">Recipient Email</label>
+                        <input type="email" id="recipient-email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 dark:text-white cursor-not-allowed" value="${recipientUser.email}" disabled>
                     </div>
                     <div>
-                        <label for="email-subject" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Subject</label>
-                        <input type="text" id="email-subject" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="Enter email subject" required>
+                        <label for="email-subject" class="block text-white dark:text-white text-sm font-semibold mb-2">Subject</label>
+                        <input type="text" id="email-subject" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="Enter email subject" required>
                     </div>
                     <div>
-                        <label for="email-message" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Message</label>
-                        <textarea id="email-message" rows="10" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="Write your email message here..." required></textarea>
+                        <label for="email-message" class="block text-white dark:text-white text-sm font-semibold mb-2">Message</label>
+                        <textarea id="email-message" rows="10" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="Write your email message here..." required></textarea>
                     </div>
                     <div>
-                        <label for="email-image-url" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Image URL (Optional)</label>
-                        <input type="url" id="email-image-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="e.g., https://example.com/image.jpg">
+                        <label for="email-image-url" class="block text-white dark:text-white text-sm font-semibold mb-2">Image URL (Optional)</label>
+                        <input type="url" id="email-image-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="e.g., https://example.com/image.jpg">
                     </div>
                     <div class="flex justify-end space-x-4 mt-6">
                         <button type="button" id="cancel-send-email-btn" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -1077,21 +1077,21 @@ export async function renderPartnersPage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Our Partners</h2>
+                <h2 class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Our Partners</h2>
                 ${partners.length === 0 ? `
-                    <p class="text-center text-white dark:text-white-400">No partners found yet. Check back later!</p>
+                    <p class="text-center text-white dark:text-white">No partners found yet. Check back later!</p>
                 ` : `
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         ${partners.map(partner => `
                             <div class="bg-gray-100 dark:bg-gray-700 p-6 rounded-lg shadow-md text-center border border-gray-200 dark:border-gray-600">
                                 <img src="${partner.profilePicUrl || `https://placehold.co/100x100/F0F0F0/000000?text=${(partner.username || 'P').charAt(0).toUpperCase()}`}" alt="${partner.username}" class="w-24 h-24 rounded-full object-cover mx-auto mb-4 border-4 border-indigo-400">
-                                <h3 class="text-xl font-bold text-white-900 dark:text-white-100 mb-1">${partner.username}</h3>
+                                <h3 class="text-xl font-bold text-white dark:text-white mb-1">${partner.username}</h3>
                                 <p class="text-md font-semibold text-indigo-600 mb-3">${getRoleVFX(partner.role)}</p>
-                                <p class="text-white dark:text-white-400 text-sm mb-4">${partner.partnerInfo?.description || 'No description provided.'}</p>
+                                <p class="text-white dark:text-white text-sm mb-4">${partner.partnerInfo?.description || 'No description provided.'}</p>
                                 ${partner.partnerInfo?.links ? `
                                     <div class="flex justify-center space-x-3 mt-3">
                                         ${partner.partnerInfo.links.discord ? `<a href="${partner.partnerInfo.links.discord}" target="_blank" class="text-blue-500 hover:text-blue-700 text-2xl"><i class="fab fa-discord"></i></a>` : ''}
-                                        ${partner.partnerInfo.links.roblox ? `<a href="${partner.partnerInfo.links.roblox}" target="_blank" class="text-white-700 dark:text-white-300 hover:text-white-900 dark:hover:text-white-100 text-2xl"><i class="fab fa-roblox"></i></a>` : ''}
+                                        ${partner.partnerInfo.links.roblox ? `<a href="${partner.partnerInfo.links.roblox}" target="_blank" class="text-white dark:text-white hover:text-white dark:hover:text-white text-2xl"><i class="fab fa-roblox"></i></a>` : ''}
                                         ${partner.partnerInfo.links.fivem ? `<a href="${partner.partnerInfo.links.fivem}" target="_blank" class="text-purple-500 hover:text-purple-700 text-2xl"><i class="fas fa-gamepad"></i></a>` : ''}
                                         ${partner.partnerInfo.links.codingCommunity ? `<a href="${partner.partnerInfo.links.codingCommunity}" target="_blank" class="text-yellow-500 hover:text-yellow-700 text-2xl"><i class="fas fa-code"></i></a>` : ''}
                                         ${partner.partnerInfo.links.minecraft ? `<a href="${partner.partnerInfo.links.minecraft}" target="_blank" class="text-green-500 hover:text-green-700 text-2xl"><i class="fas fa-cube"></i></a>` : ''}
@@ -1140,8 +1140,8 @@ export async function renderPartnerTOSPage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Partner Terms of Service</h2>
-                <div class="prose dark:prose-invert max-w-none text-white-700 dark:text-white-300 leading-relaxed whitespace-pre-wrap">
+                <h2 class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Partner Terms of Service</h2>
+                <div class="prose dark:prose-invert max-w-none text-white dark:text-white leading-relaxed whitespace-pre-wrap">
                     ${tosContent}
                 </div>
                 ${canEditTOS ? `
@@ -1170,7 +1170,7 @@ export async function renderApplyPartnerPage() {
             <div class="flex flex-col items-center justify-center p-4">
                 <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                    <p class="text-lg text-white-700 dark:text-white-300">Only members can apply to be a partner. If you are already a partner, admin, or founder, you do not need to apply.</p>
+                    <p class="text-lg text-white dark:text-white">Only members can apply to be a partner. If you are already a partner, admin, or founder, you do not need to apply.</p>
                     ${!_currentUser ? `
                         <button id="go-to-auth-from-apply-btn" class="mt-6 py-3 px-8 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
                             Sign In / Sign Up
@@ -1196,19 +1196,19 @@ export async function renderApplyPartnerPage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Apply to be a Partner</h2>
-                <p class="text-white-700 dark:text-white-300 text-center mb-6">Please fill out the form below to apply for a partnership role.</p>
+                <h2 class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Apply to be a Partner</h2>
+                <p class="text-white dark:text-white text-center mb-6">Please fill out the form below to apply for a partnership role.</p>
 
                 <form id="partner-application-form" class="space-y-6">
                     ${questions.map(q => `
                         <div>
-                            <label for="q-${q.id}" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">
+                            <label for="q-${q.id}" class="block text-white dark:text-white text-sm font-semibold mb-2">
                                 ${q.label} ${q.required ? '<span class="text-red-500">*</span>' : ''}
                             </label>
                             ${q.type === 'textarea' ? `
-                                <textarea id="q-${q.id}" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" ${q.required ? 'required' : ''}></textarea>
+                                <textarea id="q-${q.id}" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" ${q.required ? 'required' : ''}></textarea>
                             ` : `
-                                <input type="${q.type}" id="q-${q.id}" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" ${q.required ? 'required' : ''}>
+                                <input type="${q.type}" id="q-${q.id}" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" ${q.required ? 'required' : ''}>
                             `}
                         </div>
                     `).join('')}
@@ -1265,7 +1265,7 @@ export async function renderPartnerApplicationsAdminPage() {
             <div class="flex flex-col items-center justify-center p-4">
                 <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                    <p class="text-lg text-white-700 dark:text-white-300">You do not have permission to view partner applications.</p>
+                    <p class="text-lg text-white dark:text-white">You do not have permission to view partner applications.</p>
                 </div>
             </div>
         `;
@@ -1282,27 +1282,27 @@ export async function renderPartnerApplicationsAdminPage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Partner Applications</h2>
+                <h2 class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Partner Applications</h2>
                 ${_partnerApplicationsList.length === 0 ? `
-                    <p class="text-center text-white dark:text-white-400">No partner applications found.</p>
+                    <p class="text-center text-white dark:text-white">No partner applications found.</p>
                 ` : `
                     <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead class="bg-gray-100 dark:bg-gray-700">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white-500 dark:text-white-300 uppercase tracking-wider">
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white dark:text-white uppercase tracking-wider">
                                         Applicant
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white-500 dark:text-white-300 uppercase tracking-wider">
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white dark:text-white uppercase tracking-wider">
                                         Email
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white-500 dark:text-white-300 uppercase tracking-wider">
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white dark:text-white uppercase tracking-wider">
                                         Status
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white-500 dark:text-white-300 uppercase tracking-wider">
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white dark:text-white uppercase tracking-wider">
                                         Submitted
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white-500 dark:text-white-300 uppercase tracking-wider">
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-white dark:text-white uppercase tracking-wider">
                                         Actions
                                     </th>
                                 </tr>
@@ -1321,10 +1321,10 @@ export async function renderPartnerApplicationsAdminPage() {
         const applicationsTableBody = document.getElementById('applications-table-body');
         applicationsTableBody.innerHTML = _partnerApplicationsList.map(app => `
             <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                <td class="px-6 py-4 whitespace-nowrap text-white-900 dark:text-white-100 font-medium">
+                <td class="px-6 py-4 whitespace-nowrap text-white dark:text-white font-medium">
                     ${app.applicantUsername}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-white dark:text-white-300 text-sm">
+                <td class="px-6 py-4 whitespace-nowrap text-white dark:text-white text-sm">
                     ${app.applicantEmail}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap capitalize">
@@ -1335,7 +1335,7 @@ export async function renderPartnerApplicationsAdminPage() {
                         ${app.status}
                     </span>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-white dark:text-white-300 text-sm">
+                <td class="px-6 py-4 whitespace-nowrap text-white dark:text-white text-sm">
                     ${app.timestamp ? (typeof app.timestamp === 'string' ? new Date(app.timestamp).toLocaleString() : app.timestamp.toDate().toLocaleString()) : 'N/A'}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1368,7 +1368,7 @@ export async function renderManagePartnerQuestionsPage() {
             <div class="flex flex-col items-center justify-center p-4">
                 <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                    <p class="text-lg text-white-700 dark:text-white-300">Only founders and co-founders can manage partner application questions.</p>
+                    <p class="text-lg text-white dark:text-white">Only founders and co-founders can manage partner application questions.</p>
                 </div>
             </div>
         `;
@@ -1385,8 +1385,8 @@ export async function renderManagePartnerQuestionsPage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Manage Partner Application Questions</h2>
-                <p class="text-lg text-white-700 dark:text-white-300 text-center mb-6">Define the questions applicants will answer to become a partner.</p>
+                <h2 class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Manage Partner Application Questions</h2>
+                <p class="text-lg text-white dark:text-white text-center mb-6">Define the questions applicants will answer to become a partner.</p>
 
                 <div class="mb-6 text-center">
                     <button id="add-question-btn" class="py-3 px-8 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -1396,12 +1396,12 @@ export async function renderManagePartnerQuestionsPage() {
 
                 <div id="questions-list" class="space-y-4">
                     ${_currentPartnerQuestions.length === 0 ? `
-                        <p class="text-center text-white dark:text-white-400">No questions defined yet. Add your first question!</p>
+                        <p class="text-center text-white dark:text-white">No questions defined yet. Add your first question!</p>
                     ` : _currentPartnerQuestions.map((q, index) => `
                         <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-md flex items-center justify-between border border-gray-200 dark:border-gray-600">
                             <div class="flex-grow">
-                                <p class="text-lg font-semibold text-white-900 dark:text-white-100">${index + 1}. ${q.label}</p>
-                                <p class="text-sm text-white dark:text-white-300">Type: <span class="font-medium capitalize">${q.type}</span> | Required: <span class="font-medium ${q.required ? 'text-green-600' : 'text-red-600'}">${q.required ? 'Yes' : 'No'}</span></p>
+                                <p class="text-lg font-semibold text-white dark:text-white">${index + 1}. ${q.label}</p>
+                                <p class="text-sm text-white dark:text-white">Type: <span class="font-medium capitalize">${q.type}</span> | Required: <span class="font-medium ${q.required ? 'text-green-600' : 'text-red-600'}">${q.required ? 'Yes' : 'No'}</span></p>
                             </div>
                             <div class="space-x-2">
                                 <button class="edit-question-btn text-blue-500 hover:text-blue-700 font-semibold py-1 px-3 rounded-full" data-index="${index}">
@@ -1470,17 +1470,17 @@ export async function renderVideosPage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Videos</h2>
+                <h2 class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Videos</h2>
                 ${videos.length === 0 ? `
-                    <p class="text-center text-white dark:text-white-400">No videos available yet.</p>
+                    <p class="text-center text-white dark:text-white">No videos available yet.</p>
                 ` : `
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         ${videos.map(video => `
                             <div class="video-card bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-600 cursor-pointer" data-video-id="${video.youtubeVideoId}">
                                 <img src="${video.thumbnailUrl || `https://i.ytimg.com/vi/${video.youtubeVideoId}/hqdefault.jpg`}" alt="${video.name}" class="w-full h-40 object-cover rounded-md mb-3">
-                                <h3 class="text-xl font-bold text-white-900 dark:text-white-100 mb-1">${video.name}</h3>
-                                <p class="text-white dark:text-white-400 text-sm mb-2">${video.description || 'No description provided.'}</p>
-                                <p class="text-xs text-white-500 dark:text-white-400">By ${video.authorUsername} on ${video.timestamp}</p>
+                                <h3 class="text-xl font-bold text-white dark:text-white mb-1">${video.name}</h3>
+                                <p class="text-white dark:text-white text-sm mb-2">${video.description || 'No description provided.'}</p>
+                                <p class="text-xs text-white dark:text-white">By ${video.authorUsername} on ${video.timestamp}</p>
                             </div>
                         `).join('')}
                     </div>
@@ -1510,7 +1510,7 @@ export async function renderManageVideosPage() {
             <div class="flex flex-col items-center justify-center p-4">
                 <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-xl text-center backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
                     <h2 class="text-3xl font-extrabold text-red-600 mb-4">Access Denied</h2>
-                    <p class="text-lg text-white-700 dark:text-white-300">You do not have permission to manage videos.</p>
+                    <p class="text-lg text-white dark:text-white">You do not have permission to manage videos.</p>
                 </div>
             </div>
         `;
@@ -1527,8 +1527,8 @@ export async function renderManageVideosPage() {
     contentArea.innerHTML = `
         <div class="flex flex-col items-center justify-center p-4 min-h-[calc(100vh-64px)]">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-4xl backdrop-blur-sm bg-opacity-80 dark:bg-opacity-80 border border-gray-200 dark:border-gray-700">
-                <h2 class="text-3xl font-extrabold text-center text-white-800 dark:text-white-100 mb-8">Manage Videos</h2>
-                <p class="text-lg text-white-700 dark:text-white-300 text-center mb-6">Add, edit, or delete videos displayed on the Videos page.</p>
+                <h2 class="text-3xl font-extrabold text-center text-white dark:text-white mb-8">Manage Videos</h2>
+                <p class="text-lg text-white dark:text-white text-center mb-6">Add, edit, or delete videos displayed on the Videos page.</p>
 
                 <div class="mb-6 text-center">
                     <button id="add-video-btn" class="py-3 px-8 rounded-full bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -1538,13 +1538,13 @@ export async function renderManageVideosPage() {
 
                 <div id="videos-list" class="space-y-4">
                     ${_videosList.length === 0 ? `
-                        <p class="text-center text-white dark:text-white-400">No videos found yet. Add your first video!</p>
+                        <p class="text-center text-white dark:text-white">No videos found yet. Add your first video!</p>
                     ` : _videosList.map(video => `
                         <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg shadow-md flex flex-col md:flex-row items-center justify-between border border-gray-200 dark:border-gray-600">
                             <div class="flex-grow text-center md:text-left mb-4 md:mb-0">
-                                <h3 class="text-xl font-bold text-white-900 dark:text-white-100 mb-1">${video.name}</h3>
-                                <p class="text-sm text-white dark:text-white-300">${video.youtubeLink}</p>
-                                <p class="text-xs text-white-500 dark:text-white-400 mt-1">Added by ${video.authorUsername} on ${video.timestamp}</p>
+                                <h3 class="text-xl font-bold text-white dark:text-white mb-1">${video.name}</h3>
+                                <p class="text-sm text-white dark:text-white">${video.youtubeLink}</p>
+                                <p class="text-xs text-white dark:text-white mt-1">Added by ${video.authorUsername} on ${video.timestamp}</p>
                             </div>
                             <div class="space-x-2 flex justify-center md:justify-end w-full md:w-auto">
                                 <button class="edit-video-btn text-blue-500 hover:text-blue-700 font-semibold py-1 px-3 rounded-full" data-video-id="${video.id}">
