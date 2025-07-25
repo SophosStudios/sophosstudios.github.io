@@ -73,8 +73,8 @@ function createModal(id, contentHtml) {
     modal.id = id;
     modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
     modal.innerHTML = `
-        <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700 text-white-800 dark:text-white-100 relative">
-            <button class="absolute top-4 right-4 text-white-500 hover:text-white-700 dark:hover:text-white-300 text-2xl" onclick="this.closest('.fixed').remove()">
+        <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700 text-white dark:text-white relative">
+            <button class="absolute top-4 right-4 text-white hover:text-white dark:hover:text-white text-2xl" onclick="this.closest('.fixed').remove()">
                 <i class="fas fa-times"></i>
             </button>
             ${contentHtml}
@@ -91,15 +91,15 @@ function createModal(id, contentHtml) {
 export function showCreatePostModal(post = null) {
     const isEditing = !!post;
     const modal = createModal('create-post-modal', `
-        <h2 class="text-2xl font-extrabold text-center text-white-800 dark:text-white-100 mb-6">${isEditing ? 'Edit Post' : 'Create New Post'}</h2>
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">${isEditing ? 'Edit Post' : 'Create New Post'}</h2>
         <form id="post-form" class="space-y-4">
             <div>
-                <label for="post-title" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Title</label>
-                <input type="text" id="post-title" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${post ? post.title : ''}" required>
+                <label for="post-title" class="block text-white dark:text-white text-sm font-semibold mb-2">Title</label>
+                <input type="text" id="post-title" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${post ? post.title : ''}" required>
             </div>
             <div>
-                <label for="post-content" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Content</label>
-                <textarea id="post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" required>${post ? post.content : ''}</textarea>
+                <label for="post-content" class="block text-white dark:text-white text-sm font-semibold mb-2">Content</label>
+                <textarea id="post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" required>${post ? post.content : ''}</textarea>
             </div>
             <div class="flex justify-end space-x-4 mt-6">
                 <button type="button" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg" onclick="this.closest('.fixed').remove()">
@@ -137,9 +137,9 @@ export function showCreatePostModal(post = null) {
  */
 export function showTakeActionModal(user) {
     const modal = createModal('take-action-modal', `
-        <h2 class="text-2xl font-extrabold text-center text-white-800 dark:text-white-100 mb-6">Take Action on ${user.username}</h2>
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Take Action on ${user.username}</h2>
         <div class="space-y-4">
-            <p class="text-white-700 dark:text-white-300 text-center">What action would you like to take for ${user.username} (${user.email})?</p>
+            <p class="text-white dark:text-white text-center">What action would you like to take for ${user.username} (${user.email})?</p>
             <div class="flex flex-col space-y-3 mt-6">
                 <button id="edit-user-info-btn" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
                     Edit User Info
@@ -202,24 +202,24 @@ export function showTakeActionModal(user) {
  */
 export function showEditUserInfoModal(user) {
     const modal = createModal('edit-user-info-modal', `
-        <h2 class="text-2xl font-extrabold text-center text-white-800 dark:text-white-100 mb-6">Edit User Info: ${user.username}</h2>
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Edit User Info: ${user.username}</h2>
         <form id="edit-user-form" class="space-y-4">
             <div>
-                <label for="edit-username" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Username</label>
-                <input type="text" id="edit-username" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${user.username || ''}" required>
+                <label for="edit-username" class="block text-white dark:text-white text-sm font-semibold mb-2">Username</label>
+                <input type="text" id="edit-username" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${user.username || ''}" required>
             </div>
             <div>
-                <label for="edit-profile-pic-url" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Profile Picture URL</label>
-                <input type="url" id="edit-profile-pic-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${user.profilePicUrl || ''}">
+                <label for="edit-profile-pic-url" class="block text-white dark:text-white text-sm font-semibold mb-2">Profile Picture URL</label>
+                <input type="url" id="edit-profile-pic-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${user.profilePicUrl || ''}">
             </div>
             <div>
-                <label for="edit-bio" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Bio</label>
-                <textarea id="edit-bio" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100">${user.bio || ''}</textarea>
+                <label for="edit-bio" class="block text-white dark:text-white text-sm font-semibold mb-2">Bio</label>
+                <textarea id="edit-bio" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white">${user.bio || ''}</textarea>
             </div>
             <div>
-                <label for="edit-background-url" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Background URL/Class</label>
-                <input type="text" id="edit-background-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${user.backgroundUrl || ''}">
-                <p class="text-xs text-white-500 dark:text-white-400 mt-1">Can be a Tailwind CSS class (e.g., 'bg-blue-500') or a direct image/GIF URL.</p>
+                <label for="edit-background-url" class="block text-white dark:text-white text-sm font-semibold mb-2">Background URL/Class</label>
+                <input type="text" id="edit-background-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${user.backgroundUrl || ''}">
+                <p class="text-xs text-white dark:text-white mt-1">Can be a Tailwind CSS class (e.g., 'bg-blue-500') or a direct image/GIF URL.</p>
             </div>
             <div class="flex justify-end space-x-4 mt-6">
                 <button type="button" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg" onclick="this.closest('.fixed').remove()">
@@ -262,37 +262,37 @@ export function showEditUserInfoModal(user) {
 export function showEditPartnerCardModal(partnerUser) {
     const partnerLinks = partnerUser.partnerInfo?.links || {};
     const modal = createModal('edit-partner-card-modal', `
-        <h2 class="text-2xl font-extrabold text-center text-white-800 dark:text-white-100 mb-6">Edit Partner Card: ${partnerUser.username}</h2>
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Edit Partner Card: ${partnerUser.username}</h2>
         <form id="edit-partner-card-form" class="space-y-4">
             <div>
-                <label for="partner-description" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Partner Description</label>
-                <textarea id="partner-description" rows="4" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="A short description for this partner...">${partnerUser.partnerInfo?.description || ''}</textarea>
+                <label for="partner-description" class="block text-white dark:text-white text-sm font-semibold mb-2">Partner Description</label>
+                <textarea id="partner-description" rows="4" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="A short description for this partner...">${partnerUser.partnerInfo?.description || ''}</textarea>
             </div>
-            <h4 class="text-lg font-semibold text-white-800 dark:text-white-100 mt-4">Partner Links</h4>
+            <h4 class="text-lg font-semibold text-white dark:text-white mt-4">Partner Links</h4>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label for="partner-link-discord" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Discord Link</label>
-                    <input type="url" id="partner-link-discord" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${partnerLinks.discord || ''}">
+                    <label for="partner-link-discord" class="block text-white dark:text-white text-sm font-semibold mb-2">Discord Link</label>
+                    <input type="url" id="partner-link-discord" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${partnerLinks.discord || ''}">
                 </div>
                 <div>
-                    <label for="partner-link-roblox" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Roblox Link</label>
-                    <input type="url" id="partner-link-roblox" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${partnerLinks.roblox || ''}">
+                    <label for="partner-link-roblox" class="block text-white dark:text-white text-sm font-semibold mb-2">Roblox Link</label>
+                    <input type="url" id="partner-link-roblox" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${partnerLinks.roblox || ''}">
                 </div>
                 <div>
-                    <label for="partner-link-fivem" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">FiveM Link</label>
-                    <input type="url" id="partner-link-fivem" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${partnerLinks.fivem || ''}">
+                    <label for="partner-link-fivem" class="block text-white dark:text-white text-sm font-semibold mb-2">FiveM Link</label>
+                    <input type="url" id="partner-link-fivem" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${partnerLinks.fivem || ''}">
                 </div>
                 <div>
-                    <label for="partner-link-codingCommunity" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Coding Community Link</label>
-                    <input type="url" id="partner-link-codingCommunity" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${partnerLinks.codingCommunity || ''}">
+                    <label for="partner-link-codingCommunity" class="block text-white dark:text-white text-sm font-semibold mb-2">Coding Community Link</label>
+                    <input type="url" id="partner-link-codingCommunity" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${partnerLinks.codingCommunity || ''}">
                 </div>
                 <div>
-                    <label for="partner-link-minecraft" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Minecraft Link</label>
-                    <input type="url" id="partner-link-minecraft" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${partnerLinks.minecraft || ''}">
+                    <label for="partner-link-minecraft" class="block text-white dark:text-white text-sm font-semibold mb-2">Minecraft Link</label>
+                    <input type="url" id="partner-link-minecraft" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${partnerLinks.minecraft || ''}">
                 </div>
                 <div>
-                    <label for="partner-link-website" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Website Link</label>
-                    <input type="url" id="partner-link-website" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${partnerLinks.website || ''}">
+                    <label for="partner-link-website" class="block text-white dark:text-white text-sm font-semibold mb-2">Website Link</label>
+                    <input type="url" id="partner-link-website" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${partnerLinks.website || ''}">
                 </div>
             </div>
             <div class="flex justify-end space-x-4 mt-6">
@@ -337,33 +337,33 @@ export function showEditPartnerCardModal(partnerUser) {
  */
 export function showReviewApplicationModal(application, refreshCallback) {
     const applicationAnswersHtml = Object.entries(application.applicationAnswers || {}).map(([key, value]) => `
-        <p class="text-white-700 dark:text-white-300 mb-2"><span class="font-semibold capitalize">${key.replace('q_', '').replace(/([A-Z])/g, ' $1').trim()}:</span> ${value}</p>
+        <p class="text-white dark:text-white mb-2"><span class="font-semibold capitalize">${key.replace('q_', '').replace(/([A-Z])/g, ' $1').trim()}:</span> ${value}</p>
     `).join('');
 
     const modal = createModal('review-application-modal', `
-        <h2 class="text-2xl font-extrabold text-center text-white-800 dark:text-white-100 mb-6">Review Application from ${application.applicantUsername}</h2>
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Review Application from ${application.applicantUsername}</h2>
         <div class="space-y-4 mb-6">
-            <p class="text-white-700 dark:text-white-300"><span class="font-semibold">Applicant:</span> ${application.applicantUsername}</p>
-            <p class="text-white-700 dark:text-white-300"><span class="font-semibold">Email:</span> ${application.applicantEmail}</p>
-            <p class="text-white-700 dark:text-white-300"><span class="font-semibold">Status:</span> <span class="capitalize">${application.status}</span></p>
-            <p class="text-white-700 dark:text-white-300"><span class="font-semibold">Submitted:</span> ${application.timestamp ? new Date(application.timestamp.toDate()).toLocaleString() : 'N/A'}</p>
+            <p class="text-white dark:text-white"><span class="font-semibold">Applicant:</span> ${application.applicantUsername}</p>
+            <p class="text-white dark:text-white"><span class="font-semibold">Email:</span> ${application.applicantEmail}</p>
+            <p class="text-white dark:text-white"><span class="font-semibold">Status:</span> <span class="capitalize">${application.status}</span></p>
+            <p class="text-white dark:text-white"><span class="font-semibold">Submitted:</span> ${application.timestamp ? new Date(application.timestamp.toDate()).toLocaleString() : 'N/A'}</p>
             <div class="border-t border-b border-gray-200 dark:border-gray-700 py-4 mt-4">
-                <h3 class="text-xl font-bold text-white-800 dark:text-white-100 mb-3">Application Answers:</h3>
+                <h3 class="text-xl font-bold text-white dark:text-white mb-3">Application Answers:</h3>
                 ${applicationAnswersHtml}
             </div>
             ${application.status !== 'pending' ? `
                 <div class="mt-4">
-                    <p class="text-white-700 dark:text-white-300"><span class="font-semibold">Reviewer:</span> ${application.reviewerUsername || 'N/A'}</p>
-                    <p class="text-white-700 dark:text-white-300"><span class="font-semibold">Review Date:</span> ${application.reviewTimestamp ? new Date(application.reviewTimestamp.toDate()).toLocaleString() : 'N/A'}</p>
-                    <p class="text-white-700 dark:text-white-300"><span class="font-semibold">Notes:</span> ${application.reviewNotes || 'No notes.'}</p>
+                    <p class="text-white dark:text-white"><span class="font-semibold">Reviewer:</span> ${application.reviewerUsername || 'N/A'}</p>
+                    <p class="text-white dark:text-white"><span class="font-semibold">Review Date:</span> ${application.reviewTimestamp ? new Date(application.reviewTimestamp.toDate()).toLocaleString() : 'N/A'}</p>
+                    <p class="text-white dark:text-white"><span class="font-semibold">Notes:</span> ${application.reviewNotes || 'No notes.'}</p>
                 </div>
             ` : ''}
         </div>
         ${application.status === 'pending' ? `
             <form id="review-form" class="space-y-4">
                 <div>
-                    <label for="review-notes" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Review Notes (Optional)</label>
-                    <textarea id="review-notes" rows="3" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="Add notes about your review..."></textarea>
+                    <label for="review-notes" class="block text-white dark:text-white text-sm font-semibold mb-2">Review Notes (Optional)</label>
+                    <textarea id="review-notes" rows="3" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="Add notes about your review..."></textarea>
                 </div>
                 <div class="flex justify-end space-x-4 mt-6">
                     <button type="button" id="reject-btn" class="py-2 px-5 rounded-full bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -413,11 +413,11 @@ export function showReviewApplicationModal(application, refreshCallback) {
  */
 export function showEditPartnerTOSModal(currentTOSContent) {
     const modal = createModal('edit-partner-tos-modal', `
-        <h2 class="text-2xl font-extrabold text-center text-white-800 dark:text-white-100 mb-6">Edit Partner Terms of Service</h2>
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Edit Partner Terms of Service</h2>
         <form id="edit-tos-form" class="space-y-4">
             <div>
-                <label for="tos-content" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Terms of Service Content (Markdown supported)</label>
-                <textarea id="tos-content" rows="15" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" required>${currentTOSContent}</textarea>
+                <label for="tos-content" class="block text-white dark:text-white text-sm font-semibold mb-2">Terms of Service Content (Markdown supported)</label>
+                <textarea id="tos-content" rows="15" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" required>${currentTOSContent}</textarea>
             </div>
             <div class="flex justify-end space-x-4 mt-6">
                 <button type="button" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg" onclick="this.closest('.fixed').remove()">
@@ -451,15 +451,15 @@ export function showEditPartnerTOSModal(currentTOSContent) {
  */
 export function showEditQuestionModal(index, question, allQuestions) {
     const modal = createModal('edit-question-modal', `
-        <h2 class="text-2xl font-extrabold text-center text-white-800 dark:text-white-100 mb-6">Edit Question</h2>
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Edit Question</h2>
         <form id="edit-question-form" class="space-y-4">
             <div>
-                <label for="question-label" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Question Text</label>
-                <input type="text" id="question-label" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${question.label}" required>
+                <label for="question-label" class="block text-white dark:text-white text-sm font-semibold mb-2">Question Text</label>
+                <input type="text" id="question-label" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${question.label}" required>
             </div>
             <div>
-                <label for="question-type" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Input Type</label>
-                <select id="question-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" required>
+                <label for="question-type" class="block text-white dark:text-white text-sm font-semibold mb-2">Input Type</label>
+                <select id="question-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" required>
                     <option value="text" ${question.type === 'text' ? 'selected' : ''}>Text Input</option>
                     <option value="textarea" ${question.type === 'textarea' ? 'selected' : ''}>Text Area</option>
                     <option value="email" ${question.type === 'email' ? 'selected' : ''}>Email Input</option>
@@ -468,7 +468,7 @@ export function showEditQuestionModal(index, question, allQuestions) {
             </div>
             <div class="flex items-center space-x-2">
                 <input type="checkbox" id="question-required" class="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500" ${question.required ? 'checked' : ''}>
-                <label for="question-required" class="text-white-700 dark:text-white-300 text-sm font-semibold">Required Question</label>
+                <label for="question-required" class="text-white dark:text-white text-sm font-semibold">Required Question</label>
             </div>
             <div class="flex justify-end space-x-4 mt-6">
                 <button type="button" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg" onclick="this.closest('.fixed').remove()">
@@ -511,27 +511,27 @@ export function showEditQuestionModal(index, question, allQuestions) {
 export function showAddEditVideoModal(video = null) {
     const isEditing = !!video;
     const modal = createModal('add-edit-video-modal', `
-        <h2 class="text-2xl font-extrabold text-center text-white-800 dark:text-white-100 mb-6">${isEditing ? 'Edit Video' : 'Add New Video'}</h2>
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">${isEditing ? 'Edit Video' : 'Add New Video'}</h2>
         <form id="video-form" class="space-y-4">
             <div>
-                <label for="video-name" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Video Name</label>
-                <input type="text" id="video-name" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" value="${video ? video.name : ''}" required>
+                <label for="video-name" class="block text-white dark:text-white text-sm font-semibold mb-2">Video Name</label>
+                <input type="text" id="video-name" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${video ? video.name : ''}" required>
             </div>
             <div>
-                <label for="video-description" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Description</label>
-                <textarea id="video-description" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="A short description of the video...">${video ? video.description : ''}</textarea>
+                <label for="video-description" class="block text-white dark:text-white text-sm font-semibold mb-2">Description</label>
+                <textarea id="video-description" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="A short description of the video...">${video ? video.description : ''}</textarea>
             </div>
             <div>
-                <label for="video-icon-url" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Icon URL (Optional)</label>
-                <input type="url" id="video-icon-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="e.g., https://example.com/icon.png" value="${video ? video.iconUrl : ''}">
+                <label for="video-icon-url" class="block text-white dark:text-white text-sm font-semibold mb-2">Icon URL (Optional)</label>
+                <input type="url" id="video-icon-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="e.g., https://example.com/icon.png" value="${video ? video.iconUrl : ''}">
             </div>
             <div>
-                <label for="video-thumbnail-url" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">Thumbnail URL (Optional, YouTube default if empty)</label>
-                <input type="url" id="video-thumbnail-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="e.g., https://example.com/thumbnail.jpg" value="${video ? video.thumbnailUrl : ''}">
+                <label for="video-thumbnail-url" class="block text-white dark:text-white text-sm font-semibold mb-2">Thumbnail URL (Optional, YouTube default if empty)</label>
+                <input type="url" id="video-thumbnail-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="e.g., https://example.com/thumbnail.jpg" value="${video ? video.thumbnailUrl : ''}">
             </div>
             <div>
-                <label for="video-youtube-link" class="block text-white-700 dark:text-white-300 text-sm font-semibold mb-2">YouTube Link</label>
-                <input type="url" id="video-youtube-link" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white-100" placeholder="e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ" value="${video ? video.youtubeLink : ''}" required>
+                <label for="video-youtube-link" class="block text-white dark:text-white text-sm font-semibold mb-2">YouTube Link</label>
+                <input type="url" id="video-youtube-link" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ" value="${video ? video.youtubeLink : ''}" required>
             </div>
             <div class="flex justify-end space-x-4 mt-6">
                 <button type="button" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg" onclick="this.closest('.fixed').remove()">
