@@ -1055,3 +1055,136 @@ export async function deleteVideoFirestore(videoId, currentAuthUser) {
         hideLoadingSpinner();
     }
 }
+
+/**
+ * Submits a new code snippet for review.
+ * @param {string} title - The title of the code snippet.
+ * @param {string} code - The code content.
+ * @param {string} platform - The platform/language (e.g., 'javascript', 'python').
+ * @param {object} currentAuthUser - The current authenticated Firebase user.
+ * @param {object} currentLoggedInUserData - The Firestore data of the currently logged-in user.
+ * @returns {Promise<void>}
+ */
+export async function submitCodeSnippet(title, code, platform, currentAuthUser, currentLoggedInUserData) {
+    if (!currentAuthUser) {
+        throw new Error("You must be logged in to submit code snippets.");
+    }
+    showLoadingSpinner();
+    try {
+        const codeSubmissionsCollectionRef = collection(dbInstance, `/artifacts/${APP_ID}/public/data/codeSubmissions`);
+        await addDoc(codeSubmissionsCollectionRef, {
+            title: title,
+            code: code,
+            platform: platform,
+            authorId: currentAuthUser.uid,
+            authorUsername: currentLoggedInUserData.username || currentAuthUser.displayName || currentAuthUser.email,
+            status: 'pending', // 'pending', 'approved', 'denied'
+            timestamp: serverTimestamp()
+        });
+        showMessageModal('Code snippet submitted for review!');
+    } catch (error) {
+        console.error("Error submitting code snippet:", error.message);
+        throw new Error("Failed to submit code snippet: " + error.message);
+    } finally {
+        hideLoadingSpinner();
+    }
+}
+
+/**
+ * Fetches all code submissions (for admin review).
+ * @param {object} currentAuthUser - The current authenticated Firebase user.
+ * @param {object} currentLoggedInUserData - The Firestore data of the currently logged-in user.
+ * @returns {Promise<Array<object>>} - List of all code submissions.
+ */
+export async function fetchAllCodeSubmissions(currentAuthUser, currentLoggedInUserData) {
+    if (!currentAuthUser || (currentLoggedInUserData.role !== 'admin' && currentLoggedInUserData.role !== 'founder' && currentLoggedInUserData.role !== 'co-founder')) {
+        throw new Error("Not authorized to view code submissions.");
+    }
+    showLoadingSpinner();
+    try {
+        const codeSubmissionsCollectionRef = collection(dbInstance, `/artifacts/${APP_ID}/public/data/codeSubmissions`);
+        const q = query(codeSubmissionsCollectionRef, orderBy('timestamp', 'desc'));
+
+        const querySnapshot = await new Promise((resolve, reject) => {
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                unsubscribe();
+                resolve(snapshot);
+            }, (error) => {
+                reject(error);
+            });
+        });
+
+        const submissionsData = [];
+        querySnapshot.forEach((doc) => {
+            submissionsData.push({ id: doc.id, ...doc.data() });
+        });
+        return submissionsData;
+    } catch (error) {
+        console.error("Error fetching code submissions:", error.message);
+        throw new Error("Failed to fetch code submissions: " + error.message);
+    } finally {
+        hideLoadingSpinner();
+    }
+}
+
+/**
+ * Updates the status of a code submission (approved/denied).
+ * @param {string} submissionId - The ID of the submission to update.
+ * @param {string} status - The new status ('approved' or 'denied').
+ * @param {object} currentAuthUser - The current authenticated Firebase user.
+ * @param {object} currentLoggedInUserData - The Firestore data of the currently logged-in user.
+ * @returns {Promise<void>}
+ */
+export async function updateCodeSubmissionStatus(submissionId, status, currentAuthUser, currentLoggedInUserData) {
+    if (!currentAuthUser || (currentLoggedInUserData.role !== 'admin' && currentLoggedInUserData.role !== 'founder' && currentLoggedInUserData.role !== 'co-founder')) {
+        throw new Error("Not authorized to update code submission status.");
+    }
+    showLoadingSpinner();
+    try {
+        const submissionDocRef = doc(dbInstance, `/artifacts/${APP_ID}/public/data/codeSubmissions`, submissionId);
+        await updateDoc(submissionDocRef, {
+            status: status,
+            reviewerId: currentAuthUser.uid,
+            reviewerUsername: currentLoggedInUserData.username || currentAuthUser.displayName || currentAuthUser.email,
+            reviewTimestamp: serverTimestamp()
+        });
+        showMessageModal(`Code submission ${status} successfully!`);
+    } catch (error) {
+        console.error("Error updating code submission status:", error.message);
+        throw new Error("Failed to update code submission status: " + error.message);
+    } finally {
+        hideLoadingSpinner();
+    }
+}
+
+/**
+ * Fetches all approved code snippets.
+ * @returns {Promise<Array<object>>} - List of approved code snippets.
+ */
+export async function fetchAllApprovedCodeSnippets() {
+    showLoadingSpinner();
+    try {
+        const codeSubmissionsCollectionRef = collection(dbInstance, `/artifacts/${APP_ID}/public/data/codeSubmissions`);
+        const q = query(codeSubmissionsCollectionRef, where('status', '==', 'approved'), orderBy('timestamp', 'desc'));
+
+        const querySnapshot = await new Promise((resolve, reject) => {
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                unsubscribe();
+                resolve(snapshot);
+            }, (error) => {
+                reject(error);
+            });
+        });
+
+        const approvedSnippets = [];
+        querySnapshot.forEach((doc) => {
+            approvedSnippets.push({ id: doc.id, ...doc.data() });
+        });
+        return approvedSnippets;
+    } catch (error) {
+        console.error("Error fetching approved code snippets:", error.message);
+        throw new Error("Failed to fetch approved code snippets: " + error.message);
+    } finally {
+        hideLoadingSpinner();
+    }
+}
