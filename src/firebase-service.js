@@ -215,6 +215,7 @@ export async function sendPasswordReset(email) {
 
 /**
  * Fetches the current user's data from Firestore.
+ * If the user exists in Firebase Auth but not Firestore, a new user document is created.
  * @param {object} currentUser - The Firebase Auth user object.
  * @returns {Promise<object|null>} - User data or null if not authenticated/found.
  */
@@ -225,15 +226,43 @@ export async function fetchCurrentUserFirestoreData(currentUser) {
     try {
         const userDocRef = doc(dbInstance, `/artifacts/${APP_ID}/public/data/users`, currentUser.uid);
         const docSnap = await getDoc(userDocRef);
+
         if (docSnap.exists()) {
             const fetchedData = docSnap.data();
+            // Check and update role based on config for existing users
             fetchedData.role = await updateUserRoleFromConfig(currentUser.uid, currentUser.email, fetchedData.role);
             return fetchedData;
+        } else {
+            // User exists in Auth but not Firestore (e.g., first login after database reset, or a new Google user)
+            console.warn("Firestore document for user not found for existing auth user. Creating default entry.");
+            const usernameToUse = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
+            const profilePicToUse = currentUser.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${usernameToUse.charAt(0).toUpperCase()}`;
+
+            let initialRole = 'member';
+            if (CONFIG.founderEmails && CONFIG.founderEmails.includes(currentUser.email)) {
+                initialRole = 'founder';
+            } else if (CONFIG.adminEmails && CONFIG.adminEmails.includes(currentUser.email)) {
+                initialRole = 'admin';
+            }
+
+            await setDoc(userDocRef, {
+                email: currentUser.email,
+                username: usernameToUse,
+                role: initialRole,
+                profilePicUrl: profilePicToUse,
+                backgroundUrl: 'bg-gradient-to-r from-blue-400 to-purple-600',
+                bio: '',
+                partnerInfo: {
+                    description: '',
+                    links: {}
+                },
+                theme: 'light'
+            });
+            const newDocSnap = await getDoc(userDocRef);
+            return newDocSnap.exists() ? newDocSnap.data() : null; // Return newly created data
         }
-        console.log("Firestore document for user not found.");
-        return null;
     } catch (error) {
-        console.error("Error fetching user data from Firestore:", error.message);
+        console.error("Error fetching/creating user data from Firestore:", error.message);
         return null;
     } finally {
         hideLoadingSpinner();
@@ -726,6 +755,7 @@ export async function fetchPartnerApplicationQuestionsFirestore() {
         if (docSnap.exists() && docSnap.data().questions) {
             return docSnap.data().questions;
         }
+        // Default questions if none are set
         return [
             { id: 'q_name', type: 'text', label: 'Your Full Name', required: true },
             { id: 'q_email', type: 'email', label: 'Your Contact Email', required: true },

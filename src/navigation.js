@@ -18,6 +18,7 @@ const sidebarToggle = document.getElementById('sidebar-toggle');
 const sidebarIconOpen = document.getElementById('sidebar-icon-open');
 const sidebarIconClose = document.getElementById('sidebar-icon-close');
 const websiteTitleSidebar = document.getElementById('website-title-sidebar');
+const adminPanelButtonContainer = document.getElementById('admin-panel-button-container'); // New container for fixed button
 
 let isSidebarExpanded = window.innerWidth >= 768; // Start expanded on desktop, collapsed on mobile
 
@@ -138,6 +139,14 @@ function updateSidebarUI() {
                 textSpan.classList.add('hidden');
             }
         });
+        // Update visibility of dropdown icons
+        leftSidebarNav.querySelectorAll('.dropdown-toggle-icon').forEach(icon => {
+            if (isSidebarExpanded || window.innerWidth >= 768) {
+                icon.classList.remove('hidden');
+            } else {
+                icon.classList.add('hidden');
+            }
+        });
     }
 }
 
@@ -171,20 +180,36 @@ function handleResize() {
  * Renders the Navbar links based on authentication status and sidebar state.
  */
 export function renderNavbar() {
-    if (!leftSidebarNav) {
-        console.warn("Element with ID 'left-sidebar-nav' not found. Sidebar navigation may not render correctly.");
+    if (!leftSidebarNav || !adminPanelButtonContainer) {
+        console.warn("Required navigation elements not found. Sidebar navigation may not render correctly.");
         return;
     }
     leftSidebarNav.innerHTML = ''; // Clear existing links
+    adminPanelButtonContainer.innerHTML = ''; // Clear existing admin button
 
-    const createAndAppendButton = (container, id, text, page, iconHtml = '', roles = [], categoryRoles = []) => {
-        // Check if user has required roles for this item or its category
-        const hasItemRole = roles.length === 0 || (_userData && roles.includes(_userData.role));
-        const hasCategoryRole = categoryRoles.length === 0 || (_userData && categoryRoles.includes(_userData.role));
+    // Helper to check if user has any of the required roles
+    const hasRequiredRole = (roles) => {
+        return roles.length === 0 || (_userData && roles.includes(_userData.role));
+    };
 
-        if (!hasItemRole || !hasCategoryRole) {
-            return; // Skip rendering if user doesn't have the required role
+    /**
+     * Creates a navigation button or dropdown header.
+     * @param {HTMLElement} container - The parent element to append to.
+     * @param {string} id - The ID for the button/div.
+     * @param {string} text - The display text.
+     * @param {string} page - The page to navigate to (for direct links).
+     * @param {string} iconHtml - HTML for the icon.
+     * @param {Array<string>} roles - Roles required for this item.
+     * @param {Array<object>} [children=null] - Array of child menu items for dropdown.
+     * @returns {HTMLElement|null} The created element or null if roles don't match.
+     */
+    const createNavItem = (container, id, text, page, iconHtml, roles, children = null) => {
+        if (!hasRequiredRole(roles)) {
+            return null;
         }
+
+        const itemWrapper = document.createElement('div');
+        itemWrapper.className = 'relative'; // For dropdown positioning
 
         const btn = document.createElement('button');
         btn.id = id;
@@ -195,61 +220,87 @@ export function renderNavbar() {
               (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}
         `;
         btn.innerHTML = `${iconHtml} <span class="sidebar-nav-text ml-3 ${isSidebarExpanded || window.innerWidth >= 768 ? '' : 'hidden'}">${text}</span>`;
-        btn.addEventListener('click', () => {
-            _navigateTo(page);
-            closeSidebar(); // Close sidebar after navigation (especially for mobile)
-        });
-        container.appendChild(btn);
+
+        if (children) {
+            btn.classList.add('justify-between'); // Space between text and arrow
+            btn.innerHTML += `<i class="fas fa-chevron-down ml-auto dropdown-toggle-icon ${isSidebarExpanded || window.innerWidth >= 768 ? '' : 'hidden'}"></i>`;
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent closing sidebar if clicking dropdown toggle
+                const dropdownContent = itemWrapper.querySelector('.dropdown-content');
+                if (dropdownContent) {
+                    dropdownContent.classList.toggle('hidden');
+                    const icon = btn.querySelector('.dropdown-toggle-icon');
+                    if (icon) {
+                        icon.classList.toggle('fa-chevron-down');
+                        icon.classList.toggle('fa-chevron-up');
+                    }
+                }
+            });
+        } else {
+            btn.addEventListener('click', () => {
+                _navigateTo(page);
+                closeSidebar(); // Close sidebar after navigation (especially for mobile)
+            });
+        }
+
+        itemWrapper.appendChild(btn);
+
+        if (children) {
+            const dropdownContent = document.createElement('div');
+            dropdownContent.className = `dropdown-content hidden pl-4 py-2 space-y-1 bg-gray-800 rounded-b-lg`; // Indent children
+            children.forEach(child => {
+                const childBtn = document.createElement('button');
+                childBtn.id = child.id;
+                childBtn.className = `
+                    flex items-center w-full px-4 py-2 text-md font-medium rounded-lg hover:bg-gray-600 text-white transition duration-200
+                `;
+                childBtn.innerHTML = `${child.icon} <span class="sidebar-nav-text ml-3 ${isSidebarExpanded || window.innerWidth >= 768 ? '' : 'hidden'}">${child.text}</span>`;
+                childBtn.addEventListener('click', () => {
+                    _navigateTo(child.page);
+                    closeSidebar();
+                });
+                dropdownContent.appendChild(childBtn);
+            });
+            itemWrapper.appendChild(dropdownContent);
+        }
+
+        container.appendChild(itemWrapper);
+        return itemWrapper;
     };
 
-    // Navigation Categories
+
+    // Define Navigation Structure with Dropdowns
     const categories = [
         {
             name: 'General',
-            icon: '<i class="fas fa-info-circle"></i>',
+            roles: [], // No specific roles required
             items: [
-                { id: 'nav-home', text: 'Home', page: 'home', icon: '<i class="fas fa-home"></i>' },
-                { id: 'nav-about', text: 'About', page: 'about', icon: '<i class="fas fa-info-circle"></i>' },
-                { id: 'nav-team', text: 'Meet the Team', page: 'team', icon: '<i class="fas fa-users"></i>' },
-                { id: 'nav-videos', text: 'Videos', page: 'videos', icon: '<i class="fas fa-video"></i>' } // New Videos Link
-            ],
-            authRequired: false
+                { id: 'nav-home', text: 'Home', page: 'home', icon: '<i class="fas fa-home"></i>', roles: [] },
+                { id: 'nav-about', text: 'About', page: 'about', icon: '<i class="fas fa-info-circle"></i>', roles: [] },
+                { id: 'nav-team', text: 'Meet the Team', page: 'team', icon: '<i class="fas fa-users"></i>', roles: [] },
+                { id: 'nav-videos', text: 'Videos', page: 'videos', icon: '<i class="fas fa-video"></i>', roles: [] }
+            ]
         },
         {
             name: 'Community',
-            icon: '<i class="fas fa-comments"></i>',
+            roles: ['member', 'admin', 'founder', 'co-founder', 'partner'], // Only authenticated users
             items: [
-                { id: 'nav-forum', text: 'Forum', page: 'forum', icon: '<i class="fas fa-comments"></i>' }
-            ],
-            authRequired: true
+                { id: 'nav-forum', text: 'Forum', page: 'forum', icon: '<i class="fas fa-comments"></i>', roles: [] }
+            ]
         },
         {
             name: 'Partnership',
-            icon: '<i class="fas fa-handshake"></i>',
+            roles: ['member', 'admin', 'founder', 'co-founder', 'partner'], // Only authenticated users
             items: [
-                { id: 'nav-partners', text: 'Check Out Partners', page: 'partners', icon: '<i class="fas fa-users-gear"></i>' },
-                { id: 'nav-partner-tos', text: 'Partner TOS', page: 'partner-tos', icon: '<i class="fas fa-file-contract"></i>' },
+                { id: 'nav-partners', text: 'Check Out Partners', page: 'partners', icon: '<i class="fas fa-users-gear"></i>', roles: [] },
+                { id: 'nav-partner-tos', text: 'Partner TOS', page: 'partner-tos', icon: '<i class="fas fa-file-contract"></i>', roles: [] },
                 { id: 'nav-apply-partner', text: 'Become a Partner', page: 'apply-partner', icon: '<i class="fas fa-user-plus"></i>', roles: ['member'] }
-            ],
-            authRequired: true
-        },
-        {
-            name: 'Administration',
-            icon: '<i class="fas fa-shield-alt"></i>',
-            items: [
-                { id: 'nav-admin', text: 'Admin Panel', page: 'admin', icon: '<i class="fas fa-user-cog"></i>' },
-                { id: 'nav-partner-applications', text: 'Partner Applications', page: 'partner-applications', icon: '<i class="fas fa-inbox"></i>' },
-                { id: 'nav-manage-partner-questions', text: 'Manage Partner Questions', page: 'manage-partner-questions', icon: '<i class="fas fa-question-circle"></i>', roles: ['founder', 'co-founder'] },
-                { id: 'nav-manage-videos', text: 'Manage Videos', page: 'manage-videos', icon: '<i class="fas fa-video"></i>', roles: ['admin', 'founder', 'co-founder'] } // New Manage Videos link
-            ],
-            authRequired: true,
-            roles: ['admin', 'founder', 'co-founder'] // Category-level roles
+            ]
         },
         {
             name: 'Account',
-            icon: '<i class="fas fa-user-circle"></i>',
-            items: [], // Populated below based on auth state
-            authRequired: false
+            roles: [], // Handled by individual items below
+            items: []
         }
     ];
 
@@ -262,30 +313,29 @@ export function renderNavbar() {
                  onerror="this.onerror=null; this.src='https://placehold.co/100x100/F0F0F0/000000?text=${(_userData.username || _currentUser.email || 'U').charAt(0).toUpperCase()}'">`;
 
         accountCategory.items.push(
-            { id: 'nav-profile', text: 'Profile', page: 'profile', icon: profileIconHtml },
-            { id: 'nav-settings', text: 'Settings', page: 'settings', icon: '<i class="fas fa-cog"></i>' },
-            { id: 'nav-sign-out', text: 'Sign Out', page: 'logout', icon: '<i class="fas fa-sign-out-alt"></i>' }
+            { id: 'nav-profile', text: 'Profile', page: 'profile', icon: profileIconHtml, roles: [] },
+            { id: 'nav-settings', text: 'Settings', page: 'settings', icon: '<i class="fas fa-cog"></i>', roles: [] },
+            { id: 'nav-sign-out', text: 'Sign Out', page: 'logout', icon: '<i class="fas fa-sign-out-alt"></i>', roles: [] }
         );
     } else {
         accountCategory.items.push(
-            { id: 'nav-auth', text: 'Sign In / Up', page: 'auth', icon: '<i class="fas fa-sign-in-alt"></i>' }
+            { id: 'nav-auth', text: 'Sign In / Up', page: 'auth', icon: '<i class="fas fa-sign-in-alt"></i>', roles: [] }
         );
     }
 
     categories.forEach(category => {
-        if (category.authRequired && !_currentUser) return;
+        // Filter items within the category based on user's roles
+        const filteredItems = category.items.filter(item => hasRequiredRole(item.roles));
 
-        const filteredItems = category.items.filter(item => {
-            const itemRoles = item.roles || [];
-            const categoryRoles = category.roles || [];
+        // If the category itself has roles and the user doesn't meet them, skip the whole category
+        if (!hasRequiredRole(category.roles)) {
+            return;
+        }
 
-            const hasItemRole = itemRoles.length === 0 || (_userData && itemRoles.includes(_userData.role));
-            const hasCategoryRole = categoryRoles.length === 0 || (_userData && categoryRoles.includes(_userData.role));
-
-            return hasItemRole && hasCategoryRole;
-        });
-
-        if (filteredItems.length === 0) return;
+        // If there are no items after filtering, don't show the category header
+        if (filteredItems.length === 0) {
+            return;
+        }
 
         // Create category header for expanded view
         const categoryHeader = document.createElement('div');
@@ -298,9 +348,43 @@ export function renderNavbar() {
 
         // Create buttons for each item in the category
         filteredItems.forEach(item => {
-            createAndAppendButton(leftSidebarNav, item.id, item.text, item.page, item.icon, item.roles, category.roles);
+            // For now, no actual nested children in the data structure, but the function supports it.
+            // If you want a dropdown, you'd define `children` array in the `item` object.
+            // Example:
+            // { id: 'nav-partnership-dropdown', text: 'Partnership', icon: '<i class="fas fa-handshake"></i>', roles: ['member'],
+            //   children: [
+            //     { id: 'nav-partners', text: 'Check Out Partners', page: 'partners', icon: '<i class="fas fa-users-gear"></i>', roles: [] },
+            //     { id: 'nav-partner-tos', text: 'Partner TOS', page: 'partner-tos', icon: '<i class="fas fa-file-contract"></i>', roles: [] },
+            //     { id: 'nav-apply-partner', text: 'Become a Partner', page: 'apply-partner', icon: '<i class="fas fa-user-plus"></i>', roles: ['member'] }
+            //   ]
+            // }
+            // For now, I'll just render them as flat items under the category.
+            // The "Partnership" category itself acts as a conceptual grouping.
+
+            createNavItem(leftSidebarNav, item.id, item.text, item.page, item.icon, item.roles);
         });
     });
+
+    // Render the fixed Admin Panel button at the bottom
+    if (_userData && (_userData.role === 'admin' || _userData.role === 'founder' || _userData.role === 'co-founder')) {
+        const adminBtn = document.createElement('button');
+        adminBtn.id = 'fixed-admin-panel-btn';
+        adminBtn.className = `
+            w-full py-3 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg
+            flex items-center justify-center
+            ${isSidebarExpanded || window.innerWidth >= 768 ? 'px-4' : 'px-0'}
+        `;
+        adminBtn.innerHTML = `
+            <i class="fas fa-gear text-xl"></i>
+            <span class="sidebar-nav-text ml-3 ${isSidebarExpanded || window.innerWidth >= 768 ? '' : 'hidden'}">Admin Panel</span>
+        `;
+        adminBtn.addEventListener('click', () => {
+            _navigateTo('admin');
+            closeSidebar();
+        });
+        adminPanelButtonContainer.appendChild(adminBtn);
+    }
+
 
     // Update the UI to reflect current sidebar state after rendering links
     updateSidebarUI();

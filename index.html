@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sophos Community</title>
+    <title>Your Website Title</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -108,9 +108,9 @@
         <nav id="left-sidebar-nav" class="flex-grow overflow-y-auto py-4 space-y-2">
             <!-- Navigation links will be rendered here by JavaScript -->
         </nav>
-        <div class="p-4 border-t border-gray-700 text-center">
-            <!-- Optional footer content for sidebar -->
-            <p class="text-xs text-gray-500 hidden md:block" id="app-version">v1.0</p>
+        <!-- Admin Panel Button (fixed at the bottom of the sidebar) -->
+        <div id="admin-panel-button-container" class="p-4 border-t border-gray-700">
+            <!-- Button will be rendered by navigation.js -->
         </div>
     </aside>
 
@@ -126,11 +126,11 @@
 
     <!-- Import all JavaScript modules -->
     <script type="module" src="config.js"></script>
-    <script type="module" src="./src/utils.js"></script>
-    <script type="module" src="./src/firebase-service.js"></script>
-    <script type="module" src="./src/modals.js"></script>
-    <script type="module" src="./src/page-renderers.js"></script>
-    <script type="module" src="./src/navigation.js"></script>
-    <script type="module" src="./App.js"></script> <!-- Main entry point -->
+    <script type="module" src="src/utils.js"></script>
+    <script type="module" src="src/firebase-service.js"></script>
+    <script type="module" src="src/modals.js"></script>
+    <script type="module" src="src/page-renderers.js"></script>
+    <script type="module" src="src/navigation.js"></script>
+    <script type="module" src="App.js"></script> <!-- Main entry point -->
 </body>
 </html>
