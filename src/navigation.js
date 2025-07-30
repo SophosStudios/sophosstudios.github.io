@@ -215,12 +215,11 @@ export function renderNavbar() {
         btn.id = id;
         btn.className = `
             flex items-center w-full px-4 py-3 text-lg font-semibold rounded-lg hover:bg-gray-700 text-white transition duration-200
-            ${id.includes('admin') || id.includes('manage-partner-questions') || id.includes('partner-applications') || id.includes('review-code-submissions') ? 'bg-red-600 hover:bg-red-700 shadow-md' :
+            ${id.includes('admin') || id.includes('manage-partner-questions') || id.includes('partner-applications') ? 'bg-red-600 hover:bg-red-700 shadow-md' :
               (id.includes('auth') ? 'bg-green-600 hover:bg-green-700 shadow-md' :
               (id.includes('sign-out') ? 'bg-blue-600 hover:bg-blue-700 shadow-md' : ''))}
         `;
-        // Ensure text color is white for all nav items
-        btn.innerHTML = `${iconHtml} <span class="sidebar-nav-text ml-3 text-white ${isSidebarExpanded || window.innerWidth >= 768 ? '' : 'hidden'}">${text}</span>`;
+        btn.innerHTML = `${iconHtml} <span class="sidebar-nav-text ml-3 ${isSidebarExpanded || window.innerWidth >= 768 ? '' : 'hidden'}">${text}</span>`;
 
         if (children) {
             btn.classList.add('justify-between'); // Space between text and arrow
@@ -248,8 +247,7 @@ export function renderNavbar() {
 
         if (children) {
             const dropdownContent = document.createElement('div');
-            // Ensure dropdown content text is also white
-            dropdownContent.className = `dropdown-content hidden pl-4 py-2 space-y-1 bg-gray-800 rounded-b-lg text-white`; // Indent children
+            dropdownContent.className = `dropdown-content hidden pl-4 py-2 space-y-1 bg-gray-800 rounded-b-lg`; // Indent children
             children.forEach(child => {
                 const childBtn = document.createElement('button');
                 childBtn.id = child.id;
@@ -288,22 +286,6 @@ export function renderNavbar() {
             roles: ['member', 'admin', 'founder', 'co-founder', 'partner'], // Only authenticated users
             items: [
                 { id: 'nav-forum', text: 'Forum', page: 'forum', icon: '<i class="fas fa-comments"></i>', roles: [] }
-            ]
-        },
-        {
-            name: 'Games', // New Category for fun things
-            roles: ['member', 'admin', 'founder', 'co-founder', 'partner'], // Accessible to all logged-in members
-            items: [
-                { id: 'nav-simple-game', text: 'Simple Game', page: 'simple-game', icon: '<i class="fas fa-gamepad"></i>', roles: [] }
-                // Add more game links here as needed
-            ]
-        },
-        {
-            name: 'Code Showcase', // New category for code snippets
-            roles: ['member', 'admin', 'founder', 'co-founder', 'partner'],
-            items: [
-                { id: 'nav-submit-code', text: 'Submit Code', page: 'submit-code', icon: '<i class="fas fa-file-code"></i>', roles: [] },
-                { id: 'nav-approved-code', text: 'Approved Code', page: 'approved-code', icon: '<i class="fas fa-check-circle"></i>', roles: [] }
             ]
         },
         {
@@ -373,7 +355,7 @@ export function renderNavbar() {
             //   children: [
             //     { id: 'nav-partners', text: 'Check Out Partners', page: 'partners', icon: '<i class="fas fa-users-gear"></i>', roles: [] },
             //     { id: 'nav-partner-tos', text: 'Partner TOS', page: 'partner-tos', icon: '<i class="fas fa-file-contract"></i>', roles: [] },
-            //     { id: 'nav-apply-partner', text: 'Become a Partner', icon: '<i class="fas fa-user-plus"></i>', roles: ['member'] }
+            //     { id: 'nav-apply-partner', text: 'Become a Partner', page: 'apply-partner', icon: '<i class="fas fa-user-plus"></i>', roles: ['member'] }
             //   ]
             // }
             // For now, I'll just render them as flat items under the category.

@@ -1,28 +1,23 @@
 // src/modals.js
-// This file contains functions for rendering and managing various application modals.
+// Handles displaying and managing various application modals.
 
-import { showMessageModal, extractYouTubeVideoId } from './utils.js';
 import {
-    createPostFirestore, updateProfileData, setUserBanStatusFirestore,
-    deleteUserFirestore, updatePartnerApplicationStatusFirestore, updatePartnerApplicationQuestionsFirestore,
-    updatePartnerTOSFirestore, addVideoFirestore, updateVideoFirestore,
-    submitCodeSnippet, updateCodeSubmissionStatus
-} from './firebase-service.js'; // Import Firebase service functions
+    createPostFirestore, updatePostFirestore, updateProfileData,
+    updatePartnerApplicationStatusFirestore, updatePartnerTOSFirestore,
+    updatePartnerApplicationQuestionsFirestore, addVideoFirestore, updateVideoFirestore
+} from './firebase-service.js';
+import { showMessageModal, showLoadingSpinner, hideLoadingSpinner, extractYouTubeVideoId } from './utils.js';
 
-// Global variables from App.js that modals need access to
+// Global state and functions passed from App.js (initialized by App.js)
 let _currentUser = null;
 let _userData = null;
-let _currentPartnerQuestions = []; // Cached questions for editing
-let _navigateToCallback = null; // Callback to navigate function in App.js
-let _refreshAdminPageCallback = null;
-let _refreshForumPageCallback = null;
-let _refreshPartnersPageCallback = null;
-let _refreshPartnerTOSPageCallback = null;
-let _refreshManagePartnerQuestionsPageCallback = null;
-let _refreshVideosPageCallback = null;
-let _refreshApprovedCodePageCallback = null;
-let _refreshReviewCodeSubmissionsPageCallback = null;
-
+let _navigateTo = null;
+let _renderAdminPanelPage = null; // Callback to re-render admin page
+let _renderForumPage = null; // Callback to re-render forum page
+let _renderPartnersPage = null; // Callback to re-render partners page
+let _renderPartnerTOSPage = null; // Callback to re-render partner TOS page
+let _renderManagePartnerQuestionsPage = null; // Callback to re-render manage partner questions page
+let _renderVideosPage = null; // Callback to re-render videos page
 
 /**
  * Initializes the modals module with necessary global state and functions.
@@ -30,31 +25,25 @@ let _refreshReviewCodeSubmissionsPageCallback = null;
  * @param {object} currentUser - The current Firebase Auth user object.
  * @param {object} userData - The current Firestore user data.
  * @param {function} navigateTo - The main navigation function from App.js.
- * @param {function} refreshAdminPage - Callback to refresh admin page.
- * @param {function} refreshForumPage - Callback to refresh forum page.
- * @param {function} refreshPartnersPage - Callback to refresh partners page.
- * @param {function} refreshPartnerTOSPage - Callback to refresh partner TOS page.
- * @param {function} refreshManagePartnerQuestionsPage - Callback to refresh manage partner questions page.
- * @param {function} refreshVideosPage - Callback to refresh videos page.
- * @param {function} refreshApprovedCodePage - Callback to refresh approved code page.
- * @param {function} refreshReviewCodeSubmissionsPage - Callback to refresh review code submissions page.
+ * @param {function} renderAdminPanelPage - Callback to re-render the admin panel.
+ * @param {function} renderForumPage - Callback to re-render the forum page.
+ * @param {function} renderPartnersPage - Callback to re-render the partners page.
+ * @param {function} renderPartnerTOSPage - Callback to re-render the partner TOS page.
+ * @param {function} renderManagePartnerQuestionsPage - Callback to re-render the manage partner questions page.
+ * @param {function} renderVideosPage - Callback to re-render the videos page.
  */
-export function initializeModals(
-    currentUser, userData, navigateTo,
-    refreshAdminPage, refreshForumPage, refreshPartnersPage, refreshPartnerTOSPage,
-    refreshManagePartnerQuestionsPage, refreshVideosPage, refreshApprovedCodePage, refreshReviewCodeSubmissionsPage
-) {
+export function initializeModals(currentUser, userData, navigateTo,
+    renderAdminPanelPage, renderForumPage, renderPartnersPage, renderPartnerTOSPage,
+    renderManagePartnerQuestionsPage, renderVideosPage) {
     _currentUser = currentUser;
     _userData = userData;
-    _navigateToCallback = navigateTo;
-    _refreshAdminPageCallback = refreshAdminPage;
-    _refreshForumPageCallback = refreshForumPage;
-    _refreshPartnersPageCallback = refreshPartnersPage;
-    _refreshPartnerTOSPageCallback = refreshPartnerTOSPage;
-    _refreshManagePartnerQuestionsPageCallback = refreshManagePartnerQuestionsPage;
-    _refreshVideosPageCallback = refreshVideosPage;
-    _refreshApprovedCodePageCallback = refreshApprovedCodePage;
-    _refreshReviewCodeSubmissionsPageCallback = refreshReviewCodeSubmissionsPage;
+    _navigateTo = navigateTo;
+    _renderAdminPanelPage = renderAdminPanelPage;
+    _renderForumPage = renderForumPage;
+    _renderPartnersPage = renderPartnersPage;
+    _renderPartnerTOSPage = renderPartnerTOSPage;
+    _renderManagePartnerQuestionsPage = renderManagePartnerQuestionsPage;
+    _renderVideosPage = renderVideosPage;
 }
 
 /**
@@ -62,146 +51,144 @@ export function initializeModals(
  * Call this whenever currentUser or userData changes in App.js.
  * @param {object} currentUser - The current Firebase Auth user object.
  * @param {object} userData - The current Firestore user data.
- * @param {Array<object>} [currentPartnerQuestions=[]] - The current list of partner questions (optional, for specific modals).
  */
-export function updateModalState(currentUser, userData, currentPartnerQuestions = []) {
+export function updateModalState(currentUser, userData) {
     _currentUser = currentUser;
     _userData = userData;
-    _currentPartnerQuestions = currentPartnerQuestions;
 }
 
 /**
- * Renders a generic modal with a given title and content.
- * @param {string} title - The modal title.
- * @param {string} contentHtml - The HTML content for the modal body.
- * @param {function} [onCloseCallback=null] - Function to call when modal is closed.
+ * Helper function to create and append a modal to the body.
+ * @param {string} id - The ID for the modal container.
+ * @param {string} contentHtml - The inner HTML content of the modal.
+ * @returns {HTMLElement} The created modal element.
  */
-export function renderGenericModal(title, contentHtml, onCloseCallback = null) {
-    const mainModalsContainer = document.getElementById('main-modals-container');
-    if (!mainModalsContainer) {
-        console.error("Main modals container not found.");
-        return;
+function createModal(id, contentHtml) {
+    const existingModal = document.getElementById(id);
+    if (existingModal) {
+        existingModal.remove(); // Remove old modal if it exists
     }
 
-    mainModalsContainer.innerHTML = `
-        <div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg mx-auto p-6 relative backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700">
-                <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-2xl" id="close-modal-btn">
-                    <i class="fas fa-times"></i>
-                </button>
-                <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 text-center">${title}</h3>
-                <div id="modal-content-body">
-                    ${contentHtml}
-                </div>
-            </div>
+    const modal = document.createElement('div');
+    modal.id = id;
+    modal.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 p-4';
+    modal.innerHTML = `
+        <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg backdrop-blur-sm bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700 text-white dark:text-white relative">
+            <button class="absolute top-4 right-4 text-white hover:text-white dark:hover:text-white text-2xl" onclick="this.closest('.fixed').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+            ${contentHtml}
         </div>
     `;
-    mainModalsContainer.classList.remove('hidden');
-
-    const closeModalBtn = mainModalsContainer.querySelector('#close-modal-btn');
-    if (closeModalBtn) {
-        closeModalBtn.addEventListener('click', () => {
-            mainModalsContainer.classList.add('hidden');
-            mainModalsContainer.innerHTML = ''; // Clear content
-            if (onCloseCallback) {
-                onCloseCallback();
-            }
-        });
-    }
+    document.body.appendChild(modal);
+    return modal;
 }
 
 /**
- * Shows the Create Post modal.
+ * Displays the Create/Edit Post modal.
+ * @param {object} [post=null] - The post object if editing, null if creating.
  */
-export function showCreatePostModal() {
-    const contentHtml = `
-        <form id="create-post-form" class="space-y-4">
+export function showCreatePostModal(post = null) {
+    const isEditing = !!post;
+    const modal = createModal('create-post-modal', `
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">${isEditing ? 'Edit Post' : 'Create New Post'}</h2>
+        <form id="post-form" class="space-y-4">
             <div>
-                <label for="post-title" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Title</label>
-                <input type="text" id="post-title" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                <label for="post-title" class="block text-white dark:text-white text-sm font-semibold mb-2">Title</label>
+                <input type="text" id="post-title" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${post ? post.title : ''}" required>
             </div>
             <div>
-                <label for="post-content" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Content</label>
-                <textarea id="post-content" rows="8" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required></textarea>
+                <label for="post-content" class="block text-white dark:text-white text-sm font-semibold mb-2">Content</label>
+                <textarea id="post-content" rows="10" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" required>${post ? post.content : ''}</textarea>
             </div>
             <div class="flex justify-end space-x-4 mt-6">
-                <button type="button" id="cancel-create-post-btn" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                <button type="button" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg" onclick="this.closest('.fixed').remove()">
                     Cancel
                 </button>
                 <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                    Create Post
+                    ${isEditing ? 'Save Changes' : 'Create Post'}
                 </button>
             </div>
         </form>
-    `;
-    renderGenericModal('Create New Post', contentHtml, () => _refreshForumPageCallback());
+    `);
 
-    document.getElementById('create-post-form').addEventListener('submit', async (e) => {
+    modal.querySelector('#post-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const title = document.getElementById('post-title').value;
-        const content = document.getElementById('post-content').value;
+        const title = modal.querySelector('#post-title').value;
+        const content = modal.querySelector('#post-content').value;
+
         try {
-            await createPostFirestore(title, content, _currentUser, _userData);
-            document.getElementById('main-modals-container').classList.add('hidden');
-            _refreshForumPageCallback(); // Re-render forum after creation
+            if (isEditing) {
+                await updatePostFirestore(post.id, title, content, _currentUser, _userData);
+            } else {
+                await createPostFirestore(title, content, _currentUser, _userData);
+            }
+            modal.remove();
+            _renderForumPage(); // Re-render forum page after action
         } catch (error) {
             showMessageModal(error.message, 'error');
         }
     });
-    document.getElementById('cancel-create-post-btn').addEventListener('click', () => {
-        document.getElementById('main-modals-container').classList.add('hidden');
-    });
 }
 
 /**
- * Shows the Take Action modal for a specific user (admin panel).
+ * Displays the "Take Action" modal for a specific user in the Admin Panel.
  * @param {object} user - The user object to take action on.
  */
 export function showTakeActionModal(user) {
-    const contentHtml = `
-        <div class="space-y-4 text-center">
-            <p class="text-gray-700 dark:text-gray-300 text-lg">Actions for <span class="font-semibold">${user.username}</span>:</p>
-            <button id="send-email-user-btn" class="w-full py-2 px-4 rounded-full bg-blue-500 text-white font-bold hover:bg-blue-600 transition duration-300 transform hover:scale-105 shadow-md">
-                Send Email
-            </button>
-            <button id="ban-user-btn" class="w-full py-2 px-4 rounded-full ${user.isBanned ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'} text-white font-bold transition duration-300 transform hover:scale-105 shadow-md">
-                ${user.isBanned ? 'Unban User' : 'Ban User'}
-            </button>
-            <button id="delete-user-btn" class="w-full py-2 px-4 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-md">
-                Delete User Data
-            </button>
+    const modal = createModal('take-action-modal', `
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Take Action on ${user.username}</h2>
+        <div class="space-y-4">
+            <p class="text-white dark:text-white text-center">What action would you like to take for ${user.username} (${user.email})?</p>
+            <div class="flex flex-col space-y-3 mt-6">
+                <button id="edit-user-info-btn" class="w-full py-3 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                    Edit User Info
+                </button>
+                <button id="send-email-btn" class="w-full py-3 rounded-full bg-purple-600 text-white font-bold text-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                    Send Email
+                </button>
+                <button id="toggle-ban-btn" class="w-full py-3 rounded-full ${user.isBanned ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white font-bold text-lg transition duration-300 transform hover:scale-105 shadow-lg">
+                    ${user.isBanned ? 'Unban User' : 'Ban User'}
+                </button>
+                <button id="delete-user-btn" class="w-full py-3 rounded-full bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                    Delete User
+                </button>
+            </div>
         </div>
-    `;
-    renderGenericModal('User Actions', contentHtml);
+    `);
 
-    document.getElementById('send-email-user-btn').addEventListener('click', () => {
-        document.getElementById('main-modals-container').classList.add('hidden');
-        if (_navigateToCallback) {
-            _navigateToCallback('send-email', user.id);
-        }
+    modal.querySelector('#edit-user-info-btn').addEventListener('click', () => {
+        modal.remove();
+        showEditUserInfoModal(user);
     });
-
-    document.getElementById('ban-user-btn').addEventListener('click', async () => {
-        const newBanStatus = !user.isBanned;
-        showMessageModal(`Are you sure you want to ${newBanStatus ? 'ban' : 'unban'} ${user.username}?`, 'confirm', async () => {
+    modal.querySelector('#send-email-btn').addEventListener('click', () => {
+        modal.remove();
+        _navigateTo('send-email', user.id);
+    });
+    modal.querySelector('#toggle-ban-btn').addEventListener('click', async () => {
+        const confirmMessage = user.isBanned ? `Are you sure you want to unban ${user.username}?` : `Are you sure you want to ban ${user.username}? This will prevent them from logging in.`;
+        showMessageModal(confirmMessage, 'confirm', async () => {
             try {
-                await setUserBanStatusFirestore(user.id, newBanStatus, _userData);
-                document.getElementById('main-modals-container').classList.add('hidden');
-                showMessageModal(`${user.username} has been ${newBanStatus ? 'banned' : 'unbanned'}.`);
-                _refreshAdminPageCallback(); // Re-render admin panel
+                const success = await firebaseService.setUserBanStatusFirestore(user.id, !user.isBanned, _currentUser, _userData);
+                if (success) {
+                    showMessageModal(`${user.username} has been ${user.isBanned ? 'unbanned' : 'banned'}.`);
+                    modal.remove();
+                    _renderAdminPanelPage(); // Re-render admin panel to update status
+                }
             } catch (error) {
                 showMessageModal(error.message, 'error');
             }
         });
     });
-
-    document.getElementById('delete-user-btn').addEventListener('click', async () => {
-        showMessageModal(`Are you sure you want to delete all data for ${user.username}? This action is irreversible.`, 'confirm', async () => {
+    modal.querySelector('#delete-user-btn').addEventListener('click', async () => {
+        showMessageModal(`Are you sure you want to delete ${user.username}'s account? This action cannot be undone.`, 'confirm', async () => {
             try {
-                await deleteUserFirestore(user.id, _userData);
-                document.getElementById('main-modals-container').classList.add('hidden');
-                showMessageModal(`Data for ${user.username} has been deleted.`);
-                _refreshAdminPageCallback(); // Re-render admin panel
+                const success = await firebaseService.deleteUserFirestore(user.id, _currentUser, _userData);
+                if (success) {
+                    showMessageModal(`${user.username}'s account has been deleted.`);
+                    modal.remove();
+                    _renderAdminPanelPage(); // Re-render admin panel to update list
+                }
             } catch (error) {
                 showMessageModal(error.message, 'error');
             }
@@ -210,26 +197,32 @@ export function showTakeActionModal(user) {
 }
 
 /**
- * Shows the Edit Partner Card modal for a specific partner.
- * @param {object} partnerUser - The partner user object whose card is being edited.
+ * Displays the modal for editing a user's information (username, profile pic, bio, background).
+ * @param {object} user - The user object to edit.
  */
-export function showEditPartnerCardModal(partnerUser) {
-    const partnerLinks = partnerUser.partnerInfo?.links || {};
-    const contentHtml = `
-        <form id="edit-partner-card-form" class="space-y-4">
+export function showEditUserInfoModal(user) {
+    const modal = createModal('edit-user-info-modal', `
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Edit User Info: ${user.username}</h2>
+        <form id="edit-user-form" class="space-y-4">
             <div>
-                <label for="partner-description-modal" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Partner Description</label>
-                <textarea id="partner-description-modal" rows="4" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="A short description for the partner card...">${partnerUser.partnerInfo?.description || ''}</textarea>
+                <label for="edit-username" class="block text-white dark:text-white text-sm font-semibold mb-2">Username</label>
+                <input type="text" id="edit-username" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${user.username || ''}" required>
             </div>
-            <h4 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mt-4">Partner Links</h4>
-            ${['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', 'website'].map(platform => `
-                <div>
-                    <label for="partner-link-modal-${platform}" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2 capitalize">${platform.replace(/([A-Z])/g, ' $1').trim()} Link</label>
-                    <input type="url" id="partner-link-modal-${platform}" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="Enter URL for ${platform} profile/community" value="${partnerLinks[platform] || ''}">
-                </div>
-            `).join('')}
+            <div>
+                <label for="edit-profile-pic-url" class="block text-white dark:text-white text-sm font-semibold mb-2">Profile Picture URL</label>
+                <input type="url" id="edit-profile-pic-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${user.profilePicUrl || ''}">
+            </div>
+            <div>
+                <label for="edit-bio" class="block text-white dark:text-white text-sm font-semibold mb-2">Bio</label>
+                <textarea id="edit-bio" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white">${user.bio || ''}</textarea>
+            </div>
+            <div>
+                <label for="edit-background-url" class="block text-white dark:text-white text-sm font-semibold mb-2">Background URL/Class</label>
+                <input type="text" id="edit-background-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${user.backgroundUrl || ''}">
+                <p class="text-xs text-white dark:text-white mt-1">Can be a Tailwind CSS class (e.g., 'bg-blue-500') or a direct image/GIF URL.</p>
+            </div>
             <div class="flex justify-end space-x-4 mt-6">
-                <button type="button" id="cancel-edit-partner-card-btn" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                <button type="button" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg" onclick="this.closest('.fixed').remove()">
                     Cancel
                 </button>
                 <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -237,103 +230,177 @@ export function showEditPartnerCardModal(partnerUser) {
                 </button>
             </div>
         </form>
-    `;
-    renderGenericModal(`Edit Partner Card for ${partnerUser.username}`, contentHtml, () => _refreshPartnersPageCallback());
+    `);
 
-    const editPartnerCardForm = document.getElementById('edit-partner-card-form');
-    const partnerDescriptionInput = document.getElementById('partner-description-modal');
-    const partnerLinkInputs = {};
-    ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', 'website'].forEach(platform => {
-        partnerLinkInputs[platform] = document.getElementById(`partner-link-modal-${platform}`);
-    });
-
-    editPartnerCardForm.addEventListener('submit', async (e) => {
+    modal.querySelector('#edit-user-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const newDescription = partnerDescriptionInput.value;
-        const newLinks = {};
-        ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', 'website'].forEach(platform => {
-            newLinks[platform] = partnerLinkInputs[platform].value;
-        });
-
-        const updatedPartnerInfo = {
-            description: newDescription,
-            links: newLinks
-        };
+        const newUsername = modal.querySelector('#edit-username').value;
+        const newProfilePicUrl = modal.querySelector('#edit-profile-pic-url').value;
+        const newBio = modal.querySelector('#edit-bio').value;
+        const newBackgroundUrl = modal.querySelector('#edit-background-url').value;
 
         try {
-            await updateProfileData(partnerUser.id, { partnerInfo: updatedPartnerInfo });
-            document.getElementById('main-modals-container').classList.add('hidden');
-            showMessageModal('Partner card updated successfully!');
-            _refreshPartnersPageCallback(); // Re-render partners page
+            await updateProfileData(user.id, {
+                username: newUsername,
+                profilePicUrl: newProfilePicUrl,
+                bio: newBio,
+                backgroundUrl: newBackgroundUrl
+            }, _currentUser, _userData);
+            showMessageModal('User info updated successfully!');
+            modal.remove();
+            _renderAdminPanelPage(); // Re-render admin panel to update UI
         } catch (error) {
             showMessageModal(error.message, 'error');
         }
     });
+}
 
-    document.getElementById('cancel-edit-partner-card-btn').addEventListener('click', () => {
-        document.getElementById('main-modals-container').classList.add('hidden');
+/**
+ * Displays the modal for editing a partner's card information.
+ * @param {object} partnerUser - The partner user object to edit.
+ */
+export function showEditPartnerCardModal(partnerUser) {
+    const partnerLinks = partnerUser.partnerInfo?.links || {};
+    const modal = createModal('edit-partner-card-modal', `
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Edit Partner Card: ${partnerUser.username}</h2>
+        <form id="edit-partner-card-form" class="space-y-4">
+            <div>
+                <label for="partner-description" class="block text-white dark:text-white text-sm font-semibold mb-2">Partner Description</label>
+                <textarea id="partner-description" rows="4" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="A short description for this partner...">${partnerUser.partnerInfo?.description || ''}</textarea>
+            </div>
+            <h4 class="text-lg font-semibold text-white dark:text-white mt-4">Partner Links</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="partner-link-discord" class="block text-white dark:text-white text-sm font-semibold mb-2">Discord Link</label>
+                    <input type="url" id="partner-link-discord" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${partnerLinks.discord || ''}">
+                </div>
+                <div>
+                    <label for="partner-link-roblox" class="block text-white dark:text-white text-sm font-semibold mb-2">Roblox Link</label>
+                    <input type="url" id="partner-link-roblox" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${partnerLinks.roblox || ''}">
+                </div>
+                <div>
+                    <label for="partner-link-fivem" class="block text-white dark:text-white text-sm font-semibold mb-2">FiveM Link</label>
+                    <input type="url" id="partner-link-fivem" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${partnerLinks.fivem || ''}">
+                </div>
+                <div>
+                    <label for="partner-link-codingCommunity" class="block text-white dark:text-white text-sm font-semibold mb-2">Coding Community Link</label>
+                    <input type="url" id="partner-link-codingCommunity" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${partnerLinks.codingCommunity || ''}">
+                </div>
+                <div>
+                    <label for="partner-link-minecraft" class="block text-white dark:text-white text-sm font-semibold mb-2">Minecraft Link</label>
+                    <input type="url" id="partner-link-minecraft" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${partnerLinks.minecraft || ''}">
+                </div>
+                <div>
+                    <label for="partner-link-website" class="block text-white dark:text-white text-sm font-semibold mb-2">Website Link</label>
+                    <input type="url" id="partner-link-website" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${partnerLinks.website || ''}">
+                </div>
+            </div>
+            <div class="flex justify-end space-x-4 mt-6">
+                <button type="button" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg" onclick="this.closest('.fixed').remove()">
+                    Cancel
+                </button>
+                <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    `);
+
+    modal.querySelector('#edit-partner-card-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const newDescription = modal.querySelector('#partner-description').value;
+        const newLinks = {};
+        ['discord', 'roblox', 'fivem', 'codingCommunity', 'minecraft', 'website'].forEach(platform => {
+            newLinks[platform] = modal.querySelector(`#partner-link-${platform}`).value;
+        });
+
+        try {
+            await updateProfileData(partnerUser.id, {
+                partnerInfo: {
+                    description: newDescription,
+                    links: newLinks
+                }
+            }, _currentUser, _userData);
+            showMessageModal('Partner card updated successfully!');
+            modal.remove();
+            _renderPartnersPage(); // Re-render partners page to update UI
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+        }
     });
 }
 
 /**
- * Shows the Review Application modal for a specific partner application.
- * @param {object} application - The application object to review.
+ * Displays the modal for reviewing a partner application.
+ * @param {object} application - The partner application object.
+ * @param {function} refreshCallback - Function to call to refresh the applications list.
  */
-export function showReviewApplicationModal(application) {
-    const answersHtml = Object.keys(application)
-        .filter(key => !['id', 'applicantId', 'applicantUsername', 'applicantEmail', 'status', 'timestamp', 'reviewedBy', 'reviewedAt'].includes(key))
-        .map(key => `
-            <div class="mb-3">
-                <p class="font-semibold text-gray-800 dark:text-gray-100 capitalize">${key.replace(/([A-Z])/g, ' $1').trim()}:</p>
-                <p class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">${application[key]}</p>
+export function showReviewApplicationModal(application, refreshCallback) {
+    const applicationAnswersHtml = Object.entries(application.applicationAnswers || {}).map(([key, value]) => `
+        <p class="text-white dark:text-white mb-2"><span class="font-semibold capitalize">${key.replace('q_', '').replace(/([A-Z])/g, ' $1').trim()}:</span> ${value}</p>
+    `).join('');
+
+    const modal = createModal('review-application-modal', `
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Review Application from ${application.applicantUsername}</h2>
+        <div class="space-y-4 mb-6">
+            <p class="text-white dark:text-white"><span class="font-semibold">Applicant:</span> ${application.applicantUsername}</p>
+            <p class="text-white dark:text-white"><span class="font-semibold">Email:</span> ${application.applicantEmail}</p>
+            <p class="text-white dark:text-white"><span class="font-semibold">Status:</span> <span class="capitalize">${application.status}</span></p>
+            <p class="text-white dark:text-white"><span class="font-semibold">Submitted:</span> ${application.timestamp ? new Date(application.timestamp.toDate()).toLocaleString() : 'N/A'}</p>
+            <div class="border-t border-b border-gray-200 dark:border-gray-700 py-4 mt-4">
+                <h3 class="text-xl font-bold text-white dark:text-white mb-3">Application Answers:</h3>
+                ${applicationAnswersHtml}
             </div>
-        `).join('');
-
-    const contentHtml = `
-        <div class="space-y-4">
-            <p class="text-gray-700 dark:text-gray-300">Applicant: <span class="font-semibold">${application.applicantUsername} (${application.applicantEmail})</span></p>
-            <p class="text-gray-700 dark:text-gray-300">Status: <span class="font-semibold capitalize">${application.status}</span></p>
-            <p class="text-gray-700 dark:text-gray-300">Submitted: <span class="font-semibold">${application.timestamp}</span></p>
-
-            <h4 class="text-xl font-bold text-gray-800 dark:text-gray-100 mt-6 mb-4">Application Answers:</h4>
-            <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
-                ${answersHtml || '<p class="text-gray-600 dark:text-gray-400">No answers provided.</p>'}
-            </div>
-
-            <div class="flex justify-center space-x-4 mt-6">
-                ${application.status === 'pending' ? `
-                    <button id="approve-application-btn" class="py-2 px-5 rounded-full bg-green-600 text-white font-bold hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
+            ${application.status !== 'pending' ? `
+                <div class="mt-4">
+                    <p class="text-white dark:text-white"><span class="font-semibold">Reviewer:</span> ${application.reviewerUsername || 'N/A'}</p>
+                    <p class="text-white dark:text-white"><span class="font-semibold">Review Date:</span> ${application.reviewTimestamp ? new Date(application.reviewTimestamp.toDate()).toLocaleString() : 'N/A'}</p>
+                    <p class="text-white dark:text-white"><span class="font-semibold">Notes:</span> ${application.reviewNotes || 'No notes.'}</p>
+                </div>
+            ` : ''}
+        </div>
+        ${application.status === 'pending' ? `
+            <form id="review-form" class="space-y-4">
+                <div>
+                    <label for="review-notes" class="block text-white dark:text-white text-sm font-semibold mb-2">Review Notes (Optional)</label>
+                    <textarea id="review-notes" rows="3" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="Add notes about your review..."></textarea>
+                </div>
+                <div class="flex justify-end space-x-4 mt-6">
+                    <button type="button" id="reject-btn" class="py-2 px-5 rounded-full bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                        Reject
+                    </button>
+                    <button type="button" id="approve-btn" class="py-2 px-5 rounded-full bg-green-600 text-white font-bold hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
                         Approve
                     </button>
-                    <button id="deny-application-btn" class="py-2 px-5 rounded-full bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                        Deny
-                    </button>
-                ` : `
-                    <p class="text-gray-600 dark:text-gray-400">Application already ${application.status}.</p>
-                `}
+                </div>
+            </form>
+        ` : `
+            <div class="text-center mt-6">
+                <button type="button" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg" onclick="this.closest('.fixed').remove()">
+                    Close
+                </button>
             </div>
-        </div>
-    `;
-    renderGenericModal('Review Partner Application', contentHtml);
+        `}
+    `);
 
     if (application.status === 'pending') {
-        document.getElementById('approve-application-btn').addEventListener('click', async () => {
+        const reviewNotesInput = modal.querySelector('#review-notes');
+        modal.querySelector('#approve-btn').addEventListener('click', async () => {
             try {
-                await updatePartnerApplicationStatusFirestore(application.id, 'approved', _currentUser, _userData);
-                document.getElementById('main-modals-container').classList.add('hidden');
-                _refreshAdminPageCallback(); // Refresh the list
+                await updatePartnerApplicationStatusFirestore(application.id, 'approved', reviewNotesInput.value, application.applicantId, _currentUser, _userData);
+                modal.remove();
+                refreshCallback();
             } catch (error) {
                 showMessageModal(error.message, 'error');
             }
         });
 
-        document.getElementById('deny-application-btn').addEventListener('click', async () => {
+        modal.querySelector('#reject-btn').addEventListener('click', async () => {
             try {
-                await updatePartnerApplicationStatusFirestore(application.id, 'denied', _currentUser, _userData);
-                document.getElementById('main-modals-container').classList.add('hidden');
-                _refreshAdminPageCallback(); // Refresh the list
-            } catch (error)
-            {
+                await updatePartnerApplicationStatusFirestore(application.id, 'rejected', reviewNotesInput.value, application.applicantId, _currentUser, _userData);
+                modal.remove();
+                refreshCallback();
+            } catch (error) {
                 showMessageModal(error.message, 'error');
             }
         });
@@ -341,33 +408,19 @@ export function showReviewApplicationModal(application) {
 }
 
 /**
- * Shows the Edit Question modal for a specific partner application question.
- * @param {number} index - The index of the question in the `_currentPartnerQuestions` array.
- * @param {object} question - The question object to edit.
+ * Displays the modal for editing the Partner TOS content.
+ * @param {string} currentTOSContent - The current content of the Partner TOS.
  */
-export function showEditQuestionModal(index, question) {
-    const contentHtml = `
-        <form id="edit-question-form" class="space-y-4">
+export function showEditPartnerTOSModal(currentTOSContent) {
+    const modal = createModal('edit-partner-tos-modal', `
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Edit Partner Terms of Service</h2>
+        <form id="edit-tos-form" class="space-y-4">
             <div>
-                <label for="question-label" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Question Text</label>
-                <input type="text" id="question-label" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" value="${question.label}" required>
-            </div>
-            <div>
-                <label for="question-type" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Input Type</label>
-                <select id="question-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100">
-                    <option value="text" ${question.type === 'text' ? 'selected' : ''}>Text Input</option>
-                    <option value="textarea" ${question.type === 'textarea' ? 'selected' : ''}>Text Area</option>
-                    <option value="email" ${question.type === 'email' ? 'selected' : ''}>Email Input</option>
-                    <option value="url" ${question.type === 'url' ? 'selected' : ''}>URL Input</option>
-                    <option value="number" ${question.type === 'number' ? 'selected' : ''}>Number Input</option>
-                </select>
-            </div>
-            <div class="flex items-center space-x-2">
-                <input type="checkbox" id="question-required" class="rounded text-blue-600 focus:ring-blue-500" ${question.required ? 'checked' : ''}>
-                <label for="question-required" class="text-gray-700 dark:text-gray-300 text-sm font-semibold">Required</label>
+                <label for="tos-content" class="block text-white dark:text-white text-sm font-semibold mb-2">Terms of Service Content (Markdown supported)</label>
+                <textarea id="tos-content" rows="15" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" required>${currentTOSContent}</textarea>
             </div>
             <div class="flex justify-end space-x-4 mt-6">
-                <button type="button" id="cancel-edit-question-btn" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                <button type="button" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg" onclick="this.closest('.fixed').remove()">
                     Cancel
                 </button>
                 <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -375,68 +428,113 @@ export function showEditQuestionModal(index, question) {
                 </button>
             </div>
         </form>
-    `;
-    renderGenericModal('Edit Question', contentHtml);
+    `);
 
-    const editQuestionForm = document.getElementById('edit-question-form');
-    const questionLabelInput = document.getElementById('question-label');
-    const questionTypeSelect = document.getElementById('question-type');
-    const questionRequiredCheckbox = document.getElementById('question-required');
-
-    editQuestionForm.addEventListener('submit', async (e) => {
+    modal.querySelector('#edit-tos-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const updatedQuestion = {
-            id: question.id, // Keep original ID
-            label: questionLabelInput.value,
-            type: questionTypeSelect.value,
-            required: questionRequiredCheckbox.checked
-        };
-        _currentPartnerQuestions[index] = updatedQuestion; // Update the array passed by reference
-
+        const newContent = modal.querySelector('#tos-content').value;
         try {
-            await updatePartnerApplicationQuestionsFirestore(_currentPartnerQuestions, _currentUser, _userData);
-            document.getElementById('main-modals-container').classList.add('hidden');
-            showMessageModal('Question updated successfully!');
-            _refreshManagePartnerQuestionsPageCallback(); // Re-render the page
+            await updatePartnerTOSFirestore(newContent, _currentUser, _userData);
+            modal.remove();
+            _renderPartnerTOSPage(); // Re-render the TOS page to show updates
         } catch (error) {
             showMessageModal(error.message, 'error');
         }
     });
+}
 
-    document.getElementById('cancel-edit-question-btn').addEventListener('click', () => {
-        document.getElementById('main-modals-container').classList.add('hidden');
+/**
+ * Displays the modal for editing a single partner application question.
+ * @param {number} index - The index of the question in the array.
+ * @param {object} question - The question object to edit.
+ * @param {Array<object>} allQuestions - The array of all questions (for direct modification).
+ */
+export function showEditQuestionModal(index, question, allQuestions) {
+    const modal = createModal('edit-question-modal', `
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">Edit Question</h2>
+        <form id="edit-question-form" class="space-y-4">
+            <div>
+                <label for="question-label" class="block text-white dark:text-white text-sm font-semibold mb-2">Question Text</label>
+                <input type="text" id="question-label" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${question.label}" required>
+            </div>
+            <div>
+                <label for="question-type" class="block text-white dark:text-white text-sm font-semibold mb-2">Input Type</label>
+                <select id="question-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" required>
+                    <option value="text" ${question.type === 'text' ? 'selected' : ''}>Text Input</option>
+                    <option value="textarea" ${question.type === 'textarea' ? 'selected' : ''}>Text Area</option>
+                    <option value="email" ${question.type === 'email' ? 'selected' : ''}>Email Input</option>
+                    <option value="date" ${question.type === 'date' ? 'selected' : ''}>Date Input</option>
+                </select>
+            </div>
+            <div class="flex items-center space-x-2">
+                <input type="checkbox" id="question-required" class="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500" ${question.required ? 'checked' : ''}>
+                <label for="question-required" class="text-white dark:text-white text-sm font-semibold">Required Question</label>
+            </div>
+            <div class="flex justify-end space-x-4 mt-6">
+                <button type="button" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg" onclick="this.closest('.fixed').remove()">
+                    Cancel
+                </button>
+                <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    `);
+
+    modal.querySelector('#edit-question-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const newLabel = modal.querySelector('#question-label').value;
+        const newType = modal.querySelector('#question-type').value;
+        const newRequired = modal.querySelector('#question-required').checked;
+
+        // Update the question directly in the passed array
+        allQuestions[index].label = newLabel;
+        allQuestions[index].type = newType;
+        allQuestions[index].required = newRequired;
+
+        try {
+            await updatePartnerApplicationQuestionsFirestore(allQuestions, _currentUser, _userData);
+            showMessageModal('Question updated successfully!');
+            modal.remove();
+            _renderManagePartnerQuestionsPage(); // Re-render to update UI
+        } catch (error) {
+            showMessageModal(error.message, 'error');
+            _renderManagePartnerQuestionsPage(); // Re-render to revert if save fails
+        }
     });
 }
 
 /**
- * Shows the Add/Edit Video modal.
- * @param {object} [videoToEdit=null] - The video object if editing, null if adding.
+ * Displays the modal for adding or editing a video.
+ * @param {object} [video=null] - The video object if editing, null if adding.
  */
-export function showAddEditVideoModal(videoToEdit = null) {
-    const isEditing = videoToEdit !== null;
-    const title = isEditing ? 'Edit Video' : 'Add New Video';
-
-    const contentHtml = `
-        <form id="add-edit-video-form" class="space-y-4">
+export function showAddEditVideoModal(video = null) {
+    const isEditing = !!video;
+    const modal = createModal('add-edit-video-modal', `
+        <h2 class="text-2xl font-extrabold text-center text-white dark:text-white mb-6">${isEditing ? 'Edit Video' : 'Add New Video'}</h2>
+        <form id="video-form" class="space-y-4">
             <div>
-                <label for="video-name" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Video Name</label>
-                <input type="text" id="video-name" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" value="${videoToEdit?.name || ''}" required>
+                <label for="video-name" class="block text-white dark:text-white text-sm font-semibold mb-2">Video Name</label>
+                <input type="text" id="video-name" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" value="${video ? video.name : ''}" required>
             </div>
             <div>
-                <label for="youtube-link" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">YouTube Link</label>
-                <input type="url" id="youtube-link" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ" value="${videoToEdit?.youtubeLink || ''}" required>
+                <label for="video-description" class="block text-white dark:text-white text-sm font-semibold mb-2">Description</label>
+                <textarea id="video-description" rows="5" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="A short description of the video...">${video ? video.description : ''}</textarea>
             </div>
             <div>
-                <label for="video-description" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Description (Optional)</label>
-                <textarea id="video-description" rows="4" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="A short description of the video...">${videoToEdit?.description || ''}</textarea>
+                <label for="video-icon-url" class="block text-white dark:text-white text-sm font-semibold mb-2">Icon URL (Optional)</label>
+                <input type="url" id="video-icon-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="e.g., https://example.com/icon.png" value="${video ? video.iconUrl : ''}">
             </div>
             <div>
-                <label for="thumbnail-url" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Custom Thumbnail URL (Optional)</label>
-                <input type="url" id="thumbnail-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., https://example.com/custom-thumb.jpg" value="${videoToEdit?.thumbnailUrl || ''}">
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">If empty, YouTube's default thumbnail will be used.</p>
+                <label for="video-thumbnail-url" class="block text-white dark:text-white text-sm font-semibold mb-2">Thumbnail URL (Optional, YouTube default if empty)</label>
+                <input type="url" id="video-thumbnail-url" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="e.g., https://example.com/thumbnail.jpg" value="${video ? video.thumbnailUrl : ''}">
+            </div>
+            <div>
+                <label for="video-youtube-link" class="block text-white dark:text-white text-sm font-semibold mb-2">YouTube Link</label>
+                <input type="url" id="video-youtube-link" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-white" placeholder="e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ" value="${video ? video.youtubeLink : ''}" required>
             </div>
             <div class="flex justify-end space-x-4 mt-6">
-                <button type="button" id="cancel-video-modal-btn" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
+                <button type="button" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg" onclick="this.closest('.fixed').remove()">
                     Cancel
                 </button>
                 <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
@@ -444,207 +542,32 @@ export function showAddEditVideoModal(videoToEdit = null) {
                 </button>
             </div>
         </form>
-    `;
-    renderGenericModal(title, contentHtml);
+    `);
 
-    const addEditVideoForm = document.getElementById('add-edit-video-form');
-    const videoNameInput = document.getElementById('video-name');
-    const youtubeLinkInput = document.getElementById('youtube-link');
-    const videoDescriptionInput = document.getElementById('video-description');
-    const thumbnailUrlInput = document.getElementById('thumbnail-url');
-
-    addEditVideoForm.addEventListener('submit', async (e) => {
+    modal.querySelector('#video-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const name = videoNameInput.value;
-        const youtubeLink = youtubeLinkInput.value;
-        const description = videoDescriptionInput.value;
-        const thumbnailUrl = thumbnailUrlInput.value;
-
+        const name = modal.querySelector('#video-name').value;
+        const description = modal.querySelector('#video-description').value;
+        const iconUrl = modal.querySelector('#video-icon-url').value;
+        const thumbnailUrl = modal.querySelector('#video-thumbnail-url').value;
+        const youtubeLink = modal.querySelector('#video-youtube-link').value;
         const youtubeVideoId = extractYouTubeVideoId(youtubeLink);
+
         if (!youtubeVideoId) {
             showMessageModal("Invalid YouTube link. Please provide a valid YouTube video URL.", 'error');
             return;
         }
 
-        const videoData = {
-            name,
-            youtubeLink,
-            youtubeVideoId, // Store extracted ID for easy embedding/linking
-            description,
-            thumbnailUrl
-        };
-
         try {
             if (isEditing) {
-                await updateVideoFirestore(videoToEdit.id, videoData, _currentUser, _userData);
+                await updateVideoFirestore(video.id, name, description, iconUrl, thumbnailUrl, youtubeLink, youtubeVideoId, _currentUser);
             } else {
-                await addVideoFirestore(videoData, _currentUser, _userData);
+                await addVideoFirestore(name, description, iconUrl, thumbnailUrl, youtubeLink, youtubeVideoId, _currentUser, _userData);
             }
-            document.getElementById('main-modals-container').classList.add('hidden');
-            _refreshVideosPageCallback(); // Re-render the page
+            modal.remove();
+            _renderManageVideosPage(); // Re-render videos management page
         } catch (error) {
             showMessageModal(error.message, 'error');
         }
     });
-
-    document.getElementById('cancel-video-modal-btn').addEventListener('click', () => {
-        document.getElementById('main-modals-container').classList.add('hidden');
-    });
-}
-
-/**
- * Shows the Edit Partner TOS modal.
- * @param {string} currentTosContent - The current content of the Partner TOS.
- */
-export function showEditPartnerTOSModal(currentTosContent) {
-    const contentHtml = `
-        <form id="edit-tos-form" class="space-y-4">
-            <div>
-                <label for="tos-content-textarea" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Terms of Service Content (Markdown supported)</label>
-                <textarea id="tos-content-textarea" rows="15" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>${currentTosContent}</textarea>
-            </div>
-            <div class="flex justify-end space-x-4 mt-6">
-                <button type="button" id="cancel-tos-edit-btn" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
-                    Cancel
-                </button>
-                <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                    Save Changes
-                </button>
-            </div>
-        </form>
-    `;
-    renderGenericModal('Edit Partner Terms of Service', contentHtml);
-
-    const editTosForm = document.getElementById('edit-tos-form');
-    const tosContentTextarea = document.getElementById('tos-content-textarea');
-
-    editTosForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const newTosContent = tosContentTextarea.value;
-        try {
-            await updatePartnerTOSFirestore(newTosContent, _currentUser, _userData);
-            document.getElementById('main-modals-container').classList.add('hidden');
-            showMessageModal('Partner TOS updated successfully!');
-            _refreshPartnerTOSPageCallback(); // Re-render the page
-        } catch (error) {
-            showMessageModal(error.message, 'error');
-        }
-    });
-
-    document.getElementById('cancel-tos-edit-btn').addEventListener('click', () => {
-        document.getElementById('main-modals-container').classList.add('hidden');
-    });
-}
-
-/**
- * Shows the Submit Code modal.
- */
-export function showSubmitCodeModal() {
-    const contentHtml = `
-        <form id="submit-code-form" class="space-y-4">
-            <div>
-                <label for="code-title" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Title</label>
-                <input type="text" id="code-title" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
-            </div>
-            <div>
-                <label for="code-language" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Language</label>
-                <input type="text" id="code-language" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100" placeholder="e.g., JavaScript, Python, HTML" required>
-            </div>
-            <div>
-                <label for="code-snippet" class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-2">Code Snippet</label>
-                <textarea id="code-snippet" rows="15" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-100 font-mono" required></textarea>
-            </div>
-            <div class="flex justify-end space-x-4 mt-6">
-                <button type="button" id="cancel-submit-code-btn" class="py-2 px-5 rounded-full bg-gray-500 text-white font-bold hover:bg-gray-600 transition duration-300 transform hover:scale-105 shadow-lg">
-                    Cancel
-                </button>
-                <button type="submit" class="py-2 px-5 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                    Submit for Review
-                </button>
-            </div>
-        </form>
-    `;
-    renderGenericModal('Submit Code Snippet', contentHtml);
-
-    const submitCodeForm = document.getElementById('submit-code-form');
-    const codeTitleInput = document.getElementById('code-title');
-    const codeLanguageInput = document.getElementById('code-language');
-    const codeSnippetInput = document.getElementById('code-snippet');
-
-    submitCodeForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const snippetData = {
-            title: codeTitleInput.value,
-            language: codeLanguageInput.value,
-            code: codeSnippetInput.value,
-        };
-
-        try {
-            await submitCodeSnippet(snippetData, _currentUser, _userData);
-            document.getElementById('main-modals-container').classList.add('hidden');
-            _navigateToCallback('approved-code'); // Optionally navigate to approved code or stay on submit page
-        } catch (error) {
-            showMessageModal(error.message, 'error');
-        }
-    });
-
-    document.getElementById('cancel-submit-code-btn').addEventListener('click', () => {
-        document.getElementById('main-modals-container').classList.add('hidden');
-    });
-}
-
-/**
- * Shows the Review Code Submission modal.
- * @param {object} submission - The code submission object to review.
- */
-export function showReviewCodeSubmissionModal(submission) {
-    const contentHtml = `
-        <div class="space-y-4">
-            <p class="text-gray-700 dark:text-gray-300">Title: <span class="font-semibold">${submission.title}</span></p>
-            <p class="text-gray-700 dark:text-gray-300">Language: <span class="font-semibold">${submission.language}</span></p>
-            <p class="text-gray-700 dark:text-gray-300">Submitted by: <span class="font-semibold">${submission.authorUsername}</span> on ${submission.timestamp}</p>
-            <p class="text-gray-700 dark:text-gray-300">Status: <span class="font-semibold capitalize">${submission.status}</span></p>
-
-            <h4 class="text-xl font-bold text-gray-800 dark:text-gray-100 mt-6 mb-4">Code Snippet:</h4>
-            <div class="bg-gray-900 text-white p-4 rounded-lg overflow-x-auto font-mono text-sm">
-                <pre>${submission.code}</pre>
-            </div>
-
-            <div class="flex justify-center space-x-4 mt-6">
-                ${submission.status === 'pending' ? `
-                    <button id="approve-code-btn" class="py-2 px-5 rounded-full bg-green-600 text-white font-bold hover:bg-green-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                        Approve
-                    </button>
-                    <button id="deny-code-btn" class="py-2 px-5 rounded-full bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                        Deny
-                    </button>
-                ` : `
-                    <p class="text-gray-600 dark:text-gray-400">Submission already ${submission.status}.</p>
-                `}
-            </div>
-        </div>
-    `;
-    renderGenericModal('Review Code Submission', contentHtml);
-
-    if (submission.status === 'pending') {
-        document.getElementById('approve-code-btn').addEventListener('click', async () => {
-            try {
-                await updateCodeSubmissionStatus(submission.id, 'approved', _currentUser, _userData);
-                document.getElementById('main-modals-container').classList.add('hidden');
-                _refreshReviewCodeSubmissionsPageCallback(); // Refresh the list
-            } catch (error) {
-                showMessageModal(error.message, 'error');
-            }
-        });
-
-        document.getElementById('deny-code-btn').addEventListener('click', async () => {
-            try {
-                await updateCodeSubmissionStatus(submission.id, 'denied', _currentUser, _userData);
-                document.getElementById('main-modals-container').classList.add('hidden');
-                _refreshReviewCodeSubmissionsPageCallback(); // Refresh the list
-            } catch (error) {
-                showMessageModal(error.message, 'error');
-            }
-        });
-    }
 }
