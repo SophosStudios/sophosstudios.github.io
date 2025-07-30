@@ -38,8 +38,6 @@ async function navigateTo(page, id = null) {
     if (page === 'logout') {
         showLoadingSpinner();
         try {
-            // No need to update presence here, Realtime DB is not implemented in this version.
-            // If you add Realtime DB, ensure you update presence before signOut.
             if (auth) { // Ensure auth is defined before signing out
                 await auth.signOut();
             }
@@ -117,6 +115,18 @@ async function navigateTo(page, id = null) {
         case 'manage-videos': // New manage videos page
             pageRenderers.renderManageVideosPage();
             break;
+        case 'submit-code': // New submit code page
+            pageRenderers.renderSubmitCodePage();
+            break;
+        case 'review-code-submissions': // New review code submissions page
+            pageRenderers.renderReviewCodeSubmissionsPage();
+            break;
+        case 'approved-code': // New approved code showcase page
+            pageRenderers.renderApprovedCodePage();
+            break;
+        case 'simple-game': // New simple game page
+            pageRenderers.renderSimpleGamePage();
+            break;
         default:
             pageRenderers.renderHomePage();
     }
@@ -140,7 +150,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         () => navigateTo('partners'), // renderPartnersPage
         () => navigateTo('partner-tos'), // renderPartnerTOSPage
         () => navigateTo('manage-partner-questions'), // renderManagePartnerQuestionsPage
-        () => navigateTo('videos') // renderVideosPage
+        () => navigateTo('videos'), // renderVideosPage
+        () => navigateTo('review-code-submissions') // renderReviewCodeSubmissionsPage
     );
 
 
@@ -150,52 +161,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (user) {
             currentUser = user;
             try {
+                // Rely on fetchCurrentUserFirestoreData to create user document if it doesn't exist
                 const fetchedUserData = await fetchCurrentUserFirestoreData(currentUser);
                 if (fetchedUserData) {
                     userData = fetchedUserData;
                 } else {
-                    // This scenario should be rare if signup works correctly, but handles edge cases
-                    // where a user exists in Auth but not Firestore.
-                    console.warn("User exists in Auth but not Firestore. Creating default entry.");
-                    // This logic should ideally be handled within firebase-service.js's authenticateUser
-                    // to ensure consistency. For now, we'll keep it here as a fallback.
-                    const userDocRef = firebase.firestore().doc(`/artifacts/${CONFIG.firebaseConfig.projectId}/public/data/users`, user.uid);
-                    const defaultProfilePic = user.photoURL || `https://placehold.co/100x100/F0F0F0/000000?text=${(user.displayName || user.email || 'U').charAt(0).toUpperCase()}`;
-                    const defaultBackground = 'bg-gradient-to-r from-blue-400 to-purple-600';
-
-                    let initialRole = 'member';
-                    if (CONFIG.founderEmails && CONFIG.founderEmails.includes(user.email)) {
-                        initialRole = 'founder';
-                    } else if (CONFIG.adminEmails && CONFIG.adminEmails.includes(user.email)) {
-                        initialRole = 'admin';
+                    // If fetchedUserData is null, it means there was an error fetching/creating data.
+                    // Log out the user and redirect to auth.
+                    console.error("Failed to fetch or create user data in Firestore for authenticated user.");
+                    if (auth) {
+                        await auth.signOut();
                     }
-
-                    await userDocRef.set({
-                        email: user.email,
-                        username: user.displayName || user.email?.split('@')[0],
-                        role: initialRole,
-                        profilePicUrl: defaultProfilePic,
-                        backgroundUrl: defaultBackground,
-                        bio: '',
-                        partnerInfo: {
-                            description: '',
-                            links: {}
-                        },
-                        theme: 'light'
-                    });
-                    userData = {
-                        email: user.email,
-                        username: user.displayName || user.email?.split('@')[0],
-                        role: initialRole,
-                        profilePicUrl: defaultProfilePic,
-                        backgroundUrl: defaultBackground,
-                        bio: '',
-                        partnerInfo: {
-                            description: '',
-                            links: {}
-                        },
-                        theme: 'light'
-                    };
+                    currentUser = null;
+                    userData = null;
+                    showMessageModal("Failed to load user data. Please try signing in again.", 'error');
+                    navigateTo('auth');
+                    hideLoadingSpinner();
+                    return;
                 }
 
                 // Update UI based on new user data
@@ -249,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateModalState(currentUser, userData); // Update modals to logged out state
 
             // Only redirect if current page is not home, about, team, partners, or partner-tos (public pages)
-            if (!['home', 'about', 'team', 'partners', 'partner-tos', 'videos'].includes(contentArea.dataset.currentPage)) {
+            if (!['home', 'about', 'team', 'partners', 'partner-tos', 'videos', 'simple-game', 'submit-code', 'approved-code'].includes(contentArea.dataset.currentPage)) {
                  navigateTo('home'); // Redirect to home if logged out from a protected page
             }
         }
