@@ -4,21 +4,24 @@
 
 // Import Firebase services
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, addDoc, where } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
-// Global variables provided by the Canvas environment
+// Import configuration from config.js
+import CONFIG from './config.js'; 
+
+// Import utility functions
+import { showLoadingSpinner, hideLoadingSpinner, showMessageModal, updateTheme } from './utils.js';
+
+// Import all page renderers
+import { renderHomePage, renderAdminPage, renderAuthPage, renderDMsPage } from './page-renderers.js';
+
+// Import navigation functions
+import { initializeNavigation, renderSidebarNav } from './navigation.js';
+
+// --- Global variables provided by the Canvas environment (do not change) ---
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-  apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
-  authDomain: "sophoswrld.firebaseapp.com",
-  databaseURL: "https://sophoswrld-default-rtdb.firebaseio.com",
-  projectId: "sophoswrld",
-  storageBucket: "sophoswrld.firebasestorage.app",
-  messagingSenderId: "26686142400",
-  appId: "1:26686142400:web:48f8d3ae0b097731317a25",
-  measurementId: "G-6XETC98C22"
-};
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : CONFIG.firebaseConfig;
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
 // Initialize Firebase
@@ -26,632 +29,123 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Global state
 let currentUser = null;
 let userData = null;
-let usersList = [];
-let directMessages = {}; // Stores messages grouped by conversation partner
 
 // DOM Elements
 const contentArea = document.getElementById('content-area');
-const navLinks = document.getElementById('nav-links');
-const sideDrawerMenu = document.getElementById('side-drawer-menu');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
 const overlayBackdrop = document.getElementById('overlay-backdrop');
-const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-const navHomeButton = document.getElementById('nav-home');
 const modalContainer = document.getElementById('modal-container');
+const mobileAuthButton = document.getElementById('mobile-auth-btn');
 
-// --- Utility Functions ---
-
-/**
- * Shows a loading spinner.
- */
-function showLoadingSpinner() {
-    const spinner = document.getElementById('loading-spinner');
-    if (spinner) {
-        spinner.classList.remove('hidden');
-    }
-}
+// --- Navigation and Routing ---
 
 /**
- * Hides the loading spinner.
- */
-function hideLoadingSpinner() {
-    const spinner = document.getElementById('loading-spinner');
-    if (spinner) {
-        spinner.classList.add('hidden');
-    }
-}
-
-/**
- * Displays a modal message.
- * @param {string} message - The message to display.
- * @param {string} type - 'info', 'error', 'success', or 'confirm'.
- * @param {function} onConfirm - Callback for 'confirm' type.
- */
-function showMessageModal(message, type = 'info', onConfirm = null) {
-    const modalId = 'message-modal';
-    const existingModal = document.getElementById(modalId);
-    if (existingModal) existingModal.remove();
-
-    const modalHtml = `
-        <div id="${modalId}" class="modal-overlay">
-            <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-sm w-full border-2 border-red-500">
-                <p class="text-lg text-gray-200 mb-4">${message}</p>
-                <div class="flex justify-end space-x-2">
-                    ${type === 'confirm' ? `
-                        <button id="modal-confirm-btn" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition">Confirm</button>
-                    ` : ''}
-                    <button id="modal-close-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Close</button>
-                </div>
-            </div>
-        </div>
-    `;
-    modalContainer.insertAdjacentHTML('beforeend', modalHtml);
-
-    document.getElementById('modal-close-btn').addEventListener('click', () => document.getElementById(modalId).remove());
-    if (type === 'confirm' && onConfirm) {
-        document.getElementById('modal-confirm-btn').addEventListener('click', () => {
-            onConfirm();
-            document.getElementById(modalId).remove();
-        });
-    }
-}
-
-// --- Firebase Service Functions ---
-
-/**
- * Fetches a user's data from Firestore.
- * @param {string} userId - The user's UID.
- * @returns {Promise<object|null>} The user's data or null if not found.
- */
-async function fetchUserData(userId) {
-    if (!userId) return null;
-    const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
-    const userDoc = await getDoc(userDocRef);
-    if (userDoc.exists()) {
-        return { id: userDoc.id, ...userDoc.data() };
-    }
-    return null;
-}
-
-/**
- * Updates a user's profile with new data.
- * @param {string} userId - The user's UID.
- * @param {object} newData - The data to update.
- */
-async function updateUserData(userId, newData) {
-    const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
-    await updateDoc(userDocRef, newData);
-}
-
-/**
- * Resets a user's password. (This is a simplified admin function)
- * @param {string} email - The user's email.
- */
-async function adminResetPassword(email) {
-    showLoadingSpinner();
-    try {
-        // In a real application, you'd use a cloud function for this.
-        // For this example, we'll simulate the action and show a message.
-        // A real admin would likely generate a temporary password.
-        console.log(`Admin requested password reset for: ${email}`);
-        showMessageModal(`Password reset initiated for ${email}. A temporary password has been sent to their email.`, 'success');
-    } catch (error) {
-        showMessageModal(`Failed to reset password: ${error.message}`, 'error');
-    } finally {
-        hideLoadingSpinner();
-    }
-}
-
-/**
- * Sends a direct message.
- * @param {string} receiverId - The UID of the message recipient.
- * @param {string} messageText - The message content.
- */
-async function sendDirectMessage(receiverId, messageText) {
-    if (!currentUser || !receiverId || !messageText.trim()) return;
-
-    const conversationId = [currentUser.uid, receiverId].sort().join('_');
-    const messagesCollectionRef = collection(db, `/artifacts/${appId}/public/data/conversations/${conversationId}/messages`);
-    
-    try {
-        await addDoc(messagesCollectionRef, {
-            senderId: currentUser.uid,
-            receiverId: receiverId,
-            text: messageText,
-            timestamp: serverTimestamp(),
-        });
-    } catch (error) {
-        console.error("Error sending message:", error);
-        showMessageModal("Failed to send message.", 'error');
-    }
-}
-
-/**
- * Sets up a real-time listener for direct messages.
- * @param {string} partnerId - The UID of the conversation partner.
- * @param {function} callback - Function to handle the messages.
- * @returns {function} The unsubscribe function.
- */
-function listenForDirectMessages(partnerId, callback) {
-    if (!currentUser) return;
-    const conversationId = [currentUser.uid, partnerId].sort().join('_');
-    const messagesCollectionRef = collection(db, `/artifacts/${appId}/public/data/conversations/${conversationId}/messages`);
-    const q = query(messagesCollectionRef, orderBy('timestamp'));
-
-    return onSnapshot(q, (snapshot) => {
-        const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        callback(messages);
-    });
-}
-
-// --- UI Rendering Functions ---
-
-/**
- * Renders the main content area based on the page.
+ * Handles navigation to different pages.
  * @param {string} page - The page to render.
  */
-function renderPage(page) {
+function navigateTo(page) {
+    if (!contentArea) {
+        console.error("Content area not found.");
+        return;
+    }
+    
+    // Clear the content area
     contentArea.innerHTML = '';
     
+    // Render the new page based on the page name
     switch (page) {
         case 'home':
-            contentArea.innerHTML = `
-                <div class="flex flex-col items-center justify-center p-8">
-                    <h1 class="text-4xl md:text-6xl font-bold text-red-500 mb-4 animate-pulse">Welcome to SophosWRLD</h1>
-                    <p class="text-xl text-gray-400 text-center">Your personalized community hub.</p>
-                    <div class="mt-8">
-                        <button id="view-messages-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
-                            <i class="fas fa-comments mr-2"></i>View Messages
-                        </button>
-                        <button id="open-settings-btn" class="bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-600 transition-colors duration-300 ml-4 shadow-lg">
-                            <i class="fas fa-cog mr-2"></i>Customize
-                        </button>
-                    </div>
-                </div>
-            `;
-            document.getElementById('view-messages-btn').addEventListener('click', () => navigateTo('messages'));
-            document.getElementById('open-settings-btn').addEventListener('click', () => navigateTo('settings'));
+            renderHomePage(contentArea, currentUser, userData, navigateTo);
             break;
         case 'admin':
-            renderAdminPanel();
+            renderAdminPage(contentArea, currentUser, userData, showMessageModal, showLoadingSpinner, hideLoadingSpinner, db, appId);
             break;
         case 'auth':
-            renderAuthPage();
+            renderAuthPage(contentArea, auth, db, appId, showMessageModal, showLoadingSpinner, hideLoadingSpinner, navigateTo);
+            break;
+        case 'messages':
+            renderDMsPage(contentArea, currentUser, db, appId, showMessageModal, showLoadingSpinner, hideLoadingSpinner);
             break;
         default:
             contentArea.innerHTML = `<h1 class="text-3xl text-center text-gray-500">Page Not Found</h1>`;
+            break;
     }
 }
 
-/**
- * Renders the authentication page.
- */
-function renderAuthPage() {
-    contentArea.innerHTML = `
-        <div class="max-w-md mx-auto bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500">
-            <h2 class="text-3xl font-bold text-center mb-6 text-red-500">Sign In / Sign Up</h2>
-            <form id="auth-form" class="space-y-4">
-                <input type="email" id="auth-email" placeholder="Email" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500" required>
-                <input type="password" id="auth-password" placeholder="Password" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500" required>
-                <div class="flex items-center justify-between">
-                    <button type="submit" id="signin-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">Sign In</button>
-                    <button type="button" id="signup-btn" class="bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-700 transition-colors duration-300">Sign Up</button>
-                </div>
-            </form>
-        </div>
-    `;
-    const authForm = document.getElementById('auth-form');
-    authForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('auth-email').value;
-        const password = document.getElementById('auth-password').value;
-        try {
-            showLoadingSpinner();
-            await signInWithEmailAndPassword(auth, email, password);
-            showMessageModal('Signed in successfully!', 'success');
-        } catch (error) {
-            showMessageModal(`Sign in failed: ${error.message}`, 'error');
-        } finally {
-            hideLoadingSpinner();
+// --- Firebase Authentication Listener ---
+
+onAuthStateChanged(auth, async (user) => {
+    currentUser = user;
+    
+    if (user) {
+        // Sign in with custom token if available
+        if (initialAuthToken) {
+            try {
+                await signInWithCustomToken(auth, initialAuthToken);
+                console.log("Signed in with custom token.");
+            } catch (error) {
+                console.error("Error signing in with custom token:", error);
+            }
         }
-    });
-    document.getElementById('signup-btn').addEventListener('click', async () => {
-        const email = document.getElementById('auth-email').value;
-        const password = document.getElementById('auth-password').value;
-        try {
-            showLoadingSpinner();
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, userCredential.user.uid), {
-                username: email.split('@')[0],
-                email: email,
+        
+        // Fetch user data from Firestore
+        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+            userData = { id: userDoc.id, ...userDoc.data() };
+        } else {
+            // Create a new user entry if one doesn't exist
+            userData = {
+                username: user.email ? user.email.split('@')[0] : 'Guest',
+                email: user.email || 'N/A',
                 role: 'member',
                 theme: 'dark',
                 accentColor: '#ef4444'
-            });
-            showMessageModal('Signed up and logged in successfully!', 'success');
-        } catch (error) {
-            showMessageModal(`Sign up failed: ${error.message}`, 'error');
-        } finally {
-            hideLoadingSpinner();
-        }
-    });
-}
-
-/**
- * Renders the admin panel.
- */
-async function renderAdminPanel() {
-    if (!currentUser || userData?.role !== 'admin') {
-        contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Access Denied</h1>`;
-        return;
-    }
-
-    contentArea.innerHTML = `
-        <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500">
-            <h2 class="text-3xl font-bold text-red-500 mb-6">Admin Dashboard</h2>
-            <h3 class="text-xl font-semibold text-gray-200 mb-4">Manage Users</h3>
-            <div id="user-list" class="space-y-4">
-                <!-- User list will be populated here -->
-            </div>
-        </div>
-    `;
-
-    // Use onSnapshot to get a real-time list of all users
-    const usersRef = collection(db, `/artifacts/${appId}/public/data/users`);
-    onSnapshot(usersRef, (snapshot) => {
-        usersList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const userListContainer = document.getElementById('user-list');
-        userListContainer.innerHTML = '';
-        usersList.forEach(user => {
-            const userElement = document.createElement('div');
-            userElement.className = 'flex justify-between items-center bg-gray-700 p-4 rounded-lg shadow';
-            userElement.innerHTML = `
-                <div>
-                    <p class="font-semibold text-red-400">${user.username}</p>
-                    <p class="text-sm text-gray-400">${user.email} - Role: ${user.role}</p>
-                </div>
-                <button class="reset-password-btn bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition" data-email="${user.email}">Reset Password</button>
-            `;
-            userListContainer.appendChild(userElement);
-        });
-
-        document.querySelectorAll('.reset-password-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const email = e.target.dataset.email;
-                showMessageModal(`Are you sure you want to reset the password for ${email}?`, 'confirm', () => {
-                    adminResetPassword(email);
-                });
-            });
-        });
-    });
-}
-
-/**
- * Renders the direct messages list.
- */
-function renderDirectMessagesList() {
-    contentArea.innerHTML = `
-        <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500">
-            <h2 class="text-3xl font-bold text-red-500 mb-6">Direct Messages</h2>
-            <div id="messages-list" class="space-y-4">
-                <p class="text-gray-400">Loading users...</p>
-            </div>
-        </div>
-    `;
-    const messagesListContainer = document.getElementById('messages-list');
-    
-    // Render a list of all users to start a conversation with
-    const usersRef = collection(db, `/artifacts/${appId}/public/data/users`);
-    onSnapshot(usersRef, (snapshot) => {
-        usersList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        messagesListContainer.innerHTML = '';
-        usersList.forEach(user => {
-            if (user.id !== currentUser.uid) {
-                const userElement = document.createElement('button');
-                userElement.className = 'w-full text-left p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors duration-300 flex items-center';
-                userElement.innerHTML = `
-                    <div class="flex-grow">
-                        <p class="font-semibold">${user.username}</p>
-                        <p class="text-sm text-gray-400">UID: ${user.id}</p>
-                    </div>
-                    <i class="fas fa-arrow-right text-red-500"></i>
-                `;
-                userElement.addEventListener('click', () => renderDirectMessageThread(user));
-                messagesListContainer.appendChild(userElement);
-            }
-        });
-    });
-}
-
-/**
- * Renders the direct message thread for a specific user.
- * @param {object} partner - The user object of the conversation partner.
- */
-function renderDirectMessageThread(partner) {
-    contentArea.innerHTML = `
-        <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-red-500">Chat with ${partner.username}</h2>
-                <button id="call-btn" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition">
-                    <i class="fas fa-phone mr-2"></i>Call
-                </button>
-            </div>
-            <div id="message-thread" class="bg-gray-700 p-4 rounded-lg h-96 overflow-y-auto mb-4 flex flex-col-reverse space-y-4">
-                <!-- Messages will be populated here -->
-            </div>
-            <form id="message-form" class="flex space-x-2">
-                <input type="text" id="message-input" placeholder="Type a message..." class="flex-grow p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500">
-                <button type="submit" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition">Send</button>
-            </form>
-        </div>
-    `;
-    
-    const messageThread = document.getElementById('message-thread');
-    const messageForm = document.getElementById('message-form');
-
-    // Set up a real-time listener for messages
-    const unsubscribe = listenForDirectMessages(partner.id, (messages) => {
-        messageThread.innerHTML = '';
-        // The order is `orderBy('timestamp')`, so we can just reverse it for display
-        messages.slice().reverse().forEach(msg => {
-            const isSender = msg.senderId === currentUser.uid;
-            const messageClass = isSender ? 'bg-red-600 self-end' : 'bg-gray-600 self-start';
-            const messageHtml = `
-                <div class="p-3 rounded-xl max-w-xs ${messageClass} shadow-md text-white">
-                    <p>${msg.text}</p>
-                    <span class="block text-xs text-right opacity-70 mt-1">${msg.timestamp?.toDate().toLocaleTimeString()}</span>
-                </div>
-            `;
-            messageThread.insertAdjacentHTML('afterbegin', messageHtml);
-        });
-    });
-
-    messageForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const input = document.getElementById('message-input');
-        const messageText = input.value;
-        sendDirectMessage(partner.id, messageText);
-        input.value = '';
-    });
-
-    // Calling button functionality
-    document.getElementById('call-btn').addEventListener('click', () => {
-        showMessageModal(`Direct calling is not yet implemented. This would require a WebRTC service, which is a significant addition.`, 'info');
-    });
-}
-
-/**
- * Shows the user settings modal.
- */
-function showUserSettingsModal() {
-    const modalId = 'user-settings-modal';
-    const existingModal = document.getElementById(modalId);
-    if (existingModal) existingModal.remove();
-
-    const modalHtml = `
-        <div id="${modalId}" class="modal-overlay">
-            <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md border-t-4 border-red-500">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold text-red-500">User Customization</h2>
-                    <button id="close-settings-modal" class="text-gray-400 hover:text-red-500 text-xl"><i class="fas fa-times"></i></button>
-                </div>
-                <div class="space-y-4">
-                    <div>
-                        <label for="accent-color" class="block text-sm font-medium text-gray-300 mb-2">Accent Color</label>
-                        <input type="color" id="accent-color" class="w-full h-10 p-1 rounded-lg border border-gray-600 bg-gray-700 cursor-pointer" value="#ef4444">
-                    </div>
-                    <button id="save-settings-btn" class="w-full bg-red-600 text-white font-semibold py-3 rounded-lg hover:bg-red-700 transition">
-                        Save Settings
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    modalContainer.insertAdjacentHTML('beforeend', modalHtml);
-
-    document.getElementById('close-settings-modal').addEventListener('click', () => document.getElementById(modalId).remove());
-    document.getElementById('save-settings-btn').addEventListener('click', async () => {
-        const accentColor = document.getElementById('accent-color').value;
-        try {
-            await updateUserData(currentUser.uid, { accentColor: accentColor });
-            updateTheme(accentColor);
-            document.getElementById(modalId).remove();
-            showMessageModal('Theme updated successfully!', 'success');
-        } catch (error) {
-            showMessageModal(`Failed to save settings: ${error.message}`, 'error');
-        }
-    });
-}
-
-/**
- * Updates the website's theme with a new accent color.
- * @param {string} color - The new hex color for the accent.
- */
-function updateTheme(color) {
-    const styleId = 'custom-theme-style';
-    let style = document.getElementById(styleId);
-    if (!style) {
-        style = document.createElement('style');
-        style.id = styleId;
-        document.head.appendChild(style);
-    }
-    style.innerHTML = `
-        .accent-red { background-color: ${color}; }
-        .accent-red:hover { background-color: ${color}; opacity: 0.8; }
-        ::-webkit-scrollbar-thumb { background: ${color}; }
-        nav, .border-red-500 { border-color: ${color}; }
-        .text-red-500 { color: ${color}; }
-        .focus\\:ring-red-500:focus { --tw-ring-color: ${color}; }
-        .bg-red-600 { background-color: ${color}; }
-        .hover\\:bg-red-700:hover { background-color: ${color}; opacity: 0.8; }
-        .text-red-400 { color: ${color}; opacity: 0.8; }
-    `;
-}
-
-// --- Event Listeners and Initial Setup ---
-
-/**
- * Toggles the mobile side drawer.
- */
-function toggleSideDrawer() {
-    sideDrawerMenu.classList.toggle('-translate-x-full');
-    overlayBackdrop.classList.toggle('hidden');
-}
-
-/**
- * Handles navigation to different pages or modals.
- * @param {string} page - The page or modal to navigate to.
- */
-function navigateTo(page) {
-    if (page === 'messages') {
-        renderDirectMessagesList();
-    } else if (page === 'settings') {
-        showUserSettingsModal();
-    } else {
-        renderPage(page);
-    }
-}
-
-/**
- * Renders the navigation links based on user authentication and role.
- */
-function renderNavbar() {
-    navLinks.innerHTML = '';
-    sideDrawerMenu.innerHTML = `
-        <div class="p-4">
-            <h2 class="text-3xl font-bold text-red-500 mb-4">SophosWRLD</h2>
-            <hr class="border-gray-700 my-2">
-        </div>
-    `;
-    
-    // Create a new function for button creation with enhanced styling
-    const createButton = (container, text, page, iconClass, isDesktop) => {
-        const btn = document.createElement('button');
-        
-        // Define base and hover classes
-        const baseClasses = `
-            flex items-center space-x-3 px-4 py-3 rounded-xl 
-            font-semibold transition duration-300 transform 
-            hover:scale-105 active:scale-95
-            
-        `;
-        const desktopClasses = `
-            text-lg text-white hover:bg-gray-700
-        `;
-        const mobileClasses = `
-            w-full text-left text-lg text-white hover:bg-gray-700
-        `;
-
-        btn.className = `${baseClasses} ${isDesktop ? desktopClasses : mobileClasses}`;
-        btn.innerHTML = `<i class="${iconClass} text-red-500"></i><span>${text}</span>`;
-        btn.addEventListener('click', () => {
-            navigateTo(page);
-            if (!isDesktop) toggleSideDrawer();
-        });
-        container.appendChild(btn);
-    };
-
-    const desktopContainer = navLinks;
-    const mobileContainer = sideDrawerMenu.querySelector('div');
-
-    if (currentUser) {
-        // Authenticated user links
-        createButton(desktopContainer, 'Home', 'home', 'fas fa-home', true);
-        createButton(desktopContainer, 'Messages', 'messages', 'fas fa-comments', true);
-        createButton(desktopContainer, 'Customize', 'settings', 'fas fa-cog', true);
-
-        createButton(mobileContainer, 'Home', 'home', 'fas fa-home', false);
-        createButton(mobileContainer, 'Messages', 'messages', 'fas fa-comments', false);
-        createButton(mobileContainer, 'Customize', 'settings', 'fas fa-cog', false);
-
-        // Admin link (only for admins)
-        if (userData?.role === 'admin') {
-            createButton(desktopContainer, 'Admin', 'admin', 'fas fa-user-shield', true);
-            createButton(mobileContainer, 'Admin', 'admin', 'fas fa-user-shield', false);
+            };
+            await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), userData);
         }
         
-        // Sign Out button
-        const signOutBtn = document.createElement('button');
-        signOutBtn.className = 'bg-red-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-red-700 transition-colors duration-300 ml-4';
-        signOutBtn.textContent = 'Sign Out';
-        signOutBtn.addEventListener('click', async () => {
-            await signOut(auth);
-            showMessageModal('Signed out successfully!', 'success');
-        });
-        desktopContainer.appendChild(signOutBtn);
+        // Apply user-specific theme
+        if (userData.accentColor) {
+            updateTheme(userData.accentColor);
+        }
 
-        const signOutBtnMobile = document.createElement('button');
-        signOutBtnMobile.className = 'w-full text-left px-4 py-3 mt-4 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition duration-200';
-        signOutBtnMobile.textContent = 'Sign Out';
-        signOutBtnMobile.addEventListener('click', async () => {
-            await signOut(auth);
-            showMessageModal('Signed out successfully!', 'success');
-            toggleSideDrawer();
-        });
-        mobileContainer.appendChild(signOutBtnMobile);
-
+        // Render the navigation and initial page after auth state is determined
+        renderSidebarNav(currentUser, userData, navigateTo, signOut, auth, db, appId);
+        const currentPage = localStorage.getItem('currentPage') || 'home';
+        navigateTo(currentPage);
+        
     } else {
-        // Not authenticated links
-        const signInBtn = document.createElement('button');
-        signInBtn.className = 'bg-red-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-red-700 transition-colors duration-300';
-        signInBtn.textContent = 'Sign In';
-        signInBtn.addEventListener('click', () => {
-            navigateTo('auth');
-        });
-        desktopContainer.appendChild(signInBtn);
-
-        const signInBtnMobile = document.createElement('button');
-        signInBtnMobile.className = 'w-full text-left px-4 py-3 mt-4 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition duration-200';
-        signInBtnMobile.textContent = 'Sign In';
-        signInBtnMobile.addEventListener('click', () => {
-            navigateTo('auth');
-            toggleSideDrawer();
-        });
-        mobileContainer.appendChild(signInBtnMobile);
+        // Not authenticated
+        userData = null;
+        renderSidebarNav(currentUser, userData, navigateTo, signOut, auth, db, appId);
+        navigateTo('auth');
     }
-}
+});
+
 
 document.addEventListener('DOMContentLoaded', async () => {
-    mobileMenuToggle.addEventListener('click', toggleSideDrawer);
-    overlayBackdrop.addEventListener('click', toggleSideDrawer);
-    navHomeButton.addEventListener('click', () => navigateTo('home'));
-
-    onAuthStateChanged(auth, async (user) => {
-        currentUser = user;
-        
-        // Render navigation based on auth state
-        renderNavbar();
-
-        if (user) {
-            // Sign in with custom token if available and not already signed in
-            if (initialAuthToken) {
-                try {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                    console.log("Signed in with custom token.");
-                } catch (error) {
-                    console.error("Error signing in with custom token:", error);
-                }
-            }
-            
-            // Fetch user data from Firestore
-            userData = await fetchUserData(user.uid);
-            if (!userData) {
-                // Create new user data if it doesn't exist
-                userData = { username: user.email.split('@')[0], email: user.email, role: 'member', theme: 'dark', accentColor: '#ef4444' };
-                await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), userData);
-            }
-            
-            // Apply user-specific theme
-            if (userData.accentColor) {
-                updateTheme(userData.accentColor);
-            }
-
-            // Render the initial page after auth state is determined
-            const currentPage = localStorage.getItem('currentPage') || 'home';
-            navigateTo(currentPage);
-        } else {
+    initializeNavigation(mobileSidebarToggle, overlayBackdrop);
+    
+    // Set up click listener for the mobile auth button
+    if(mobileAuthButton) {
+        mobileAuthButton.addEventListener('click', () => {
             navigateTo('auth');
+            toggleSidebar();
+        });
+    }
+
+    // Handle initial anonymous sign-in if no user is present
+    if (!auth.currentUser) {
+        try {
+            await signInAnonymously(auth);
+        } catch(error) {
+            console.error("Anonymous sign-in failed: ", error);
         }
-    });
+    }
 });
