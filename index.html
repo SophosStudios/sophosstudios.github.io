@@ -31,7 +31,7 @@
             border-radius: 4px;
         }
         
-        /* Sidebar layout */
+        /* Left Sidebar: Collapsed by default on desktop, hidden on mobile */
         .left-sidebar {
             width: 72px;
             transition: width 0.3s ease, transform 0.3s ease;
@@ -39,16 +39,15 @@
             z-index: 40;
             height: 100vh;
             background-color: #1f2937; /* dark:bg-gray-800 */
-            transform: translateX(-100%);
-        }
-        .left-sidebar.expanded {
-            width: 256px;
-            transform: translateX(0);
-        }
-        .left-sidebar.expanded .sidebar-nav-text {
-            display: inline;
+            flex-shrink: 0;
         }
 
+        /* Sidebar Expanded State */
+        .left-sidebar.expanded {
+            width: 256px;
+        }
+
+        /* Main Content Wrapper: Adjusts margin based on sidebar state */
         .main-content-wrapper {
             margin-left: 72px;
             transition: margin-left 0.3s ease;
@@ -57,26 +56,9 @@
             margin-left: 256px;
         }
 
-        /* Mobile specific styles */
-        @media (min-width: 768px) {
-            .left-sidebar {
-                transform: translateX(0);
-            }
-            .left-sidebar:not(.expanded) {
-                width: 72px;
-            }
-            .left-sidebar.expanded {
-                width: 256px;
-            }
-            .main-content-wrapper {
-                margin-left: 72px;
-            }
-            .main-content-wrapper.expanded {
-                margin-left: 256px;
-            }
-        }
+        /* Mobile specific styles (<= 768px) */
         @media (max-width: 767px) {
-             .left-sidebar {
+            .left-sidebar {
                 transform: translateX(-100%);
             }
             .left-sidebar.expanded {
@@ -108,10 +90,13 @@
     <div id="overlay-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden md:hidden"></div>
 
     <!-- Left Sidebar -->
-    <aside id="left-sidebar" class="bg-gray-800 text-gray-300 flex flex-col p-4 shadow-xl">
+    <aside id="left-sidebar" class="left-sidebar bg-gray-800 text-gray-300 flex flex-col p-4 shadow-xl">
         <div class="flex items-center justify-between h-16 mb-6">
-            <h1 id="website-title-sidebar" class="text-2xl font-bold text-red-500 whitespace-nowrap">SophosWRLD</h1>
-            <button id="sidebar-toggle" class="md:hidden text-gray-400 hover:text-white transition-colors duration-200">
+            <button id="sidebar-toggle-full" class="hidden md:block text-gray-400 hover:text-white transition-colors duration-200">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1 id="website-title-sidebar" class="text-2xl font-bold text-red-500 whitespace-nowrap hidden md:block">SophosWRLD</h1>
+            <button id="sidebar-toggle-close" class="md:hidden text-gray-400 hover:text-white transition-colors duration-200">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -126,7 +111,7 @@
     </aside>
 
     <!-- Main Content Wrapper -->
-    <div id="main-content-wrapper" class="min-h-screen">
+    <div id="main-content-wrapper" class="main-content-wrapper min-h-screen">
         <!-- Top Nav for Mobile -->
         <nav class="md:hidden bg-gray-800 text-white p-4 flex items-center justify-between shadow-md">
             <button id="mobile-sidebar-toggle" class="text-gray-400 hover:text-white transition-colors duration-200">
@@ -167,14 +152,14 @@
         // You can paste your project's firebaseConfig object here.
         // It will be used if the environment's config is not available.
         const FIREBASE_CONFIG_PLACEHOLDER = {
-            apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
-            authDomain: "sophoswrld.firebaseapp.com",
-            databaseURL: "https://sophoswrld-default-rtdb.firebaseio.com",
-            projectId: "sophoswrld",
-            storageBucket: "sophoswrld.firebasestorage.app",
-            messagingSenderId: "26686142400",
-            appId: "1:26686142400:web:48f8d3ae0b097731317a25",
-            measurementId: "G-6XETC98C22"
+          apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
+          authDomain: "sophoswrld.firebaseapp.com",
+          databaseURL: "https://sophoswrld-default-rtdb.firebaseio.com",
+          projectId: "sophoswrld",
+          storageBucket: "sophoswrld.firebasestorage.app",
+          messagingSenderId: "26686142400",
+          appId: "1:26686142400:web:48f8d3ae0b097731317a25",
+          measurementId: "G-6XETC98C22"
         };
         
         // --- DO NOT EDIT BELOW THIS LINE ---
@@ -281,41 +266,55 @@
         const leftSidebarNav = document.getElementById('left-sidebar-nav');
         const mainContentWrapper = document.getElementById('main-content-wrapper');
         const overlayBackdrop = document.getElementById('overlay-backdrop');
-        const sidebarToggle = document.getElementById('sidebar-toggle');
-        const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
-        const websiteTitleSidebar = document.getElementById('website-title-sidebar');
-        const adminButtonContainer = document.getElementById('admin-panel-button-container');
-        let isSidebarExpanded = window.innerWidth >= 768;
+        const sidebarToggleDesktop = document.getElementById('sidebar-toggle-full');
+        const sidebarToggleMobile = document.getElementById('mobile-sidebar-toggle');
+        const sidebarToggleClose = document.getElementById('sidebar-toggle-close');
 
         function initializeNavigation() {
-            if (mobileSidebarToggle) mobileSidebarToggle.addEventListener('click', toggleSidebar);
-            if (sidebarToggle) sidebarToggle.addEventListener('click', toggleSidebar);
+            if (sidebarToggleDesktop) sidebarToggleDesktop.addEventListener('click', toggleSidebar);
+            if (sidebarToggleMobile) sidebarToggleMobile.addEventListener('click', () => {
+                toggleSidebar();
+                overlayBackdrop.classList.remove('hidden');
+            });
+            if (sidebarToggleClose) sidebarToggleClose.addEventListener('click', () => {
+                toggleSidebar();
+                overlayBackdrop.classList.add('hidden');
+            });
             if (overlayBackdrop) overlayBackdrop.addEventListener('click', toggleSidebar);
-            updateSidebarUI();
+            
+            // Set initial state based on screen size
+            if (window.innerWidth >= 768) {
+                leftSidebar.classList.remove('expanded');
+                mainContentWrapper.classList.remove('expanded');
+            }
         }
 
         function toggleSidebar() {
-            isSidebarExpanded = !isSidebarExpanded;
-            updateSidebarUI();
-        }
+            leftSidebar.classList.toggle('expanded');
+            mainContentWrapper.classList.toggle('expanded');
+            
+            if (window.innerWidth < 768) {
+                overlayBackdrop.classList.toggle('hidden');
+            }
 
-        function updateSidebarUI() {
-            const textSpans = leftSidebar.querySelectorAll('.sidebar-nav-text');
-            if (isSidebarExpanded) {
-                leftSidebar.classList.add('expanded');
-                mainContentWrapper.classList.add('expanded');
-                if (window.innerWidth < 768) overlayBackdrop.classList.remove('hidden');
-                websiteTitleSidebar.classList.remove('hidden');
-                textSpans.forEach(span => span.classList.remove('hidden'));
-                if (adminButtonContainer.innerHTML.trim() !== '') {
-                    adminButtonContainer.classList.remove('hidden');
+            const isExpanded = leftSidebar.classList.contains('expanded');
+            const navTextElements = leftSidebar.querySelectorAll('.sidebar-nav-text');
+            const websiteTitleSidebar = document.getElementById('website-title-sidebar');
+            const adminButtonContainer = document.getElementById('admin-panel-button-container');
+
+            navTextElements.forEach(el => {
+                if (isExpanded) {
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
                 }
+            });
+
+            if (isExpanded) {
+                websiteTitleSidebar.classList.remove('hidden');
+                adminButtonContainer.classList.remove('hidden');
             } else {
-                leftSidebar.classList.remove('expanded');
-                mainContentWrapper.classList.remove('expanded');
-                overlayBackdrop.classList.add('hidden');
                 websiteTitleSidebar.classList.add('hidden');
-                textSpans.forEach(span => span.classList.add('hidden'));
                 adminButtonContainer.classList.add('hidden');
             }
         }
@@ -326,12 +325,12 @@
             link.className = `flex items-center space-x-4 py-3 px-4 rounded-xl text-lg font-semibold text-gray-300 hover:bg-gray-700 transition-colors duration-200`;
             link.innerHTML = `
                 <i class="${iconClass} text-red-500 w-6 text-center"></i>
-                <span class="sidebar-nav-text whitespace-nowrap ${isSidebarExpanded ? '' : 'hidden'}">${text}</span>
+                <span class="sidebar-nav-text whitespace-nowrap hidden md:inline">${text}</span>
             `;
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 navigateTo(page);
-                if (window.innerWidth < 768 && isSidebarExpanded) {
+                if (window.innerWidth < 768) {
                     toggleSidebar();
                 }
             });
@@ -340,7 +339,6 @@
 
         function renderSidebarNav(currentUser, userData) {
             leftSidebarNav.innerHTML = '';
-            adminButtonContainer.innerHTML = '';
             
             createNavLink(leftSidebarNav, 'Home', 'home', 'fas fa-home');
             createNavLink(leftSidebarNav, 'Forums', 'forums', 'fas fa-comments');
@@ -363,7 +361,7 @@
                 logoutButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
                 logoutButton.innerHTML = `
                     <i class="fas fa-sign-out-alt w-6 text-center"></i>
-                    <span class="sidebar-nav-text ${isSidebarExpanded ? '' : 'hidden'}">Sign Out</span>`;
+                    <span class="sidebar-nav-text hidden md:inline">Sign Out</span>`;
                 logoutButton.addEventListener('click', async () => {
                     try {
                         await signOut(auth);
@@ -380,12 +378,10 @@
                 authButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
                 authButton.innerHTML = `
                     <i class="fas fa-sign-in-alt w-6 text-center"></i>
-                    <span class="sidebar-nav-text ${isSidebarExpanded ? '' : 'hidden'}">Account</span>`;
+                    <span class="sidebar-nav-text hidden md:inline">Account</span>`;
                 authButton.addEventListener('click', () => navigateTo('auth'));
                 authContainer.appendChild(authButton);
             }
-
-            updateSidebarUI();
         }
 
         // =================================================================
