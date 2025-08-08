@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SophosWRLD</title>
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-    <!-- Inter Font -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <style>
         :root {
@@ -31,7 +28,7 @@
             border-radius: 4px;
         }
         
-        /* Left Sidebar: Collapsed by default on desktop, hidden on mobile */
+        /* Left Sidebar Collapsed by default on desktop, hidden on mobile */
         .left-sidebar {
             width: 72px;
             transition: width 0.3s ease, transform 0.3s ease;
@@ -47,7 +44,7 @@
             width: 256px;
         }
         
-        /* Main Content Wrapper: Adjusts margin based on sidebar state */
+        /* Main Content Wrapper Adjusts margin based on sidebar state */
         .main-content-wrapper {
             margin-left: 72px;
             transition: margin-left 0.3s ease;
@@ -123,38 +120,28 @@
         <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-500"></div>
     </div>
     
-    <!-- Overlay for mobile sidebar -->
     <div id="overlay-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden md:hidden"></div>
 
-    <!-- Left Sidebar -->
     <aside id="left-sidebar" class="left-sidebar bg-gray-800 text-gray-300 flex flex-col p-4 shadow-xl">
         <div class="flex items-center justify-between h-16 mb-6">
-            <!-- Sidebar toggle button -->
             <button id="sidebar-toggle-full" class="hidden md:block text-gray-400 hover:text-white transition-colors duration-200">
                 <i class="fas fa-bars"></i>
             </button>
-            <!-- Logo in expanded state -->
             <h1 id="website-title-sidebar" class="text-2xl font-bold text-red-500 whitespace-nowrap hidden">SophosWRLD</h1>
-            <!-- Logo in collapsed state -->
             <h1 id="website-logo-collapsed" class="text-2xl font-bold text-red-500 whitespace-nowrap md:hidden">SW</h1>
-            <!-- Close button for mobile -->
             <button id="sidebar-toggle-close" class="md:hidden text-gray-400 hover:text-white transition-colors duration-200">
                 <i class="fas fa-times"></i>
             </button>
         </div>
         
         <nav id="left-sidebar-nav" class="space-y-2 flex-grow overflow-y-auto">
-            <!-- Nav links will be rendered here -->
-        </nav>
+            </nav>
         
         <div id="admin-panel-button-container" class="mt-auto pt-4 border-t border-gray-700">
-            <!-- Auth/Admin button will be rendered here -->
-        </div>
+            </div>
     </aside>
 
-    <!-- Main Content Wrapper -->
     <div id="main-content-wrapper" class="main-content-wrapper min-h-screen">
-        <!-- Top Nav for Mobile -->
         <nav class="md:hidden bg-gray-800 text-white p-4 flex items-center justify-between shadow-md">
             <button id="mobile-sidebar-toggle" class="text-gray-400 hover:text-white transition-colors duration-200">
                 <i class="fas fa-bars"></i>
@@ -163,9 +150,7 @@
             <button id="mobile-auth-btn" class="bg-red-600 text-white font-semibold py-1 px-4 rounded-lg hover:bg-red-700 transition duration-300">Account</button>
         </nav>
 
-        <!-- Main Content Area -->
         <main id="content-area" class="p-4 md:p-8 min-h-screen">
-            <!-- Page content will be rendered here -->
             <div class="flex flex-col items-center justify-center h-full">
                 <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-500"></div>
                 <p class="mt-4 text-gray-400">Loading...</p>
@@ -173,24 +158,23 @@
         </main>
     </div>
 
-    <!-- The combined JavaScript logic -->
     <script type="module">
-        // =================================================================
-        // 1. FIREBASE IMPORTS
-        // =================================================================
+        /* =================================================================
+         * 1. FIREBASE IMPORTS
+         * ================================================================= */
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore, deleteDoc, addDoc, query, orderBy, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
-        // =================================================================
-        // 2. CONFIGURATION & GLOBAL VARIABLES
-        // =================================================================
+        /* =================================================================
+         * 2. CONFIGURATION & GLOBAL VARIABLES
+         * ================================================================= */
         const CONFIG = {
             websiteTitle: "SophosWRLD",
         };
 
-        // --- PLACEHOLDER FOR YOUR FIREBASE CONFIGURATION ---
+        /* --- PLACEHOLDER FOR YOUR FIREBASE CONFIGURATION --- */
         const FIREBASE_CONFIG_PLACEHOLDER = {
           apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
           authDomain: "sophoswrld.firebaseapp.com",
@@ -202,12 +186,12 @@
           measurementId: "G-6XETC98C22"
         };
         
-        // --- DO NOT EDIT BELOW THIS LINE ---
+        /* --- DO NOT EDIT BELOW THIS LINE --- */
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : FIREBASE_CONFIG_PLACEHOLDER;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        // --- Initialize Firebase ---
+        /* --- Initialize Firebase --- */
         let app;
         try {
             app = initializeApp(firebaseConfig);
@@ -225,15 +209,15 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // --- Global state ---
+        /* --- Global state --- */
         let appCurrentUser = null;
         let appUserData = null;
         let authReady = false;
         let lastNavigatedPage = null;
 
-        // =================================================================
-        // 3. UTILITY FUNCTIONS
-        // =================================================================
+        /* =================================================================
+         * 3. UTILITY FUNCTIONS
+         * ================================================================= */
 
         /**
          * Shows a loading spinner.
@@ -299,9 +283,9 @@
             document.documentElement.style.setProperty('--accent-color', color);
         }
 
-        // =================================================================
-        // 4. NAVIGATION LOGIC
-        // =================================================================
+        /* =================================================================
+         * 4. NAVIGATION LOGIC
+         * ================================================================= */
         const leftSidebar = document.getElementById('left-sidebar');
         const leftSidebarNav = document.getElementById('left-sidebar-nav');
         const mainContentWrapper = document.getElementById('main-content-wrapper');
@@ -382,7 +366,7 @@
             createNavLink(leftSidebarNav, 'Messages', 'messages', 'fas fa-envelope');
             createNavLink(leftSidebarNav, 'Settings', 'settings', 'fas fa-cog');
 
-            if (userData?.role === 'admin' || userData?.role === 'founder') {
+            if (userData.role === 'admin' || userData.role === 'founder') {
                 const adminCategory = document.createElement('div');
                 adminCategory.className = 'mt-6 pt-4 border-t border-gray-700';
                 leftSidebarNav.appendChild(adminCategory);
@@ -441,9 +425,9 @@
             }
         }
 
-        // =================================================================
-        // 5. PAGE RENDERERS
-        // =================================================================
+        /* =================================================================
+         * 5. PAGE RENDERERS
+         * ================================================================= */
         const contentArea = document.getElementById('content-area');
         
         let activeDMUserId = null;
@@ -466,7 +450,7 @@
         }
 
         function renderAdminPage() {
-            if (!appCurrentUser || (appUserData?.role !== 'admin' && appUserData?.role !== 'founder')) {
+            if (!appCurrentUser || (appUserData.role !== 'admin' && appUserData.role !== 'founder')) {
                 contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be an admin to view this page.</p></div>`;
                 return;
             }
@@ -475,20 +459,43 @@
                 <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full mx-auto">
                     <h2 class="text-3xl font-bold text-red-500 mb-6">Admin Dashboard</h2>
                     <h3 class="text-xl font-semibold text-gray-200 mb-4">Manage Users</h3>
+                    
+                    <div class="mb-4">
+                        <input type="text" id="user-search-input" placeholder="Search by username or email..." class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500">
+                    </div>
+                    
                     <div id="user-list" class="overflow-x-auto">
                         <p class="text-gray-400 text-center">Loading users...</p>
                     </div>
                 </div>
             `;
 
-            const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
+            let allUsers = []; // Store the full list of users
+
+            const usersCollection = collection(db, `artifacts${appId}:public:data:users`);
             onSnapshot(usersCollection, (snapshot) => {
-                const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                displayUsers(allUsers);
+            });
+            
+            // Add event listener for the search input
+            const searchInput = document.getElementById('user-search-input');
+            if (searchInput) {
+                searchInput.addEventListener('input', (event) => {
+                    const searchTerm = event.target.value.toLowerCase();
+                    const filteredUsers = allUsers.filter(user => 
+                        user.username.toLowerCase().includes(searchTerm) || 
+                        user.email.toLowerCase().includes(searchTerm)
+                    );
+                    displayUsers(filteredUsers);
+                });
+            }
+
+            function displayUsers(usersToShow) {
                 const userListContainer = document.getElementById('user-list');
                 if (!userListContainer) return;
                 
-                // Filter out the current user from the list
-                const filteredUsers = userList.filter(user => user.id !== appCurrentUser.uid);
+                const filteredUsers = usersToShow.filter(user => user.id !== appCurrentUser.uid);
 
                 if (filteredUsers.length === 0) {
                     userListContainer.innerHTML = '<p class="text-gray-400 text-center">No other users found.</p>';
@@ -497,8 +504,8 @@
 
                 userListContainer.innerHTML = `
                     <table class="w-full text-left text-gray-300 min-w-[700px]">
-                        <thead class="bg-gray-700">
-                            <tr>
+                        <thead>
+                            <tr class="bg-gray-700">
                                 <th class="p-3">Username</th>
                                 <th class="p-3">Email</th>
                                 <th class="p-3">Role</th>
@@ -543,11 +550,12 @@
                     </table>
                 `;
                 
+                // Add event listeners for the displayed users
                 userListContainer.querySelectorAll('.role-select').forEach(select => {
                     select.addEventListener('change', async (event) => {
                         const userId = event.target.dataset.userId;
                         const newRole = event.target.value;
-                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
+                        const userDocRef = doc(db, `artifacts${appId}:public:data:users`, userId);
                         try {
                             await updateDocFirestore(userDocRef, { role: newRole });
                             showMessageModal('User role updated successfully!', 'success');
@@ -561,7 +569,7 @@
                     btn.addEventListener('click', async (event) => {
                         const userId = event.currentTarget.dataset.userId;
                         const isBanned = event.currentTarget.dataset.isBanned === 'true';
-                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
+                        const userDocRef = doc(db, `artifacts${appId}:public:data:users`, userId);
                         try {
                             await updateDocFirestore(userDocRef, { isBanned: !isBanned });
                             showMessageModal(`User ${!isBanned ? 'banned' : 'unbanned'} successfully!`, 'success');
@@ -587,11 +595,11 @@
                     btn.addEventListener('click', (event) => {
                         const userId = event.currentTarget.dataset.userId;
                         showMessageModal(
-                            'Are you sure you want to delete this user\'s data? This will NOT delete the Firebase Authentication account, which must be done manually in the console.',
+                            "Are you sure you want to delete this user's data? This will NOT delete the Firebase Authentication account, which must be done manually in the console.",
                             'confirm',
                             async () => {
                                 try {
-                                    const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
+                                    const userDocRef = doc(db, `artifacts${appId}:public:data:users`, userId);
                                     await deleteDoc(userDocRef);
                                     showMessageModal('User data deleted from Firestore. Remember to delete the user from the Firebase Authentication console.', 'success');
                                 } catch (error) {
@@ -601,7 +609,7 @@
                         );
                     });
                 });
-            });
+            }
         }
 
         function renderAuthPage() {
@@ -658,7 +666,7 @@
                         theme: 'dark',
                         accentColor: '#ef4444'
                     };
-                    await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), newUser);
+                    await setDoc(doc(db, `artifacts${appId}:public:data:users`, user.uid), newUser);
                     
                     showMessageModal('Account created successfully! You are now signed in.', 'success');
                 } catch (error) {
@@ -675,7 +683,7 @@
                     try {
                         const result = await signInWithPopup(auth, provider);
                         const user = result.user;
-                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
+                        const userDocRef = doc(db, `artifacts${appId}:public:data:users`, user.uid);
                         const userDoc = await getDoc(userDocRef);
 
                         if (!userDoc.exists()) {
@@ -700,7 +708,7 @@
         
         function renderSettingsPage() {
             if (!appCurrentUser || !appUserData) {
-                contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Not Logged In</h1><p class="text-center text-gray-400">Please log in to view settings.</p>`;
+                contentArea.innerHTML = `h1 class="text-3xl text-center text-red-500">Not Logged In</h1><p class="text-center text-gray-400">Please log in to view settings.</p>`;
                 return;
             }
 
@@ -726,7 +734,7 @@
                 showLoadingSpinner();
                 const newUsername = document.getElementById('username').value;
                 const newAccentColor = document.getElementById('accent-color').value;
-                const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, appCurrentUser.uid);
+                const userDocRef = doc(db, `artifacts${appId}:public:data:users`, appCurrentUser.uid);
 
                 try {
                     await updateDocFirestore(userDocRef, {
@@ -767,11 +775,11 @@
                 showLoadingSpinner();
                 const newTitle = document.getElementById('post-title').value;
                 const newContent = document.getElementById('post-content').value;
-                const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
+                const postsCollection = collection(db, `artifacts${appId}:public:data:forums`);
 
                 try {
                     if (postId) {
-                        const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
+                        const postDocRef = doc(db, `artifacts${appId}:public:data:forums`, postId);
                         await updateDocFirestore(postDocRef, {
                             title: newTitle,
                             content: newContent
@@ -820,7 +828,7 @@
             document.querySelectorAll('.reaction-emoji').forEach(button => {
                 button.addEventListener('click', async (e) => {
                     const emoji = e.target.dataset.emoji;
-                    const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
+                    const postDocRef = doc(db, `artifacts${appId}:public:data:forums`, postId);
                     
                     try {
                         const postDoc = await getDoc(postDocRef);
@@ -848,11 +856,11 @@
         
         function deletePost(postId) {
             showMessageModal(
-                'Are you sure you want to delete this post? This action cannot be undone.',
+                "Are you sure you want to delete this post? This action cannot be undone.",
                 'confirm',
                 async () => {
                     showLoadingSpinner();
-                    const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
+                    const postDocRef = doc(db, `artifacts${appId}:public:data:forums`, postId);
                     try {
                         await deleteDoc(postDocRef);
                         showMessageModal('Post deleted successfully!', 'success');
@@ -891,7 +899,7 @@
                 }
             });
 
-            const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
+            const postsCollection = collection(db, `artifacts${appId}:public:data:forums`);
             const q = query(postsCollection, orderBy('createdAt', 'desc'));
             onSnapshot(q, (snapshot) => {
                 const postsList = document.getElementById('posts-list');
@@ -905,7 +913,7 @@
                 postsList.innerHTML = snapshot.docs.map(postDoc => {
                     const post = postDoc.data();
                     const postId = postDoc.id;
-                    const canEditOrDelete = appUserData?.role === 'admin' || appUserData?.role === 'founder';
+                    const canEditOrDelete = appUserData.role === 'admin' || appUserData.role === 'founder';
 
                     const reactionsHtml = post.reactions ? Object.values(post.reactions).map(reaction => `
                         <span class="bg-gray-700 px-2 py-1 rounded-full text-sm">${reaction.emoji} ${reaction.count}</span>
@@ -953,7 +961,7 @@
                     button.addEventListener('click', async (e) => {
                         const postId = e.currentTarget.dataset.postId;
                         showLoadingSpinner();
-                        const postDoc = await getDoc(doc(db, `/artifacts/${appId}/public/data/forums`, postId));
+                        const postDoc = await getDoc(doc(db, `artifacts${appId}:public:data:forums`, postId));
                         hideLoadingSpinner();
                         if (postDoc.exists()) {
                             const postData = postDoc.data();
@@ -977,7 +985,7 @@
             return [user1Id, user2Id].sort().join('-');
         }
         
-        // --- Simulated Calling Logic ---
+        /* --- Simulated Calling Logic --- */
         let currentCallId = null;
 
         function renderCallModal(callId, status, participants, callerId) {
@@ -1021,7 +1029,7 @@
                 `;
             } else if (status === 'active') {
                 // Active call modal for both participants
-                const participantsHtml = participants.map(p => `<li class="flex items-center space-x-2"><i class="fas fa-user-circle"></i><span>${p.name}</span></li>`).join('');
+                const participantsHtml = participants.map(p => `<li><i class="fas fa-user-circle"></i><span>${p.name}</span></li>`).join('');
                 modalHtml = `
                     <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                         <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-green-500 text-center">
@@ -1049,8 +1057,8 @@
                     document.getElementById('hangup-btn').addEventListener('click', () => endCall(callId));
                 }
             } else {
-                 const existingModal = document.getElementById(modalId);
-                 if (existingModal) existingModal.remove();
+                // const existingModal = document.getElementById(modalId);
+                // if(existingModal) existingModal.remove();
             }
         }
         
@@ -1059,7 +1067,7 @@
                 `Are you sure you want to call ${recipientUsername}?`,
                 'confirm',
                 async () => {
-                    const callsCollection = collection(db, `/artifacts/${appId}/private/data/calls`);
+                    const callsCollection = collection(db, `artifacts${appId}:private:data:calls`);
                     const newCall = {
                         callerId: appCurrentUser.uid,
                         recipientId: recipientId,
@@ -1078,7 +1086,7 @@
         }
 
         async function acceptCall(callId, currentParticipants) {
-            const callDocRef = doc(db, `/artifacts/${appId}/private/data/calls`, callId);
+            const callDocRef = doc(db, `artifacts${appId}:private:data:calls`, callId);
             try {
                 const updatedParticipants = [...currentParticipants, { id: appCurrentUser.uid, name: appUserData.username }];
                 await updateDocFirestore(callDocRef, {
@@ -1091,7 +1099,7 @@
         }
 
         async function endCall(callId) {
-            const callDocRef = doc(db, `/artifacts/${appId}/private/data/calls`, callId);
+            const callDocRef = doc(db, `artifacts${appId}:private:data:calls`, callId);
             try {
                 await updateDocFirestore(callDocRef, {
                     status: 'ended'
@@ -1104,10 +1112,10 @@
         // Listens for incoming and outgoing calls
         function listenForCalls() {
             if (!appCurrentUser) return;
-            const callsCollection = collection(db, `/artifacts/${appId}/private/data/calls`);
+            const callsCollection = collection(db, `artifacts${appId}:private:data:calls`);
             const q = query(callsCollection, where('status', 'in', ['ringing', 'active']));
             
-            if (callUnsubscribe) callUnsubscribe(); // Unsubscribe old listener
+            if (callUnsubscribe) callUnsubscribe();  // Unsubscribe old listener
             
             callUnsubscribe = onSnapshot(q, (snapshot) => {
                 let foundCall = false;
@@ -1139,14 +1147,12 @@
 
             contentArea.innerHTML = `
                 <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto flex flex-col md:flex-row h-[70vh]">
-                    <!-- User List Panel -->
                     <div id="user-list-panel" class="w-full md:w-1/3 flex-shrink-0 border-b md:border-r border-gray-700 overflow-y-auto">
                         <h3 class="text-xl font-bold text-[var(--accent-color)] mb-4">Users</h3>
                         <div id="messages-user-list">
                             <p class="text-gray-400 text-center">Loading users...</p>
                         </div>
                     </div>
-                    <!-- Chat Panel -->
                     <div id="chat-panel" class="flex-grow w-full md:w-2/3 flex flex-col p-4 relative">
                         <div class="flex items-center justify-center h-full text-gray-400">
                             Select a user to start a conversation.
@@ -1157,7 +1163,7 @@
             
             listenForCalls();
 
-            const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
+            const usersCollection = collection(db, `artifacts${appId}:public:data:users`);
             onSnapshot(usersCollection, (snapshot) => {
                 const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 const userListContainer = document.getElementById('messages-user-list');
@@ -1200,7 +1206,6 @@
                     </button>
                 </div>
                 <div id="messages-container" class="flex-grow overflow-y-auto p-4 space-y-4">
-                    <!-- Messages will be rendered here -->
                     <p class="text-center text-gray-400">Say hello!</p>
                 </div>
                 <form id="dm-form" class="p-4 border-t border-gray-700 bg-gray-800 sticky bottom-0 z-10">
@@ -1220,7 +1225,7 @@
 
                 if (messageText) {
                     const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
-                    const messagesCollection = collection(db, `/artifacts/${appId}/private/data/chats/${chatId}/messages`);
+                    const messagesCollection = collection(db, `artifacts${appId}:private:data:chats/${chatId}/messages`);
 
                     try {
                         await addDoc(messagesCollection, {
@@ -1240,7 +1245,7 @@
             });
             
             const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
-            const messagesCollection = collection(db, `/artifacts/${appId}/private/data/chats/${chatId}/messages`);
+            const messagesCollection = collection(db, `artifacts${appId}:private:data:chats/${chatId}/messages`);
             const q = query(messagesCollection, orderBy('createdAt', 'asc'));
 
             dmUnsubscribe = onSnapshot(q, (snapshot) => {
@@ -1264,9 +1269,9 @@
         }
 
 
-        // =================================================================
-        // 6. MAIN APP LOGIC
-        // =================================================================
+        /* =================================================================
+         * 6. MAIN APP LOGIC
+         * ================================================================= */
 
         function navigateTo(page) {
             if (!contentArea) {
@@ -1326,7 +1331,7 @@
             authReady = true;
 
             if (user) {
-                const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
+                const userDocRef = doc(db, `artifacts${appId}:public:data:users`, user.uid);
                 const userDoc = await getDoc(userDocRef);
                 
                 if (userDoc.exists()) {
@@ -1334,13 +1339,13 @@
                 } else {
                     appUserData = {
                         username: user.displayName || user.email.split('@')[0] || 'Guest',
-                        email: user.email || 'N/A',
+                        email: user.email || 'NA',
                         role: 'member',
                         isBanned: false,
                         theme: 'dark',
                         accentColor: '#ef4444'
                     };
-                    await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), appUserData);
+                    await setDoc(doc(db, `artifacts${appId}:public:data:users`, user.uid), appUserData);
                 }
                 
                 if (appUserData.accentColor) {
@@ -1377,10 +1382,10 @@
             
             if (initialAuthToken) {
                 try {
-                     await signInWithCustomToken(auth, initialAuthToken);
+                    // await signInWithCustomToken(auth, initialAuthToken);
                 } catch (error) {
-                     console.error("Error signing in with custom token:", error);
-                     navigateTo('auth');
+                    // console.error("Error signing in with custom token:", error);
+                    // navigateTo('auth');
                 }
             }
         });
