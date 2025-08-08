@@ -3,58 +3,696 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SophosWRLD - Community</title>
+    <title>SophosWRLD</title>
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./style.css">
-</head>
-<body class="bg-dark-1 text-light-1 flex">
-
-    <aside id="left-sidebar" class="fixed top-0 left-0 h-full bg-dark-2 text-light-1 flex flex-col p-4 z-50 transition-all duration-300 ease-in-out transform -translate-x-full md:translate-x-0 md:w-64">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <!-- Inter Font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <style>
+        :root {
+            --accent-color: #ef4444; /* Default red accent */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* dark:bg-gray-900 */
+        }
         
-        <div class="flex items-center justify-between mb-6">
-            <h1 id="website-title-sidebar" class="text-3xl font-extrabold text-red-500 whitespace-nowrap overflow-hidden">SophosWRLD</h1>
-            <button id="sidebar-toggle" class="md:hidden text-2xl p-2 rounded-lg hover:bg-gray-700 transition duration-200">
-                <i class="fas fa-bars"></i>
-            </button>
-        </div>
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; /* dark:bg-gray-800 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent-color);
+            border-radius: 4px;
+        }
+        
+        /* Sidebar layout */
+        .left-sidebar {
+            width: 72px;
+            transition: width 0.3s ease, transform 0.3s ease;
+            position: fixed;
+            z-index: 40;
+            height: 100vh;
+            background-color: #1f2937; /* dark:bg-gray-800 */
+            transform: translateX(-100%);
+        }
+        .left-sidebar.expanded {
+            width: 256px;
+            transform: translateX(0);
+        }
+        .left-sidebar.expanded .sidebar-nav-text {
+            display: inline;
+        }
 
-        <nav id="left-sidebar-nav" class="flex-grow space-y-4">
-            </nav>
+        .main-content-wrapper {
+            margin-left: 72px;
+            transition: margin-left 0.3s ease;
+        }
+        .main-content-wrapper.expanded {
+            margin-left: 256px;
+        }
 
-        <div id="admin-panel-button-container" class="mt-auto pt-4 border-t border-gray-700">
-            </div>
-    </aside>
-
-    <div id="overlay-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden"></div>
-
-    <div id="main-content-wrapper" class="flex-grow flex flex-col transition-all duration-300 ease-in-out md:ml-64 min-h-screen">
-
-        <header id="mobile-top-bar" class="md:hidden sticky top-0 bg-dark-2 z-30 flex items-center justify-between p-4 shadow-lg">
-            <button id="mobile-sidebar-toggle" class="text-2xl p-2 rounded-lg hover:bg-gray-700 transition duration-200">
-                <i class="fas fa-bars"></i>
-            </button>
-            <h1 class="text-2xl font-extrabold text-red-500">SophosWRLD</h1>
-            <button id="mobile-auth-btn" class="bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-600 transition">
-                Account
-            </button>
-        </header>
-
-        <main id="content-area" class="flex-grow p-4 md:p-8 flex items-center justify-center">
-            </main>
-
-        <footer class="p-4 text-center text-gray-500 text-sm">
-            © 2025 SophosWRLD. All rights reserved.
-        </footer>
-    </div>
-    
-    <div id="modal-container" class="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"></div>
-
-    <div id="loading-spinner" class="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 hidden">
+        /* Mobile specific styles */
+        @media (min-width: 768px) {
+            .left-sidebar {
+                transform: translateX(0);
+            }
+            .left-sidebar:not(.expanded) {
+                width: 72px;
+            }
+            .left-sidebar.expanded {
+                width: 256px;
+            }
+            .main-content-wrapper {
+                margin-left: 72px;
+            }
+            .main-content-wrapper.expanded {
+                margin-left: 256px;
+            }
+        }
+        @media (max-width: 767px) {
+             .left-sidebar {
+                transform: translateX(-100%);
+            }
+            .left-sidebar.expanded {
+                transform: translateX(0);
+            }
+            .main-content-wrapper {
+                margin-left: 0;
+            }
+        }
+        
+        /* Dynamic theme classes based on accent color */
+        .accent-red { background-color: var(--accent-color); }
+        .accent-red:hover { background-color: var(--accent-color); opacity: 0.8; }
+        nav.border-red-500, .border-red-500 { border-color: var(--accent-color); }
+        .text-red-500 { color: var(--accent-color); }
+        .focus\:ring-red-500:focus { --tw-ring-color: var(--accent-color); }
+        .bg-red-600 { background-color: var(--accent-color); }
+        .hover\:bg-red-700:hover { background-color: var(--accent-color); opacity: 0.8; }
+        .text-red-400 { color: var(--accent-color); opacity: 0.8; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+    <div id="modal-container"></div>
+    <div id="loading-spinner" class="hidden fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50">
         <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-500"></div>
     </div>
     
-    <script type="module" src="./main.js"></script>
+    <!-- Overlay for mobile sidebar -->
+    <div id="overlay-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden md:hidden"></div>
+
+    <!-- Left Sidebar -->
+    <aside id="left-sidebar" class="bg-gray-800 text-gray-300 flex flex-col p-4 shadow-xl">
+        <div class="flex items-center justify-between h-16 mb-6">
+            <h1 id="website-title-sidebar" class="text-2xl font-bold text-red-500 whitespace-nowrap">SophosWRLD</h1>
+            <button id="sidebar-toggle" class="md:hidden text-gray-400 hover:text-white transition-colors duration-200">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <nav id="left-sidebar-nav" class="space-y-2 flex-grow overflow-y-auto">
+            <!-- Nav links will be rendered here -->
+        </nav>
+        
+        <div id="admin-panel-button-container" class="mt-auto pt-4 border-t border-gray-700">
+            <!-- Auth/Admin button will be rendered here -->
+        </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div id="main-content-wrapper" class="min-h-screen">
+        <!-- Top Nav for Mobile -->
+        <nav class="md:hidden bg-gray-800 text-white p-4 flex items-center justify-between shadow-md">
+            <button id="mobile-sidebar-toggle" class="text-gray-400 hover:text-white transition-colors duration-200">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1 class="text-2xl font-bold text-red-500">SophosWRLD</h1>
+            <button id="mobile-auth-btn" class="bg-red-600 text-white font-semibold py-1 px-4 rounded-lg hover:bg-red-700 transition duration-300">Account</button>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main id="content-area" class="p-4 md:p-8 min-h-screen">
+            <!-- Page content will be rendered here -->
+            <div class="flex flex-col items-center justify-center h-full">
+                <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-500"></div>
+                <p class="mt-4 text-gray-400">Loading...</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- The combined JavaScript logic -->
+    <script type="module">
+        // =================================================================
+        // 1. FIREBASE IMPORTS
+        // =================================================================
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+
+        // =================================================================
+        // 2. CONFIGURATION & GLOBAL VARIABLES
+        // =================================================================
+        const CONFIG = {
+            websiteTitle: "SophosWRLD",
+        };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { /* Your placeholder config here */ };
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- Initialize Firebase ---
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- Global state ---
+        let appCurrentUser = null;
+        let appUserData = null;
+        let authReady = false;
+
+        // =================================================================
+        // 3. UTILITY FUNCTIONS
+        // =================================================================
+
+        /**
+         * Shows a loading spinner.
+         */
+        function showLoadingSpinner() {
+            let spinner = document.getElementById('loading-spinner');
+            if (spinner) {
+                spinner.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Hides the loading spinner.
+         */
+        function hideLoadingSpinner() {
+            const spinner = document.getElementById('loading-spinner');
+            if (spinner) {
+                spinner.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Displays a message modal.
+         * @param {string} message - The message to display.
+         * @param {string} type - 'info', 'error', 'success', or 'confirm'.
+         * @param {function} onConfirm - Callback for 'confirm' type.
+         */
+        function showMessageModal(message, type = 'info', onConfirm = null) {
+            const modalContainer = document.getElementById('modal-container');
+            const modalId = 'message-modal';
+            const existingModal = document.getElementById(modalId);
+            if (existingModal) existingModal.remove();
+
+            const modalHtml = `
+                <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-sm w-full border-2 border-[var(--accent-color)]">
+                        <p class="text-lg text-gray-200 mb-4">${message}</p>
+                        <div class="flex justify-end space-x-2">
+                            ${type === 'confirm' ? `
+                                <button id="modal-confirm-btn" class="bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg hover:bg-opacity-80 transition">Confirm</button>
+                            ` : ''}
+                            <button id="modal-close-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Close</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            modalContainer.insertAdjacentHTML('beforeend', modalHtml);
+
+            document.getElementById('modal-close-btn').addEventListener('click', () => document.getElementById(modalId).remove());
+            if (type === 'confirm' && onConfirm) {
+                document.getElementById('modal-confirm-btn').addEventListener('click', () => {
+                    onConfirm();
+                    document.getElementById(modalId).remove();
+                });
+            }
+        }
+
+        /**
+         * Updates the website's theme with a new accent color.
+         * @param {string} color - The new hex color for the accent.
+         */
+        function updateTheme(color) {
+            document.documentElement.style.setProperty('--accent-color', color);
+        }
+
+        // =================================================================
+        // 4. NAVIGATION LOGIC
+        // =================================================================
+        const leftSidebar = document.getElementById('left-sidebar');
+        const leftSidebarNav = document.getElementById('left-sidebar-nav');
+        const mainContentWrapper = document.getElementById('main-content-wrapper');
+        const overlayBackdrop = document.getElementById('overlay-backdrop');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
+        const websiteTitleSidebar = document.getElementById('website-title-sidebar');
+        const adminButtonContainer = document.getElementById('admin-panel-button-container');
+        let isSidebarExpanded = window.innerWidth >= 768;
+
+        function initializeNavigation() {
+            if (mobileSidebarToggle) mobileSidebarToggle.addEventListener('click', toggleSidebar);
+            if (sidebarToggle) sidebarToggle.addEventListener('click', toggleSidebar);
+            if (overlayBackdrop) overlayBackdrop.addEventListener('click', toggleSidebar);
+            updateSidebarUI();
+        }
+
+        function toggleSidebar() {
+            isSidebarExpanded = !isSidebarExpanded;
+            updateSidebarUI();
+        }
+
+        function updateSidebarUI() {
+            const textSpans = leftSidebar.querySelectorAll('.sidebar-nav-text');
+            if (isSidebarExpanded) {
+                leftSidebar.classList.add('expanded');
+                mainContentWrapper.classList.add('expanded');
+                if (window.innerWidth < 768) overlayBackdrop.classList.remove('hidden');
+                websiteTitleSidebar.classList.remove('hidden');
+                textSpans.forEach(span => span.classList.remove('hidden'));
+                if (adminButtonContainer.innerHTML.trim() !== '') {
+                    adminButtonContainer.classList.remove('hidden');
+                }
+            } else {
+                leftSidebar.classList.remove('expanded');
+                mainContentWrapper.classList.remove('expanded');
+                overlayBackdrop.classList.add('hidden');
+                websiteTitleSidebar.classList.add('hidden');
+                textSpans.forEach(span => span.classList.add('hidden'));
+                adminButtonContainer.classList.add('hidden');
+            }
+        }
+
+        function createNavLink(parentElement, text, page, iconClass) {
+            const link = document.createElement('a');
+            link.href = '#';
+            link.className = `flex items-center space-x-4 py-3 px-4 rounded-xl text-lg font-semibold text-gray-300 hover:bg-gray-700 transition-colors duration-200`;
+            link.innerHTML = `
+                <i class="${iconClass} text-red-500 w-6 text-center"></i>
+                <span class="sidebar-nav-text whitespace-nowrap ${isSidebarExpanded ? '' : 'hidden'}">${text}</span>
+            `;
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                navigateTo(page);
+                if (window.innerWidth < 768 && isSidebarExpanded) {
+                    toggleSidebar();
+                }
+            });
+            parentElement.appendChild(link);
+        }
+
+        function renderSidebarNav(currentUser, userData) {
+            leftSidebarNav.innerHTML = '';
+            adminButtonContainer.innerHTML = '';
+            
+            createNavLink(leftSidebarNav, 'Home', 'home', 'fas fa-home');
+            createNavLink(leftSidebarNav, 'Forums', 'forums', 'fas fa-comments');
+            createNavLink(leftSidebarNav, 'Messages', 'messages', 'fas fa-envelope');
+            createNavLink(leftSidebarNav, 'Settings', 'settings', 'fas fa-cog');
+
+            if (userData?.role === 'admin') {
+                const adminCategory = document.createElement('div');
+                adminCategory.className = 'mt-6 pt-4 border-t border-gray-700';
+                leftSidebarNav.appendChild(adminCategory);
+                createNavLink(adminCategory, 'Admin Panel', 'admin', 'fas fa-user-shield');
+            }
+            
+            const authContainer = document.getElementById('admin-panel-button-container');
+            authContainer.innerHTML = ''; 
+            
+            if (currentUser && !currentUser.isAnonymous) {
+                const logoutButton = document.createElement('button');
+                logoutButton.id = 'logout-btn';
+                logoutButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
+                logoutButton.innerHTML = `
+                    <i class="fas fa-sign-out-alt w-6 text-center"></i>
+                    <span class="sidebar-nav-text ${isSidebarExpanded ? '' : 'hidden'}">Sign Out</span>`;
+                logoutButton.addEventListener('click', async () => {
+                    try {
+                        await signOut(auth);
+                        navigateTo('auth');
+                        showMessageModal('You have been signed out.', 'success');
+                    } catch (error) {
+                        showMessageModal(`Sign out failed: ${error.message}`, 'error');
+                    }
+                });
+                authContainer.appendChild(logoutButton);
+            } else {
+                const authButton = document.createElement('button');
+                authButton.id = 'auth-btn';
+                authButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
+                authButton.innerHTML = `
+                    <i class="fas fa-sign-in-alt w-6 text-center"></i>
+                    <span class="sidebar-nav-text ${isSidebarExpanded ? '' : 'hidden'}">Account</span>`;
+                authButton.addEventListener('click', () => navigateTo('auth'));
+                authContainer.appendChild(authButton);
+            }
+
+            updateSidebarUI();
+        }
+
+        // =================================================================
+        // 5. PAGE RENDERERS
+        // =================================================================
+        const contentArea = document.getElementById('content-area');
+
+        function renderHomePage() {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-8 text-center">
+                    <h1 class="text-4xl md:text-6xl font-bold text-red-500 mb-4 animate-pulse">Welcome to SophosWRLD</h1>
+                    <p class="text-xl text-gray-400">Your personalized community hub.</p>
+                    <div class="mt-8">
+                        <button id="view-forums-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
+                            <i class="fas fa-comments mr-2"></i>Go to Forums
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('view-forums-btn').addEventListener('click', () => navigateTo('forums'));
+        }
+
+        function renderAdminPage() {
+            if (!appCurrentUser || appUserData?.role !== 'admin') {
+                contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be an admin to view this page.</p>`;
+                return;
+            }
+
+            contentArea.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto">
+                    <h2 class="text-3xl font-bold text-red-500 mb-6">Admin Dashboard</h2>
+                    <h3 class="text-xl font-semibold text-gray-200 mb-4">Manage Users</h3>
+                    <div id="user-list" class="space-y-4">
+                        <p class="text-gray-400 text-center">Loading users...</p>
+                    </div>
+                </div>
+            `;
+
+            const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
+            onSnapshot(usersCollection, (snapshot) => {
+                const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const userListContainer = document.getElementById('user-list');
+                if (!userListContainer) return;
+                
+                if (userList.length === 0) {
+                    userListContainer.innerHTML = '<p class="text-gray-400 text-center">No users found.</p>';
+                    return;
+                }
+
+                userListContainer.innerHTML = `
+                    <table class="w-full text-left text-gray-300">
+                        <thead class="bg-gray-700">
+                            <tr>
+                                <th class="p-3">Username</th>
+                                <th class="p-3">Email</th>
+                                <th class="p-3">Role</th>
+                                <th class="p-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${userList.map(user => `
+                                <tr class="border-b border-gray-700 hover:bg-gray-700/50">
+                                    <td class="p-3">${user.username}</td>
+                                    <td class="p-3">${user.email}</td>
+                                    <td class="p-3">
+                                        <select class="role-select bg-gray-600 p-2 rounded" data-user-id="${user.id}">
+                                            <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
+                                            <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                        </select>
+                                    </td>
+                                    <td class="p-3"></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
+                userListContainer.querySelectorAll('.role-select').forEach(select => {
+                    select.addEventListener('change', async (event) => {
+                        const userId = event.target.dataset.userId;
+                        const newRole = event.target.value;
+                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
+                        try {
+                            await updateDocFirestore(userDocRef, { role: newRole });
+                            showMessageModal('User role updated successfully!', 'success');
+                        } catch (error) {
+                            showMessageModal('Failed to update user role.', 'error');
+                        }
+                    });
+                });
+            });
+        }
+
+        function renderAuthPage() {
+            contentArea.innerHTML = `
+                <div class="max-w-md mx-auto bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500">
+                    <h2 class="text-3xl font-bold text-center mb-6 text-red-500">Join or Sign In</h2>
+                    <form id="auth-form" class="space-y-4">
+                        <input type="email" id="auth-email" placeholder="Email" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                        <input type="password" id="auth-password" placeholder="Password" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                        <div class="flex items-center justify-between pt-2">
+                            <button type="submit" id="signin-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">Sign In</button>
+                            <button type="button" id="signup-btn" class="bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-700 transition-colors duration-300">Sign Up</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            const authForm = document.getElementById('auth-form');
+            const emailInput = document.getElementById('auth-email');
+            const passwordInput = document.getElementById('auth-password');
+
+            document.getElementById('signin-btn').addEventListener('click', async (e) => {
+                e.preventDefault();
+                showLoadingSpinner();
+                try {
+                    await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+                    navigateTo('home');
+                } catch (error) {
+                    showMessageModal(error.message, 'error');
+                } finally {
+                    hideLoadingSpinner();
+                }
+            });
+
+            document.getElementById('signup-btn').addEventListener('click', async (e) => {
+                e.preventDefault();
+                showLoadingSpinner();
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+                    const user = userCredential.user;
+                    
+                    const newUser = {
+                        username: user.email.split('@')[0],
+                        email: user.email,
+                        role: 'member',
+                        theme: 'dark',
+                        accentColor: '#ef4444'
+                    };
+                    await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), newUser);
+                    
+                    showMessageModal('Account created successfully! Please sign in.', 'success');
+                    navigateTo('auth');
+                } catch (error) {
+                    showMessageModal(error.message, 'error');
+                } finally {
+                    hideLoadingSpinner();
+                }
+            });
+        }
+
+        function renderSettingsPage() {
+            if (!appCurrentUser || !appUserData) {
+                contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Not Logged In</h1><p class="text-center text-gray-400">Please log in to view settings.</p>`;
+                return;
+            }
+
+            contentArea.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-lg mx-auto">
+                    <h2 class="text-3xl font-bold text-red-500 mb-6">Settings</h2>
+                    <form id="settings-form" class="space-y-6">
+                        <div>
+                            <label for="username" class="block text-lg font-semibold text-gray-300 mb-2">Username</label>
+                            <input type="text" id="username" value="${appUserData.username}" class="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                        </div>
+                        <div>
+                            <label for="accent-color" class="block text-lg font-semibold text-gray-300 mb-2">Accent Color</label>
+                            <input type="color" id="accent-color" value="${appUserData.accentColor}" class="w-full h-12 p-1 bg-gray-700 rounded-lg cursor-pointer">
+                        </div>
+                        <button type="submit" id="save-settings-btn" class="w-full bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">Save Changes</button>
+                    </form>
+                </div>
+            `;
+
+            document.getElementById('settings-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                showLoadingSpinner();
+                const newUsername = document.getElementById('username').value;
+                const newAccentColor = document.getElementById('accent-color').value;
+                const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, appCurrentUser.uid);
+
+                try {
+                    await updateDocFirestore(userDocRef, {
+                        username: newUsername,
+                        accentColor: newAccentColor
+                    });
+                    updateTheme(newAccentColor);
+                    showMessageModal('Settings saved successfully!', 'success');
+                } catch (error) {
+                    showMessageModal('Error saving settings: ' + error.message, 'error');
+                } finally {
+                    hideLoadingSpinner();
+                }
+            });
+        }
+
+        function renderDMsPage() {
+            contentArea.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto">
+                    <h2 class="text-3xl font-bold text-red-500 mb-6">Direct Messages</h2>
+                    <div id="messages-list" class="space-y-4">
+                        <p class="text-gray-400 text-center">This feature is coming soon!</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderForumsPage() {
+            contentArea.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-3xl font-bold text-red-500">Forums</h2>
+                        <button id="create-post-btn" class="bg-red-600 text-white font-semibold py-2 px-5 rounded-lg hover:bg-red-700 transition-colors duration-300">
+                            <i class="fas fa-plus mr-2"></i>Create Post
+                        </button>
+                    </div>
+                    <div id="posts-list" class="space-y-4">
+                        <p class="text-gray-400 text-center">No posts yet. Be the first to create one!</p>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('create-post-btn').addEventListener('click', () => {
+                if (appCurrentUser && !appCurrentUser.isAnonymous) {
+                    showMessageModal('Create Post modal would appear here.', 'info');
+                } else {
+                    showMessageModal('You must be signed in to create a post.', 'error');
+                }
+            });
+        }
+
+        // =================================================================
+        // 6. MAIN APP LOGIC
+        // =================================================================
+
+        function navigateTo(page) {
+            if (!contentArea) {
+                console.error("Content area not found.");
+                return;
+            }
+            
+            contentArea.innerHTML = '';
+            localStorage.setItem('currentPage', page);
+            
+            switch (page) {
+                case 'home':
+                    renderHomePage();
+                    break;
+                case 'admin':
+                    renderAdminPage();
+                    break;
+                case 'auth':
+                    renderAuthPage();
+                    break;
+                case 'messages':
+                    renderDMsPage();
+                    break;
+                case 'settings':
+                    renderSettingsPage();
+                    break;
+                case 'forums':
+                    renderForumsPage();
+                    break;
+                default:
+                    contentArea.innerHTML = `<h1 class="text-3xl text-center text-gray-500">Page Not Found</h1>`;
+                    break;
+            }
+        }
+
+        // --- Firebase Authentication Listener ---
+        onAuthStateChanged(auth, async (user) => {
+            appCurrentUser = user;
+            authReady = true;
+
+            if (user) {
+                const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
+                const userDoc = await getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                    appUserData = { id: userDoc.id, ...userDoc.data() };
+                } else {
+                    appUserData = {
+                        username: user.email ? user.email.split('@')[0] : 'Guest',
+                        email: user.email || 'N/A',
+                        role: 'member',
+                        theme: 'dark',
+                        accentColor: '#ef4444'
+                    };
+                    // Only create the doc if it's not an anonymous user
+                    if (!user.isAnonymous) {
+                         await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), appUserData);
+                    }
+                }
+                
+                if (appUserData.accentColor) {
+                    updateTheme(appUserData.accentColor);
+                }
+
+                renderSidebarNav(appCurrentUser, appUserData);
+                const currentPage = localStorage.getItem('currentPage') || 'home';
+                navigateTo(currentPage);
+                
+            } else {
+                appUserData = null;
+                renderSidebarNav(appCurrentUser, appUserData);
+                navigateTo('auth');
+            }
+        });
+
+        // --- App Initialization ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            initializeNavigation();
+            const mobileAuthButton = document.getElementById('mobile-auth-btn');
+            if(mobileAuthButton) {
+                mobileAuthButton.addEventListener('click', () => {
+                    navigateTo('auth');
+                    if (window.innerWidth < 768) {
+                        toggleSidebar();
+                    }
+                });
+            }
+        });
+
+        // Handle initial anonymous sign-in if no user is present
+        if (!auth.currentUser && !initialAuthToken) {
+            try {
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Error signing in anonymously:", error);
+            }
+        } else if (!auth.currentUser && initialAuthToken) {
+            try {
+                 await signInWithCustomToken(auth, initialAuthToken);
+            } catch (error) {
+                 console.error("Error signing in with custom token:", error);
+            }
+        }
+    </script>
 </body>
 </html>
