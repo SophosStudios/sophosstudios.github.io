@@ -78,6 +78,28 @@
         .bg-red-600 { background-color: var(--accent-color); }
         .hover\:bg-red-700:hover { background-color: var(--accent-color); opacity: 0.8; }
         .text-red-400 { color: var(--accent-color); opacity: 0.8; }
+        
+        /* New styling for hover-to-expand buttons */
+        .action-btn-group button {
+            transition: width 0.3s ease, padding 0.3s ease, background-color 0.3s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            width: 40px; /* Initial width for just the icon */
+            padding: 8px;
+            text-align: center;
+        }
+        .action-btn-group button:hover {
+            width: auto; /* Expand width on hover */
+            padding-left: 16px;
+            padding-right: 16px;
+        }
+        .action-btn-group button span {
+            display: none;
+        }
+        .action-btn-group button:hover span {
+            display: inline;
+        }
+
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200">
@@ -143,7 +165,7 @@
         // =================================================================
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore, deleteDoc, addDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
         // =================================================================
@@ -154,8 +176,6 @@
         };
 
         // --- PLACEHOLDER FOR YOUR FIREBASE CONFIGURATION ---
-        // You can paste your project's firebaseConfig object here.
-        // It will be used if the environment's config is not available.
         const FIREBASE_CONFIG_PLACEHOLDER = {
           apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
           authDomain: "sophoswrld.firebaseapp.com",
@@ -178,7 +198,6 @@
             app = initializeApp(firebaseConfig);
         } catch (error) {
             console.error("Firebase initialization failed:", error);
-            // Show a user-friendly error message if config is invalid
             document.getElementById('content-area').innerHTML = `
                 <div class="text-center p-8">
                     <h1 class="text-3xl font-bold text-red-500">Configuration Error</h1>
@@ -290,7 +309,6 @@
                 overlayBackdrop.classList.add('hidden');
             });
             
-            // Set initial state based on screen size
             if (window.innerWidth >= 768) {
                 leftSidebar.classList.remove('expanded');
                 mainContentWrapper.classList.remove('expanded');
@@ -386,7 +404,6 @@
                 authContainer.appendChild(authButton);
             }
             
-            // Re-render the collapsed/expanded state after populating the nav links
             const isExpanded = leftSidebar.classList.contains('expanded');
             const navTextElements = leftSidebar.querySelectorAll('.sidebar-nav-text');
             const websiteTitleSidebar = document.getElementById('website-title-sidebar');
@@ -412,6 +429,9 @@
         // 5. PAGE RENDERERS
         // =================================================================
         const contentArea = document.getElementById('content-area');
+        
+        let activeDMUserId = null;
+        let dmUnsubscribe = null;
 
         function renderHomePage() {
             contentArea.innerHTML = `
@@ -467,7 +487,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            ${userList.map(user => `
+                            ${userList.filter(user => user.id !== appCurrentUser.uid).map(user => `
                                 <tr class="border-b border-gray-700 hover:bg-gray-700/50">
                                     <td class="p-3">${user.username}</td>
                                     <td class="p-3">${user.email}</td>
@@ -482,16 +502,18 @@
                                             ${user.isBanned ? 'Banned' : 'Active'}
                                         </span>
                                     </td>
-                                    <td class="p-3 space-x-2 flex">
-                                        <button class="ban-btn bg-yellow-500 text-white p-2 rounded-lg hover:bg-yellow-600 transition" data-user-id="${user.id}" data-is-banned="${user.isBanned}">
+                                    <td class="p-3 space-x-2 flex action-btn-group">
+                                        <button class="ban-btn bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition" data-user-id="${user.id}" data-is-banned="${user.isBanned}">
                                             <i class="fas fa-ban"></i>
-                                            <span class="ml-1">${user.isBanned ? 'Unban' : 'Ban'}</span>
+                                            <span class="ml-2">${user.isBanned ? 'Unban' : 'Ban'}</span>
                                         </button>
-                                        <button class="reset-password-btn bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 transition" data-user-id="${user.id}" data-user-email="${user.email}">
+                                        <button class="reset-password-btn bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition" data-user-id="${user.id}" data-user-email="${user.email}">
                                             <i class="fas fa-key"></i>
+                                            <span class="ml-2">Reset Password</span>
                                         </button>
-                                        <button class="delete-btn bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 transition" data-user-id="${user.id}">
+                                        <button class="delete-btn bg-red-600 text-white rounded-lg hover:bg-red-700 transition" data-user-id="${user.id}">
                                             <i class="fas fa-trash"></i>
+                                            <span class="ml-2">Delete</span>
                                         </button>
                                     </td>
                                 </tr>
@@ -654,7 +676,7 @@
                 });
             }
         }
-
+        
         function renderSettingsPage() {
             if (!appCurrentUser || !appUserData) {
                 contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Not Logged In</h1><p class="text-center text-gray-400">Please log in to view settings.</p>`;
@@ -699,19 +721,106 @@
                 }
             });
         }
-
-        function renderDMsPage() {
-            contentArea.innerHTML = `
-                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto">
-                    <h2 class="text-3xl font-bold text-red-500 mb-6">Direct Messages</h2>
-                    <div id="messages-list" class="space-y-4">
-                        <p class="text-gray-400 text-center">This feature is coming soon!</p>
+        
+        function renderCreatePostModal() {
+            const modalHtml = `
+                <div id="create-post-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-lg w-full border-2 border-[var(--accent-color)]">
+                        <h3 class="text-2xl font-bold text-[var(--accent-color)] mb-4">Create New Post</h3>
+                        <form id="create-post-form" class="space-y-4">
+                            <input type="text" id="post-title" placeholder="Post Title" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required>
+                            <textarea id="post-content" placeholder="What's on your mind?" rows="5" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required></textarea>
+                            <div class="flex justify-end space-x-2">
+                                <button type="button" id="cancel-post-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Cancel</button>
+                                <button type="submit" class="bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg hover:bg-opacity-80 transition">Post</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             `;
+            document.getElementById('modal-container').innerHTML = modalHtml;
+            document.getElementById('cancel-post-btn').addEventListener('click', () => document.getElementById('create-post-modal').remove());
+
+            document.getElementById('create-post-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                showLoadingSpinner();
+                const title = document.getElementById('post-title').value;
+                const content = document.getElementById('post-content').value;
+                const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
+
+                try {
+                    await addDoc(postsCollection, {
+                        title,
+                        content,
+                        authorId: appCurrentUser.uid,
+                        authorName: appUserData.username,
+                        createdAt: serverTimestamp(),
+                        reactions: {}
+                    });
+                    document.getElementById('create-post-modal').remove();
+                    showMessageModal('Post created successfully!', 'success');
+                } catch (error) {
+                    showMessageModal('Error creating post: ' + error.message, 'error');
+                } finally {
+                    hideLoadingSpinner();
+                }
+            });
+        }
+        
+        function renderReactionModal(postId) {
+            const emojis = ['👍', '❤️', '😂', '🔥', '🤔', '🎉'];
+            const emojiHtml = emojis.map(emoji => `<button class="reaction-emoji text-3xl p-2 hover:bg-gray-700 rounded-lg transition" data-emoji="${emoji}">${emoji}</button>`).join('');
+
+            const modalHtml = `
+                <div id="reaction-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full border-2 border-[var(--accent-color)]">
+                        <h3 class="text-2xl font-bold text-[var(--accent-color)] mb-4">React to Post</h3>
+                        <div class="flex justify-around items-center space-x-2">
+                            ${emojiHtml}
+                        </div>
+                        <div class="flex justify-end mt-4">
+                            <button id="cancel-reaction-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-container').innerHTML = modalHtml;
+            document.getElementById('cancel-reaction-btn').addEventListener('click', () => document.getElementById('reaction-modal').remove());
+
+            document.querySelectorAll('.reaction-emoji').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const emoji = e.target.dataset.emoji;
+                    const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
+                    
+                    try {
+                        const postDoc = await getDoc(postDocRef);
+                        const currentReactions = postDoc.data().reactions || {};
+                        const reactionKey = emoji.codePointAt(0).toString(16);
+                        
+                        const newReactions = { ...currentReactions };
+                        if (newReactions[reactionKey]) {
+                            newReactions[reactionKey].count += 1;
+                        } else {
+                            newReactions[reactionKey] = {
+                                emoji: emoji,
+                                count: 1
+                            };
+                        }
+                        
+                        await updateDocFirestore(postDocRef, { reactions: newReactions });
+                        document.getElementById('reaction-modal').remove();
+                    } catch (error) {
+                        showMessageModal('Failed to add reaction: ' + error.message, 'error');
+                    }
+                });
+            });
         }
 
         function renderForumsPage() {
+            if (!appCurrentUser) {
+                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be logged in to view the forums.</p></div>`;
+                return;
+            }
             contentArea.innerHTML = `
                 <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto">
                     <div class="flex justify-between items-center mb-6">
@@ -721,19 +830,201 @@
                         </button>
                     </div>
                     <div id="posts-list" class="space-y-4">
-                        <p class="text-gray-400 text-center">No posts yet. Be the first to create one!</p>
+                        <p class="text-gray-400 text-center">Loading posts...</p>
                     </div>
                 </div>
             `;
-
             document.getElementById('create-post-btn').addEventListener('click', () => {
                 if (appCurrentUser) {
-                    showMessageModal('Create Post modal would appear here.', 'info');
+                    renderCreatePostModal();
                 } else {
                     showMessageModal('You must be signed in to create a post.', 'error');
                 }
             });
+
+            const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
+            const q = query(postsCollection, orderBy('createdAt', 'desc'));
+            onSnapshot(q, (snapshot) => {
+                const postsList = document.getElementById('posts-list');
+                if (!postsList) return;
+                
+                if (snapshot.empty) {
+                    postsList.innerHTML = '<p class="text-gray-400 text-center">No posts yet. Be the first to create one!</p>';
+                    return;
+                }
+
+                postsList.innerHTML = snapshot.docs.map(postDoc => {
+                    const post = postDoc.data();
+                    const postId = postDoc.id;
+                    
+                    const reactionsHtml = post.reactions ? Object.values(post.reactions).map(reaction => `
+                        <span class="bg-gray-700 px-2 py-1 rounded-full text-sm">${reaction.emoji} ${reaction.count}</span>
+                    `).join('') : '';
+
+                    return `
+                        <div class="bg-gray-700 p-6 rounded-lg shadow-md border border-gray-600">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-xl font-bold text-[var(--accent-color)]">${post.title}</h3>
+                                <span class="text-sm text-gray-400">by ${post.authorName}</span>
+                            </div>
+                            <p class="text-gray-300 mb-4">${post.content}</p>
+                            <div class="flex items-center space-x-4">
+                                <div class="flex space-x-2">
+                                    ${reactionsHtml}
+                                </div>
+                                <button class="add-reaction-btn bg-gray-600 text-white p-2 rounded-full hover:bg-gray-500 transition" data-post-id="${postId}">
+                                    <i class="far fa-smile"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                document.querySelectorAll('.add-reaction-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const postId = e.currentTarget.dataset.postId;
+                        renderReactionModal(postId);
+                    });
+                });
+            });
         }
+        
+        function getChatId(user1Id, user2Id) {
+            return [user1Id, user2Id].sort().join('-');
+        }
+
+        function renderMessagesPage() {
+            if (!appCurrentUser) {
+                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be logged in to view messages.</p></div>`;
+                return;
+            }
+
+            contentArea.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto flex flex-col md:flex-row h-[70vh]">
+                    <!-- User List Panel -->
+                    <div id="user-list-panel" class="w-full md:w-1/3 flex-shrink-0 border-b md:border-r border-gray-700 overflow-y-auto">
+                        <h3 class="text-xl font-bold text-[var(--accent-color)] mb-4">Users</h3>
+                        <div id="messages-user-list">
+                            <p class="text-gray-400 text-center">Loading users...</p>
+                        </div>
+                    </div>
+                    <!-- Chat Panel -->
+                    <div id="chat-panel" class="flex-grow w-full md:w-2/3 flex flex-col p-4 relative">
+                        <div class="flex items-center justify-center h-full text-gray-400">
+                            Select a user to start a conversation.
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
+            onSnapshot(usersCollection, (snapshot) => {
+                const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const userListContainer = document.getElementById('messages-user-list');
+                if (!userListContainer) return;
+
+                userListContainer.innerHTML = userList.filter(user => user.id !== appCurrentUser.uid).map(user => `
+                    <div class="user-item p-4 border-b border-gray-700 hover:bg-gray-700 cursor-pointer transition" data-user-id="${user.id}" data-username="${user.username}">
+                        <span class="font-semibold text-gray-200">${user.username}</span>
+                        <span class="block text-sm text-gray-400">${user.email}</span>
+                    </div>
+                `).join('');
+
+                document.querySelectorAll('.user-item').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        const userId = e.currentTarget.dataset.userId;
+                        const username = e.currentTarget.dataset.username;
+                        renderChatPanel(userId, username);
+                    });
+                });
+            });
+        }
+        
+        function renderChatPanel(userId, username) {
+            const chatPanel = document.getElementById('chat-panel');
+            if (!chatPanel) return;
+            
+            // Clear previous listener if one exists
+            if (dmUnsubscribe) {
+                dmUnsubscribe();
+            }
+
+            activeDMUserId = userId;
+
+            chatPanel.innerHTML = `
+                <div class="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800 sticky top-0 z-10">
+                    <h4 class="text-xl font-bold text-[var(--accent-color)]">Chatting with ${username}</h4>
+                    <button id="call-user-btn" class="bg-green-500 text-white p-2 rounded-lg hover:bg-green-600 transition">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                </div>
+                <div id="messages-container" class="flex-grow overflow-y-auto p-4 space-y-4">
+                    <!-- Messages will be rendered here -->
+                    <p class="text-center text-gray-400">Say hello!</p>
+                </div>
+                <form id="dm-form" class="p-4 border-t border-gray-700 bg-gray-800 sticky bottom-0 z-10">
+                    <div class="flex space-x-2">
+                        <input type="text" id="dm-input" placeholder="Type a message..." class="flex-grow p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required>
+                        <button type="submit" class="bg-[var(--accent-color)] text-white px-4 py-3 rounded-lg hover:bg-opacity-80 transition">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </form>
+            `;
+            
+            document.getElementById('dm-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const messageInput = document.getElementById('dm-input');
+                const messageText = messageInput.value.trim();
+
+                if (messageText) {
+                    const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
+                    const messagesCollection = collection(db, `/artifacts/${appId}/private/data/chats/${chatId}/messages`);
+
+                    try {
+                        await addDoc(messagesCollection, {
+                            senderId: appCurrentUser.uid,
+                            text: messageText,
+                            createdAt: serverTimestamp()
+                        });
+                        messageInput.value = '';
+                    } catch (error) {
+                        showMessageModal('Failed to send message: ' + error.message, 'error');
+                    }
+                }
+            });
+
+            document.getElementById('call-user-btn').addEventListener('click', () => {
+                showMessageModal(
+                    `Starting a call with ${username}... This would connect via a real-time communication service like WebRTC.`,
+                    'info'
+                );
+            });
+            
+            const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
+            const messagesCollection = collection(db, `/artifacts/${appId}/private/data/chats/${chatId}/messages`);
+            const q = query(messagesCollection, orderBy('createdAt', 'asc'));
+
+            dmUnsubscribe = onSnapshot(q, (snapshot) => {
+                const messagesContainer = document.getElementById('messages-container');
+                if (!messagesContainer) return;
+                
+                messagesContainer.innerHTML = snapshot.docs.map(msgDoc => {
+                    const message = msgDoc.data();
+                    const isSender = message.senderId === appCurrentUser.uid;
+                    const messageClass = isSender ? 'self-end bg-[var(--accent-color)] text-white' : 'self-start bg-gray-700 text-gray-200';
+                    return `
+                        <div class="flex ${isSender ? 'justify-end' : 'justify-start'}">
+                            <div class="p-3 rounded-lg max-w-xs ${messageClass}">
+                                ${message.text}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            });
+        }
+
 
         // =================================================================
         // 6. MAIN APP LOGIC
@@ -745,10 +1036,16 @@
                 return;
             }
             
+            // Clean up old listeners
+            if (dmUnsubscribe) {
+                dmUnsubscribe();
+                dmUnsubscribe = null;
+            }
+            activeDMUserId = null;
+            
             contentArea.innerHTML = '';
             localStorage.setItem('currentPage', page);
             
-            // Check if user is banned and prevent access to all pages except auth.
             if (appUserData && appUserData.isBanned && page !== 'auth') {
                 showMessageModal('Your account has been banned.', 'error');
                 localStorage.removeItem('currentPage');
@@ -767,7 +1064,7 @@
                     renderAuthPage();
                     break;
                 case 'messages':
-                    renderDMsPage();
+                    renderMessagesPage();
                     break;
                 case 'settings':
                     renderSettingsPage();
@@ -781,7 +1078,6 @@
             }
         }
 
-        // --- Firebase Authentication Listener ---
         onAuthStateChanged(auth, async (user) => {
             appCurrentUser = user;
             authReady = true;
@@ -819,7 +1115,6 @@
             }
         });
 
-        // --- App Initialization ---
         document.addEventListener('DOMContentLoaded', async () => {
             initializeNavigation();
             const mobileAuthButton = document.getElementById('mobile-auth-btn');
@@ -840,8 +1135,6 @@
                      console.error("Error signing in with custom token:", error);
                      navigateTo('auth');
                 }
-            } else {
-                 // The onAuthStateChanged listener handles navigation, so we don't need a default here.
             }
         });
     </script>
