@@ -152,7 +152,7 @@
         // 1. FIREBASE IMPORTS
         // =================================================================
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
@@ -162,12 +162,42 @@
         const CONFIG = {
             websiteTitle: "SophosWRLD",
         };
+
+        // --- PLACEHOLDER FOR YOUR FIREBASE CONFIGURATION ---
+        // You can paste your project's firebaseConfig object here.
+        // It will be used if the environment's config is not available.
+        const FIREBASE_CONFIG_PLACEHOLDER = {
+            apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
+            authDomain: "sophoswrld.firebaseapp.com",
+            databaseURL: "https://sophoswrld-default-rtdb.firebaseio.com",
+            projectId: "sophoswrld",
+            storageBucket: "sophoswrld.firebasestorage.app",
+            messagingSenderId: "26686142400",
+            appId: "1:26686142400:web:48f8d3ae0b097731317a25",
+            measurementId: "G-6XETC98C22"
+        };
+        
+        // --- DO NOT EDIT BELOW THIS LINE ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { /* Your placeholder config here */ };
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : FIREBASE_CONFIG_PLACEHOLDER;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         // --- Initialize Firebase ---
-        const app = initializeApp(firebaseConfig);
+        let app;
+        try {
+            app = initializeApp(firebaseConfig);
+        } catch (error) {
+            console.error("Firebase initialization failed:", error);
+            // Show a user-friendly error message if config is invalid
+            document.getElementById('content-area').innerHTML = `
+                <div class="text-center p-8">
+                    <h1 class="text-3xl font-bold text-red-500">Configuration Error</h1>
+                    <p class="mt-4 text-gray-400">Please provide a valid Firebase configuration in the code.</p>
+                </div>
+            `;
+            throw error;
+        }
+
         const auth = getAuth(app);
         const db = getFirestore(app);
 
@@ -327,7 +357,7 @@
             const authContainer = document.getElementById('admin-panel-button-container');
             authContainer.innerHTML = ''; 
             
-            if (currentUser && !currentUser.isAnonymous) {
+            if (currentUser) {
                 const logoutButton = document.createElement('button');
                 logoutButton.id = 'logout-btn';
                 logoutButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
@@ -579,7 +609,7 @@
             `;
 
             document.getElementById('create-post-btn').addEventListener('click', () => {
-                if (appCurrentUser && !appCurrentUser.isAnonymous) {
+                if (appCurrentUser) {
                     showMessageModal('Create Post modal would appear here.', 'info');
                 } else {
                     showMessageModal('You must be signed in to create a post.', 'error');
@@ -644,10 +674,7 @@
                         theme: 'dark',
                         accentColor: '#ef4444'
                     };
-                    // Only create the doc if it's not an anonymous user
-                    if (!user.isAnonymous) {
-                         await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), appUserData);
-                    }
+                    await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), appUserData);
                 }
                 
                 if (appUserData.accentColor) {
@@ -678,19 +705,15 @@
                 });
             }
             
-            // Handle initial anonymous sign-in if no user is present
-            if (!auth.currentUser && !initialAuthToken) {
-                try {
-                    await signInAnonymously(auth);
-                } catch (error) {
-                    console.error("Error signing in anonymously:", error);
-                }
-            } else if (!auth.currentUser && initialAuthToken) {
+            if (initialAuthToken) {
                 try {
                      await signInWithCustomToken(auth, initialAuthToken);
                 } catch (error) {
                      console.error("Error signing in with custom token:", error);
+                     navigateTo('auth');
                 }
+            } else {
+                navigateTo('auth');
             }
         });
     </script>
