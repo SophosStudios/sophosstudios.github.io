@@ -1,9 +1,8 @@
 // src/navigation.js
-// This script handles all sidebar navigation rendering and toggle logic.
+// Handles sidebar navigation rendering and toggle logic.
 
-// Import necessary Firebase functions and utilities
-import { getAuth, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-import { showMessageModal } from './utils.js';
+import { getAuth, signOut } from 'https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js';
+import { showMessageModal, getRoleVFX } from './utils.js';
 
 // Global state and functions passed from App.js
 let _currentUser = null;
@@ -11,159 +10,131 @@ let _userData = null;
 let _navigateTo = null;
 let _CONFIG = null;
 
-// DOM Elements
-const leftSidebar = document.getElementById('left-sidebar');
-const mainContentWrapper = document.getElementById('main-content-wrapper');
-const overlayBackdrop = document.getElementById('overlay-backdrop');
-const sidebarToggle = document.getElementById('sidebar-toggle');
-const websiteTitleSidebar = document.getElementById('website-title-sidebar');
-const leftSidebarNav = document.getElementById('left-sidebar-nav');
-const mobileAuthButton = document.getElementById('mobile-auth-btn');
-const mobileMenuCloseButton = document.getElementById('mobile-menu-close');
-
-let isSidebarExpanded = window.innerWidth >= 768;
+// DOM Elements for navigation
+const navLinksContainer = document.getElementById('nav-links');
+const mobileDynamicLinksContainer = document.getElementById('mobile-dynamic-links');
+const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+const sideDrawerMenu = document.getElementById('side-drawer-menu');
+const closeDrawerBtn = document.getElementById('close-drawer-btn');
+const websiteTitle = document.querySelector('title');
 
 /**
- * Toggles the visibility of the sidebar menu and overlay.
- */
-function toggleSidebar() {
-    isSidebarExpanded = !isSidebarExpanded;
-    if (isSidebarExpanded) {
-        leftSidebar.classList.remove('-translate-x-full');
-        leftSidebar.classList.add('translate-x-0');
-        mainContentWrapper.classList.remove('md:ml-20');
-        mainContentWrapper.classList.add('md:ml-64');
-        overlayBackdrop.classList.add('hidden');
-    } else {
-        leftSidebar.classList.remove('translate-x-0');
-        leftSidebar.classList.add('-translate-x-full');
-        mainContentWrapper.classList.remove('md:ml-64');
-        mainContentWrapper.classList.add('md:ml-20');
-        overlayBackdrop.classList.remove('hidden');
-    }
-}
-
-/**
- * Renders the sidebar navigation links based on user authentication status and role.
- * @param {object} currentUser - The current authenticated Firebase user object.
- * @param {object} userData - The user's data from Firestore.
+ * Initializes the navigation module with necessary global state and functions.
+ * This should be called once from App.js.
+ * @param {object} currentUser - The current Firebase Auth user object.
+ * @param {object} userData - The current Firestore user data.
  * @param {function} navigateTo - The navigation function from App.js.
- * @param {function} signOut - The Firebase signOut function.
- * @param {object} auth - The Firebase Auth instance.
+ * @param {object} CONFIG - The application's configuration object.
  */
-export function renderSidebarNav(currentUser, userData, navigateTo, signOut, auth) {
-    if (!leftSidebarNav) return;
+export function initializeNavigation(currentUser, userData, navigateTo, CONFIG) {
+    _currentUser = currentUser;
+    _userData = userData;
+    _navigateTo = navigateTo;
+    _CONFIG = CONFIG;
+    renderNavbar();
+    setupEventListeners();
+}
 
-    leftSidebarNav.innerHTML = ``; // Clear existing links
-    const navLinks = [
-        { id: 'nav-home', text: 'Home', icon: 'fas fa-home', page: 'home', requiresAuth: false },
-        { id: 'nav-forum', text: 'Forum', icon: 'fas fa-comments', page: 'forum', requiresAuth: true },
-        { id: 'nav-messages', text: 'Messages', icon: 'fas fa-envelope', page: 'messages', requiresAuth: true },
-        { id: 'nav-settings', text: 'Settings', icon: 'fas fa-cogs', page: 'settings', requiresAuth: true },
-        { id: 'nav-admin', text: 'Admin', icon: 'fas fa-user-shield', page: 'admin', requiresAuth: true, requiresAdmin: true },
-    ];
+/**
+ * Renders the dynamic part of the navigation bar based on user authentication and role.
+ */
+function renderNavbar() {
+    // Clear existing dynamic links
+    navLinksContainer.innerHTML = '';
+    mobileDynamicLinksContainer.innerHTML = '';
 
-    navLinks.forEach(link => {
-        if (!link.requiresAuth || currentUser) {
-            if (!link.requiresAdmin || (userData && userData.role === 'admin')) {
-                const navItem = document.createElement('div');
-                navItem.className = 'w-full mb-2';
-                navItem.innerHTML = `
-                    <button id="${link.id}" class="flex items-center w-full px-4 py-2 rounded-lg text-white font-semibold hover:bg-gray-700 transition duration-200">
-                        <i class="${link.icon} text-lg mr-4"></i>
-                        <span class="sidebar-nav-text text-lg">${link.text}</span>
-                    </button>
-                `;
-                leftSidebarNav.appendChild(navItem);
-                navItem.querySelector('button').addEventListener('click', () => {
-                    navigateTo(link.page);
-                    if (window.innerWidth < 768) {
-                        toggleSidebar();
-                    }
-                });
-            }
-        }
-    });
+    // Set website title
+    websiteTitle.textContent = _CONFIG.websiteTitle;
 
-    // Add Auth/Logout button dynamically
-    const authButtonContainer = document.createElement('div');
-    authButtonContainer.className = 'w-full mt-auto'; // Push to the bottom of the sidebar
-    if (currentUser) {
-        const logoutButton = document.createElement('button');
-        logoutButton.id = 'nav-logout';
-        logoutButton.className = 'w-full flex items-center px-4 py-2 rounded-lg text-white font-semibold bg-red-600 hover:bg-red-700 transition duration-200';
-        logoutButton.innerHTML = `<i class="fas fa-sign-out-alt text-lg mr-4"></i><span class="sidebar-nav-text text-lg">Logout</span>`;
-        logoutButton.addEventListener('click', async () => {
-            try {
-                await signOut(auth);
-                showMessageModal('You have been signed out successfully.');
-                navigateTo('home');
-            } catch (error) {
-                showMessageModal(error.message, 'error');
-            }
-        });
-        authButtonContainer.appendChild(logoutButton);
-    } else {
-        const loginButton = document.createElement('button');
-        loginButton.id = 'nav-login';
-        loginButton.className = 'w-full flex items-center px-4 py-2 rounded-lg text-white font-semibold bg-blue-600 hover:bg-blue-700 transition duration-200';
-        loginButton.innerHTML = `<i class="fas fa-sign-in-alt text-lg mr-4"></i><span class="sidebar-nav-text text-lg">Login</span>`;
-        loginButton.addEventListener('click', () => navigateTo('auth'));
-        authButtonContainer.appendChild(loginButton);
+    // Add common links for all authenticated users
+    if (_currentUser) {
+        addNavLink('Forum', 'forum');
+        addNavLink('Profile', 'profile');
     }
-    leftSidebarNav.appendChild(authButtonContainer);
 
-    // Initial state based on screen size
-    if (window.innerWidth >= 768) {
-        leftSidebar.classList.remove('-translate-x-full');
-        mainContentWrapper.classList.remove('ml-20');
-        mainContentWrapper.classList.add('ml-64');
+    // Add admin-specific links
+    if (_userData && (_userData.role === 'admin' || _userData.role === 'founder')) {
+        addNavLink('Admin', 'admin');
+    }
+    
+    // Add partner application link for members
+    if (_userData && _userData.role === 'member') {
+        addNavLink('Partner', 'partner-application');
+    }
+
+    // Add auth-related buttons
+    if (_currentUser) {
+        const displayName = _userData?.displayName || _currentUser.email.split('@')[0];
+        addNavLink('Logout', 'logout', true, 'logout');
+    } else {
+        addNavLink('Login', 'auth');
     }
 }
 
 /**
- * Initializes all navigation event listeners.
- * @param {HTMLElement} mobileSidebarToggle - The mobile toggle button element.
- * @param {HTMLElement} overlayBackdrop - The overlay backdrop element.
+ * A helper function to create and append a navigation link.
+ * @param {string} text - The display text of the link.
+ * @param {string} pageName - The page to navigate to.
+ * @param {boolean} isMobileOnly - Whether to render only in the mobile drawer.
+ * @param {string} [actionType] - The type of action ('logout' etc.).
  */
-export function initializeNavigation(mobileSidebarToggle, overlayBackdrop) {
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', toggleSidebar);
-    }
-    if (mobileSidebarToggle) {
-        mobileSidebarToggle.addEventListener('click', () => {
-            leftSidebar.classList.remove('-translate-x-full');
-            leftSidebar.classList.add('translate-x-0');
-            overlayBackdrop.classList.remove('hidden');
-        });
-    }
-    if (mobileMenuCloseButton) {
-        mobileMenuCloseButton.addEventListener('click', () => {
-            leftSidebar.classList.remove('translate-x-0');
-            leftSidebar.classList.add('-translate-x-full');
-            overlayBackdrop.classList.add('hidden');
-        });
-    }
-    if (overlayBackdrop) {
-        overlayBackdrop.addEventListener('click', toggleSidebar);
-    }
-
-    // Handle window resize for responsive behavior
-    window.addEventListener('resize', () => {
-        if (window.innerWidth >= 768) {
-            if (!isSidebarExpanded) {
-                leftSidebar.classList.remove('-translate-x-full');
-                leftSidebar.classList.add('translate-x-0');
-            }
-            mainContentWrapper.classList.remove('ml-20', 'ml-64');
-            mainContentWrapper.classList.add(isSidebarExpanded ? 'ml-64' : 'ml-20');
-            overlayBackdrop.classList.add('hidden');
+function addNavLink(text, pageName, isLogout = false) {
+    // Desktop button
+    const desktopButton = document.createElement('button');
+    desktopButton.textContent = text;
+    desktopButton.className = 'px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200';
+    desktopButton.addEventListener('click', () => {
+        if (isLogout) {
+            handleLogout();
         } else {
-            if (isSidebarExpanded) {
-                leftSidebar.classList.remove('translate-x-0');
-                leftSidebar.classList.add('-translate-x-full');
-                overlayBackdrop.classList.add('hidden');
-            }
+            _navigateTo(pageName);
         }
     });
+    navLinksContainer.appendChild(desktopButton);
+
+    // Mobile button
+    const mobileButton = document.createElement('button');
+    mobileButton.textContent = text;
+    mobileButton.className = 'block w-full text-left px-4 py-3 hover:bg-gray-700 text-white transition duration-200 text-lg font-semibold';
+    mobileButton.addEventListener('click', () => {
+        if (isLogout) {
+            handleLogout();
+        } else {
+            _navigateTo(pageName);
+            sideDrawerMenu.classList.remove('open');
+        }
+    });
+    mobileDynamicLinksContainer.appendChild(mobileButton);
+}
+
+/**
+ * Sets up global event listeners for navigation.
+ */
+function setupEventListeners() {
+    mobileMenuBtn.addEventListener('click', () => {
+        sideDrawerMenu.classList.add('open');
+    });
+
+    closeDrawerBtn.addEventListener('click', () => {
+        sideDrawerMenu.classList.remove('open');
+    });
+
+    // Add event listeners for static buttons
+    document.getElementById('nav-home').addEventListener('click', () => _navigateTo('home'));
+    document.getElementById('nav-about').addEventListener('click', () => _navigateTo('about'));
+    document.getElementById('mobile-drawer-home').addEventListener('click', () => { _navigateTo('home'); sideDrawerMenu.classList.remove('open'); });
+    document.getElementById('mobile-drawer-about').addEventListener('click', () => { _navigateTo('about'); sideDrawerMenu.classList.remove('open'); });
+}
+
+/**
+ * Handles the logout process.
+ */
+async function handleLogout() {
+    const auth = getAuth();
+    try {
+        await signOut(auth);
+        showMessageModal('You have been signed out successfully.', 'success');
+    } catch (error) {
+        showMessageModal(error.message, 'error');
+    }
 }

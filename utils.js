@@ -16,7 +16,7 @@ export function showLoadingSpinner() {
         spinner = document.createElement('div');
         spinner.id = 'loading-spinner';
         spinner.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50';
-        spinner.innerHTML = `<div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-white"></div>`;
+        spinner.innerHTML = `<div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-500"></div>`;
         document.body.appendChild(spinner);
     }
     spinner.classList.remove('hidden');
@@ -35,83 +35,73 @@ export function hideLoadingSpinner() {
 /**
  * Displays a message modal.
  * @param {string} message - The message to display.
- * @param {string} type - 'info', 'error', or 'confirm'.
- * @param {function} onConfirm - Callback for 'confirm' type (only for 'confirm' type).
+ * @param {string} type - 'info', 'error', 'confirm', 'success'.
+ * @param {function} onConfirm - Callback for 'confirm' type.
  */
 export function showMessageModal(message, type = 'info', onConfirm = null) {
+    // Hide any existing modal first
     if (currentModal) {
         currentModal.remove();
+        currentModal = null;
     }
 
-    const modal = document.createElement('div');
-    modal.id = 'message-modal';
-    modal.className = 'fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4';
-    
-    let modalContent = `
-        <div class="bg-gray-800 text-white p-6 rounded-lg shadow-xl max-w-sm w-full border-t-4 border-red-500 text-center animate-fade-in">
-            <p class="text-lg font-semibold mb-4">${message}</p>
-            <button id="modal-close-btn" class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-red-500">
-                OK
-            </button>
+    const modalContainer = document.getElementById('message-modal-container');
+    const modalDiv = document.createElement('div');
+    modalDiv.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]';
+    modalDiv.innerHTML = `
+        <div class="bg-gray-800 text-white p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 border-t-4 border-${type === 'error' ? 'red' : type === 'confirm' ? 'yellow' : 'blue'}-500 transform scale-95 transition-transform duration-200">
+            <p class="text-center font-semibold text-lg mb-4">${message}</p>
+            <div class="flex justify-end space-x-4">
+                ${type === 'confirm' ? `<button id="cancel-btn" class="px-4 py-2 bg-gray-600 rounded-lg text-white font-bold hover:bg-gray-500">Cancel</button>` : ''}
+                <button id="ok-btn" class="px-4 py-2 bg-red-600 rounded-lg text-white font-bold hover:bg-red-700">
+                    ${type === 'confirm' ? 'Confirm' : 'OK'}
+                </button>
+            </div>
         </div>
     `;
+    
+    modalContainer.appendChild(modalDiv);
+    currentModal = modalDiv;
 
-    if (type === 'confirm' && onConfirm) {
-        modalContent = `
-            <div class="bg-gray-800 text-white p-6 rounded-lg shadow-xl max-w-sm w-full border-t-4 border-red-500 text-center animate-fade-in">
-                <p class="text-lg font-semibold mb-4">${message}</p>
-                <div class="flex justify-center space-x-4">
-                    <button id="modal-confirm-btn" class="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-green-500">
-                        Confirm
-                    </button>
-                    <button id="modal-cancel-btn" class="bg-gray-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500">
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-
-    modal.innerHTML = modalContent;
-    document.body.appendChild(modal);
-    currentModal = modal;
-
-    if (type === 'confirm' && onConfirm) {
-        document.getElementById('modal-confirm-btn').addEventListener('click', () => {
+    const okButton = modalDiv.querySelector('#ok-btn');
+    okButton.addEventListener('click', () => {
+        if (type === 'confirm' && onConfirm) {
             onConfirm();
-            modal.remove();
+        }
+        currentModal.remove();
+        currentModal = null;
+    });
+
+    if (type === 'confirm') {
+        const cancelButton = modalDiv.querySelector('#cancel-btn');
+        cancelButton.addEventListener('click', () => {
+            currentModal.remove();
             currentModal = null;
         });
-        document.getElementById('modal-cancel-btn').addEventListener('click', () => {
-            modal.remove();
-            currentModal = null;
-        });
+    }
+}
+
+/**
+ * Updates the body's background image with a specific image URL.
+ * @param {string} imageUrl - The URL of the image to set.
+ */
+export function updateBodyBackground(imageUrl) {
+    document.body.style.backgroundImage = `url('${imageUrl}')`;
+}
+
+/**
+ * Extracts a YouTube video ID from various YouTube URL formats.
+ * @param {string} url - The YouTube URL.
+ * @returns {string|null} The video ID, or null if not found.
+ */
+export function extractYouTubeVideoId(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+        return match[2];
     } else {
-        document.getElementById('modal-close-btn').addEventListener('click', () => {
-            modal.remove();
-            currentModal = null;
-        });
+        return null;
     }
-}
-
-/**
- * Toggles a CSS class for a given element.
- * @param {HTMLElement} element - The DOM element.
- * @param {string} className - The class name to toggle.
- */
-export function toggleClass(element, className) {
-    if (element) {
-        element.classList.toggle(className);
-    }
-}
-
-/**
- * Updates the theme of the body based on a provided accent color.
- * @param {string} accentColor - A hex color code.
- */
-export function updateTheme(accentColor) {
-    document.documentElement.style.setProperty('--primary-color', accentColor);
-    document.documentElement.style.setProperty('--primary-color-hover', accentColor);
 }
 
 /**
@@ -125,30 +115,30 @@ export function getRoleVFX(role) {
 
     switch (role) {
         case 'member':
-            emoji = '👤'; // User emoji
-            colorClass = 'text-blue-600'; // Member color
+            emoji = '👤';
+            colorClass = 'text-blue-600';
             break;
         case 'admin':
-            emoji = '🛡️'; // Shield emoji
-            colorClass = 'text-red-600'; // Admin color
+            emoji = '🛡️';
+            colorClass = 'text-red-600';
             break;
         case 'founder':
-            emoji = '✨'; // Sparkles emoji
-            colorClass = 'text-purple-600'; // Founder color
+            emoji = '✨';
+            colorClass = 'text-purple-600';
             break;
-        case 'co-founder': // New co-founder role
-            emoji = '🌟'; // Star emoji
-            colorClass = 'text-yellow-600'; // Co-founder color
+        case 'co-founder':
+            emoji = '🌟';
+            colorClass = 'text-yellow-600';
             break;
-        case 'partner': // New partner role
-            emoji = '🤝'; // Handshake emoji
-            colorClass = 'text-indigo-600'; // Partner color
+        case 'partner':
+            emoji = '🤝';
+            colorClass = 'text-indigo-600';
             break;
         default:
             emoji = '';
             colorClass = 'text-white';
     }
-    // Apply a subtle animation for all roles, or only privileged ones
-    const animationClass = (role === 'admin' || role === 'founder') ? 'animate-pulse' : '';
-    return `<span class="mr-1 ${animationClass}">${emoji}</span><span class="${colorClass} font-bold">${role.charAt(0).toUpperCase() + role.slice(1)}</span>`;
+    const animationClass = (role === 'admin' || role === 'founder' || role === 'co-founder') ? 'animate-pulse' : '';
+    return `<span class="mr-1">${emoji}</span><span class="${colorClass} font-bold ${animationClass}">${role.toUpperCase()}</span>`;
 }
+
