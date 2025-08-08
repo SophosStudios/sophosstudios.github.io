@@ -19,7 +19,6 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
   appId: "1:26686142400:web:48f8d3ae0b097731317a25",
   measurementId: "G-6XETC98C22"
 };
-};
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
 // Initialize Firebase
@@ -526,13 +525,29 @@ function renderNavbar() {
         </div>
     `;
     
-    const createButton = (container, text, page, iconClass) => {
+    // Create a new function for button creation with enhanced styling
+    const createButton = (container, text, page, iconClass, isDesktop) => {
         const btn = document.createElement('button');
-        btn.className = `w-full text-left px-4 py-3 rounded-lg hover:bg-gray-700 text-white transition duration-200 text-lg font-semibold flex items-center space-x-2`;
+        
+        // Define base and hover classes
+        const baseClasses = `
+            flex items-center space-x-3 px-4 py-3 rounded-xl 
+            font-semibold transition duration-300 transform 
+            hover:scale-105 active:scale-95
+            
+        `;
+        const desktopClasses = `
+            text-lg text-white hover:bg-gray-700
+        `;
+        const mobileClasses = `
+            w-full text-left text-lg text-white hover:bg-gray-700
+        `;
+
+        btn.className = `${baseClasses} ${isDesktop ? desktopClasses : mobileClasses}`;
         btn.innerHTML = `<i class="${iconClass} text-red-500"></i><span>${text}</span>`;
         btn.addEventListener('click', () => {
             navigateTo(page);
-            toggleSideDrawer();
+            if (!isDesktop) toggleSideDrawer();
         });
         container.appendChild(btn);
     };
@@ -542,23 +557,23 @@ function renderNavbar() {
 
     if (currentUser) {
         // Authenticated user links
-        createButton(desktopContainer, 'Home', 'home', 'fas fa-home');
-        createButton(desktopContainer, 'Messages', 'messages', 'fas fa-comments');
-        createButton(desktopContainer, 'Customize', 'settings', 'fas fa-cog');
+        createButton(desktopContainer, 'Home', 'home', 'fas fa-home', true);
+        createButton(desktopContainer, 'Messages', 'messages', 'fas fa-comments', true);
+        createButton(desktopContainer, 'Customize', 'settings', 'fas fa-cog', true);
 
-        createButton(mobileContainer, 'Home', 'home', 'fas fa-home');
-        createButton(mobileContainer, 'Messages', 'messages', 'fas fa-comments');
-        createButton(mobileContainer, 'Customize', 'settings', 'fas fa-cog');
+        createButton(mobileContainer, 'Home', 'home', 'fas fa-home', false);
+        createButton(mobileContainer, 'Messages', 'messages', 'fas fa-comments', false);
+        createButton(mobileContainer, 'Customize', 'settings', 'fas fa-cog', false);
 
         // Admin link (only for admins)
         if (userData?.role === 'admin') {
-            createButton(desktopContainer, 'Admin', 'admin', 'fas fa-user-shield');
-            createButton(mobileContainer, 'Admin', 'admin', 'fas fa-user-shield');
+            createButton(desktopContainer, 'Admin', 'admin', 'fas fa-user-shield', true);
+            createButton(mobileContainer, 'Admin', 'admin', 'fas fa-user-shield', false);
         }
         
         // Sign Out button
         const signOutBtn = document.createElement('button');
-        signOutBtn.className = 'bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors duration-300 ml-4';
+        signOutBtn.className = 'bg-red-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-red-700 transition-colors duration-300 ml-4';
         signOutBtn.textContent = 'Sign Out';
         signOutBtn.addEventListener('click', async () => {
             await signOut(auth);
@@ -567,7 +582,7 @@ function renderNavbar() {
         desktopContainer.appendChild(signOutBtn);
 
         const signOutBtnMobile = document.createElement('button');
-        signOutBtnMobile.className = 'w-full text-left px-4 py-3 mt-4 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition duration-200';
+        signOutBtnMobile.className = 'w-full text-left px-4 py-3 mt-4 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition duration-200';
         signOutBtnMobile.textContent = 'Sign Out';
         signOutBtnMobile.addEventListener('click', async () => {
             await signOut(auth);
@@ -579,7 +594,7 @@ function renderNavbar() {
     } else {
         // Not authenticated links
         const signInBtn = document.createElement('button');
-        signInBtn.className = 'bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors duration-300';
+        signInBtn.className = 'bg-red-600 text-white font-semibold py-2 px-4 rounded-xl hover:bg-red-700 transition-colors duration-300';
         signInBtn.textContent = 'Sign In';
         signInBtn.addEventListener('click', () => {
             navigateTo('auth');
@@ -587,7 +602,7 @@ function renderNavbar() {
         desktopContainer.appendChild(signInBtn);
 
         const signInBtnMobile = document.createElement('button');
-        signInBtnMobile.className = 'w-full text-left px-4 py-3 mt-4 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition duration-200';
+        signInBtnMobile.className = 'w-full text-left px-4 py-3 mt-4 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition duration-200';
         signInBtnMobile.textContent = 'Sign In';
         signInBtnMobile.addEventListener('click', () => {
             navigateTo('auth');
