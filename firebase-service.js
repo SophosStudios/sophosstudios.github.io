@@ -1,8 +1,9 @@
 // src/firebase-service.js
 // Handles all Firebase Authentication and Firestore operations.
 
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField, addDoc, where } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, deleteField, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Import utilities for showing loading and messages
 import { showLoadingSpinner, hideLoadingSpinner, showMessageModal } from './utils.js';
@@ -12,7 +13,7 @@ let appInstance;
 let authInstance;
 let dbInstance;
 let APP_ID;
-let CONFIG;
+let CONFIG; // To access adminEmails and founderEmails
 
 /**
  * Initializes Firebase services for this module.
@@ -29,55 +30,213 @@ export function initializeFirebaseServices(firebaseConfig, appConfig) {
 }
 
 /**
- * Updates a user's role in Firestore.
- * @param {string} userId - The UID of the user to update.
- * @param {string} newRole - The new role ('member' or 'admin').
- * @param {object} currentAuthUser - The current authenticated Firebase user.
+ * Handles user authentication (sign-up, sign-in, etc.).
+ * @param {string} email - User's email.
+ * @param {string} password - User's password.
+ * @param {string} mode - 'signup' or 'signin'.
+ * @returns {Promise<object>} - The user credential object.
  */
-export async function updateUserRoleFirestore(userId, newRole, currentAuthUser) {
-    if (!currentAuthUser) {
-        showMessageModal('You must be logged in to perform this action.', 'error');
-        return;
+export async function authenticateUser(email, password, mode) {
+    if (!authInstance) {
+        throw new Error("Firebase Auth not initialized.");
     }
     showLoadingSpinner();
     try {
-        const userDocRef = doc(dbInstance, `/artifacts/${APP_ID}/public/data/users`, userId);
-        await updateDoc(userDocRef, { role: newRole });
-        showMessageModal(`User role updated to ${newRole} successfully!`);
+        let userCredential;
+        if (mode === 'signup') {
+            userCredential = await createUserWithEmailAndPassword(authInstance, email, password);
+        } else {
+            userCredential = await signInWithEmailAndPassword(authInstance, email, password);
+        }
+        return userCredential;
     } catch (error) {
-        console.error("Error updating user role:", error.message);
-        showMessageModal("Failed to update user role: " + error.message, 'error');
+        console.error("Authentication error:", error.message);
+        throw new Error("Authentication failed: " + error.message);
     } finally {
         hideLoadingSpinner();
     }
 }
 
-// --- Forum Functions ---
-
 /**
- * Creates a new forum post.
- * @param {string} title
- * @param {string} content
- * @param {object} currentUser - The current authenticated user.
+ * Sends a password reset email.
+ * @param {string} email - The user's email.
+ * @returns {Promise<void>}
  */
-export async function createForumPost(title, content, currentUser) {
-    if (!currentUser) {
-        showMessageModal('You must be logged in to create a post.', 'error');
-        return;
+export async function sendPasswordReset(email) {
+    if (!authInstance) {
+        throw new Error("Firebase Auth not initialized.");
     }
     showLoadingSpinner();
     try {
-        await addDoc(collection(dbInstance, `/artifacts/${APP_ID}/public/data/posts`), {
-            title,
-            content,
+        await sendPasswordResetEmail(authInstance, email);
+        showMessageModal('Password reset email sent!', 'info');
+    } catch (error) {
+        console.error("Error sending password reset email:", error.message);
+        throw new Error("Failed to send password reset email: " + error.message);
+    } finally {
+        hideLoadingSpinner();
+    }
+}
+
+/**
+ * Fetches the current user's data from Firestore.
+ * @param {string} userId - The UID of the current user.
+ * @returns {Promise<object|null>} - The user data object or null if not found.
+ */
+export async function fetchCurrentUserFirestoreData(userId) {
+    if (!dbInstance) {
+        throw new Error("Firebase Firestore not initialized.");
+    }
+    const userDocRef = doc(dbInstance, `/artifacts/${APP_ID}/public/data/users`, userId);
+    const docSnap = await getDoc(userDocRef);
+    if (docSnap.exists()) {
+        return { id: docSnap.id, ...docSnap.data() };
+    } else {
+        return null;
+    }
+}
+
+/**
+ * Updates a user's profile data in Firestore.
+ * @param {string} userId - The UID of the user.
+ * @param {object} updates - An object with the fields to update.
+ * @returns {Promise<void>}
+ */
+export async function updateProfileData(userId, updates) {
+    if (!dbInstance) {
+        throw new Error("Firebase Firestore not initialized.");
+    }
+    showLoadingSpinner();
+    try {
+        const userDocRef = doc(dbInstance, `/artifacts/${APP_ID}/public/data/users`, userId);
+        await updateDoc(userDocRef, updates);
+        showMessageModal('Profile updated successfully!');
+    } catch (error) {
+        console.error("Error updating profile:", error.message);
+        throw new Error("Failed to update profile: " + error.message);
+    } finally {
+        hideLoadingSpinner();
+    }
+}
+
+/**
+ * Fetches all users from Firestore.
+ * @returns {Promise<Array<object>>} - An array of user data objects.
+ */
+export async function fetchAllUsersFirestore() {
+    if (!dbInstance) {
+        throw new Error("Firebase Firestore not initialized.");
+    }
+    const usersCollection = collection(dbInstance, `/artifacts/${APP_ID}/public/data/users`);
+    const usersSnapshot = await getDocs(usersCollection);
+    return usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+/**
+ * Updates a user's role in Firestore.
+ * @param {string} userId - The UID of the user.
+ * @param {string} newRole - The new role.
+ * @returns {Promise<void>}
+ */
+export async function updateUserRoleFirestore(userId, newRole) {
+    if (!dbInstance) {
+        throw new Error("Firebase Firestore not initialized.");
+    }
+    showLoadingSpinner();
+    try {
+        const userDocRef = doc(dbInstance, `/artifacts/${APP_ID}/public/data/users`, userId);
+        await updateDoc(userDocRef, { role: newRole });
+        showMessageModal('User role updated successfully!');
+    } catch (error) {
+        console.error("Error updating user role:", error.message);
+        throw new Error("Failed to update user role: " + error.message);
+    } finally {
+        hideLoadingSpinner();
+    }
+}
+
+/**
+ * Creates a new forum post in Firestore.
+ * @param {string} title - The title of the post.
+ * @param {string} content - The content of the post.
+ * @param {object} currentUser - The current user object.
+ * @param {object} userData - The current user data object.
+ * @returns {Promise<void>}
+ */
+export async function createPostFirestore(title, content, currentUser, userData) {
+    if (!dbInstance || !currentUser) {
+        throw new Error("You must be logged in to create a post.");
+    }
+    showLoadingSpinner();
+    try {
+        const postsCollectionRef = collection(dbInstance, `/artifacts/${APP_ID}/public/data/posts`);
+        await addDoc(postsCollectionRef, {
+            title: title,
+            content: content,
             authorId: currentUser.uid,
-            authorName: currentUser.displayName || 'Anonymous',
-            createdAt: serverTimestamp(),
+            authorName: userData.username || 'Anonymous',
+            timestamp: serverTimestamp(),
+            reactions: {},
             comments: []
         });
         showMessageModal('Post created successfully!');
     } catch (error) {
-        showMessageModal('Failed to create post: ' + error.message, 'error');
+        console.error("Error creating post:", error.message);
+        throw new Error("Failed to create post: " + error.message);
+    } finally {
+        hideLoadingSpinner();
+    }
+}
+
+/**
+ * Adds a reaction to a forum post.
+ * @param {string} postId - The ID of the post.
+ * @param {string} userId - The ID of the user.
+ * @param {string} reaction - The reaction emoji (e.g., '👍', '❤️').
+ * @returns {Promise<void>}
+ */
+export async function addReactionToPost(postId, userId, reaction) {
+    if (!dbInstance || !userId) {
+        throw new Error("You must be logged in to react to a post.");
+    }
+    showLoadingSpinner();
+    try {
+        const postDocRef = doc(dbInstance, `/artifacts/${APP_ID}/public/data/posts`, postId);
+        const postSnapshot = await getDoc(postDocRef);
+
+        if (!postSnapshot.exists()) {
+            throw new Error("Post not found.");
+        }
+
+        const postData = postSnapshot.data();
+        const existingReactions = postData.reactions || {};
+
+        if (existingReactions[reaction] && existingReactions[reaction].includes(userId)) {
+            // User has already reacted with this emoji, so remove it
+            await updateDoc(postDocRef, {
+                [`reactions.${reaction}`]: arrayRemove(userId)
+            });
+            showMessageModal('Reaction removed.');
+        } else {
+            // Add the new reaction
+            // First, remove the user's previous reaction if any
+            for (const key in existingReactions) {
+                if (existingReactions[key].includes(userId)) {
+                    await updateDoc(postDocRef, {
+                        [`reactions.${key}`]: arrayRemove(userId)
+                    });
+                }
+            }
+            // Then add the new one
+            await updateDoc(postDocRef, {
+                [`reactions.${reaction}`]: arrayUnion(userId)
+            });
+            showMessageModal('Reaction added!');
+        }
+
+    } catch (error) {
+        console.error("Error adding reaction:", error.message);
+        throw new Error("Failed to add reaction: " + error.message);
     } finally {
         hideLoadingSpinner();
     }
@@ -85,114 +244,90 @@ export async function createForumPost(title, content, currentUser) {
 
 /**
  * Adds a comment to a forum post.
- * @param {string} postId
- * @param {string} commentText
- * @param {object} currentUser - The current authenticated user.
+ * @param {string} postId - The ID of the post.
+ * @param {object} commentData - The comment object.
+ * @returns {Promise<void>}
  */
-export async function addCommentToPost(postId, commentText, currentUser) {
-    if (!currentUser) {
-        showMessageModal('You must be logged in to comment.', 'error');
-        return;
+export async function addCommentToPost(postId, commentData) {
+    if (!dbInstance || !commentData.authorId) {
+        throw new Error("You must be logged in to comment.");
     }
     showLoadingSpinner();
     try {
         const postDocRef = doc(dbInstance, `/artifacts/${APP_ID}/public/data/posts`, postId);
         await updateDoc(postDocRef, {
             comments: arrayUnion({
-                text: commentText,
-                authorId: currentUser.uid,
-                authorName: currentUser.displayName || 'Anonymous',
-                createdAt: serverTimestamp()
+                ...commentData,
+                timestamp: serverTimestamp()
             })
         });
         showMessageModal('Comment added successfully!');
     } catch (error) {
-        showMessageModal('Failed to add comment: ' + error.message, 'error');
+        console.error("Error adding comment:", error.message);
+        throw new Error("Failed to add comment: " + error.message);
     } finally {
         hideLoadingSpinner();
     }
 }
 
 /**
- * Deletes a forum post.
- * @param {string} postId
- * @param {object} currentUser - The current authenticated user.
+ * Fetches all posts from Firestore.
+ * @returns {Promise<Array<object>>} - An array of post data objects.
  */
-export async function deleteForumPost(postId, currentUser) {
-    if (!currentUser) {
-        showMessageModal('You must be logged in to delete a post.', 'error');
-        return;
+export async function fetchAllPostsFirestore() {
+    if (!dbInstance) {
+        throw new Error("Firebase Firestore not initialized.");
     }
-    showLoadingSpinner();
-    try {
-        await deleteDoc(doc(dbInstance, `/artifacts/${APP_ID}/public/data/posts`, postId));
-        showMessageModal('Post deleted successfully!');
-    } catch (error) {
-        showMessageModal('Failed to delete post: ' + error.message, 'error');
-    } finally {
-        hideLoadingSpinner();
-    }
+    const postsCollectionRef = collection(dbInstance, `/artifacts/${APP_ID}/public/data/posts`);
+    const postsQuery = query(postsCollectionRef, orderBy('timestamp', 'desc'));
+    const postsSnapshot = await getDocs(postsQuery);
+    return postsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
-// --- Direct Messaging Functions ---
 
-/**
- * Sends a direct message.
- * @param {string} senderId
- * @param {string} receiverId
- * @param {string} text
- */
-export async function sendDirectMessage(senderId, receiverId, text) {
-    showLoadingSpinner();
-    try {
-        const messageCollectionRef = collection(dbInstance, `/artifacts/${APP_ID}/public/data/messages`);
-        await addDoc(messageCollectionRef, {
-            senderId,
-            receiverId,
-            text,
-            timestamp: serverTimestamp(),
-            seen: false
-        });
-        hideLoadingSpinner();
-    } catch (error) {
-        console.error("Error sending message:", error);
-        hideLoadingSpinner();
-    }
+// Placeholder functions for other parts of the app
+export async function updatePostFirestore(postId, updates) {
+    // Logic for updating a post
 }
-
-/**
- * Sets up a real-time listener for direct messages between two users.
- * @param {string} userId1
- * @param {string} userId2
- * @param {function} callback - Function to call with the new messages array.
- * @returns {function} - Unsubscribe function.
- */
-export function getDirectMessages(userId1, userId2, callback) {
-    const q = query(
-        collection(dbInstance, `/artifacts/${APP_ID}/public/data/messages`),
-        orderBy('timestamp', 'asc'),
-        where('senderId', 'in', [userId1, userId2]),
-        where('receiverId', 'in', [userId1, userId2])
-    );
-
-    return onSnapshot(q, (querySnapshot) => {
-        const messages = [];
-        querySnapshot.forEach((doc) => {
-            messages.push({ id: doc.id, ...doc.data() });
-        });
-        callback(messages);
-    });
+export async function deletePostFirestore(postId) {
+    // Logic for deleting a post
 }
-
-/**
- * Updates the 'seen' status of a message.
- * @param {string} messageId
- */
+export async function sendEmailToUserFirestore(userId, emailContent) {
+    // Logic for sending an email
+}
+export async function fetchPartnerTOSFirestore() {
+    // Logic for fetching TOS
+}
+export async function fetchPartnerApplicationQuestionsFirestore() {
+    // Logic for fetching application questions
+}
+export async function submitPartnerApplicationFirestore(applicationData) {
+    // Logic for submitting application
+}
+export async function fetchAllPartnerApplicationsFirestore() {
+    // Logic for fetching applications
+}
+export async function updatePartnerApplicationStatusFirestore(applicationId, newStatus) {
+    // Logic for updating application status
+}
+export async function fetchVideosFirestore() {
+    // Logic for fetching videos
+}
+export async function addVideoFirestore(videoData) {
+    // Logic for adding a video
+}
+export async function updateVideoFirestore(videoId, videoData) {
+    // Logic for updating a video
+}
+export async function deleteVideoFirestore(videoId) {
+    // Logic for deleting a video
+}
+export async function sendDirectMessage(recipientId, message) {
+    // Logic for sending direct messages
+}
+export async function getDirectMessages(senderId, recipientId) {
+    // Logic for getting direct messages
+}
 export async function updateDirectMessageSeenStatus(messageId) {
-    try {
-        const messageDocRef = doc(dbInstance, `/artifacts/${APP_ID}/public/data/messages`, messageId);
-        await updateDoc(messageDocRef, { seen: true });
-    } catch (error) {
-        console.error("Error updating message seen status:", error);
-    }
+    // Logic for updating message seen status
 }
