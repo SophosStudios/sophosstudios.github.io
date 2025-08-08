@@ -895,6 +895,15 @@
         function getChatId(user1Id, user2Id) {
             return [user1Id, user2Id].sort().join('-');
         }
+        
+        function startCall(recipientId, recipientUsername) {
+            // Placeholder for real-time communication
+            const callId = `call-${Math.random().toString(36).substring(2, 11)}`;
+            showMessageModal(
+                `<p class="text-lg">Initiating call with ${recipientUsername}...</p><p class="text-sm mt-2">Call ID: ${callId}</p>`,
+                'info'
+            );
+        }
 
         function renderMessagesPage() {
             if (!appCurrentUser) {
@@ -998,10 +1007,7 @@
             });
 
             document.getElementById('call-user-btn').addEventListener('click', () => {
-                showMessageModal(
-                    `Starting a call with ${username}... This would connect via a real-time communication service like WebRTC.`,
-                    'info'
-                );
+                startCall(activeDMUserId, username);
             });
             
             const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
