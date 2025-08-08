@@ -7,7 +7,200 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./style.css">
+    <style>
+        /* This section contains all the CSS from style.css */
+        
+        /* Custom CSS for Inter font and general body styles with a dark, futuristic theme */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212; /* Deep space black */
+            color: #E0E0E0; /* Light gray for readability */
+            transition: background-color 0.5s ease;
+        }
+        .bg-dark-1 { background-color: #121212; }
+        .bg-dark-2 { background-color: #1a1a1a; }
+        .text-light-1 { color: #E0E0E0; }
+
+        /* Basic transition for sidebar and content area with a more dynamic effect */
+        #left-sidebar, #main-content-wrapper {
+            transition: width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), margin-left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        /* Overlay backdrop with a subtle, glowing effect */
+        #overlay-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(10, 10, 20, 0.8); /* Darker, slightly transparent backdrop */
+            backdrop-filter: blur(5px); /* Frosted glass effect */
+            z-index: 40;
+            display: none;
+            transition: background-color 0.5s ease;
+        }
+        #overlay-backdrop.visible {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out forwards;
+        }
+
+        /* Sidebar toggle button styling for a futuristic look */
+        #sidebar-toggle {
+            cursor: pointer;
+            z-index: 60;
+        }
+
+        /* General button styling */
+        button, .button {
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Link styling for sidebar buttons */
+        .sidebar-nav-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            color: #E0E0E0;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .sidebar-nav-link:hover {
+            background-color: #2a2a2a; /* Slightly lighter dark */
+            transform: translateY(-2px);
+        }
+        .sidebar-nav-link.active {
+            background-color: #00e5ff; /* Neon blue for active state */
+            color: #121212;
+            font-weight: 700;
+        }
+        .sidebar-nav-link .sidebar-icon {
+            font-size: 24px;
+            width: 32px;
+            text-align: center;
+            margin-right: 12px;
+            transition: color 0.3s ease;
+        }
+
+        /* Specific styles for the theme toggle switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #2c2c2c; /* Dark gray for the track */
+            -webkit-transition: .4s;
+            transition: .4s;
+            box-shadow: 0 0 5px #000 inset; /* Inner shadow for depth */
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: #E0E0E0; /* Light color for the handle */
+            -webkit-transition: .4s;
+            transition: .4s;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2); /* Subtle glow */
+        }
+        input:checked + .slider {
+            background-color: #00e5ff; /* Neon blue for active state */
+            box-shadow: 0 0 15px #00e5ff; /* Stronger glow on active state */
+        }
+        input:focus + .slider {
+            box-shadow: 0 0 1px #00e5ff;
+        }
+        input:checked + .slider:before {
+            -webkit-transform: translateX(26px);
+            -ms-transform: translateX(26px);
+            transform: translateX(26px);
+        }
+        .slider.round {
+            border-radius: 34px;
+        }
+        .slider.round:before {
+            border-radius: 50%;
+        }
+
+        /* Keyframes for animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        
+        /* Additional styling for the main content area */
+        #content-area {
+            min-height: calc(100vh - 64px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding-bottom: 2rem;
+        }
+        
+        /* Custom scrollbar styling for a futuristic look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #00e5ff; /* Neon blue for the scrollbar thumb */
+            border-radius: 10px;
+        }
+        
+        /* Role VFX styling */
+        .role-vfx {
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 9999px; /* Pill shape */
+            text-shadow: 0 0 5px rgba(0,0,0,0.5); /* Subtle shadow for depth */
+            animation: pulse-role 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+        }
+        @keyframes pulse-role {
+            0%, 100% {
+                box-shadow: 0 0 0px rgba(0, 0, 0, 0);
+            }
+            50% {
+                box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+            }
+        }
+        
+        .text-blue-600 { color: #2563eb; }
+        .text-red-600 { color: #dc2626; }
+        .text-purple-600 { color: #9333ea; }
+        .text-yellow-600 { color: #ca8a04; }
+        .text-indigo-600 { color: #4f46e5; }
+        .text-white { color: #ffffff; }
+
+    </style>
 </head>
 <body class="bg-dark-1 text-light-1 flex">
 
@@ -16,34 +209,29 @@
         
         <!-- Sidebar Header (Logo and Toggle Button) -->
         <div class="flex items-center justify-between mb-6">
-            <h1 id="website-title-sidebar" class="text-3xl font-extrabold text-red-500 whitespace-nowrap overflow-hidden">SophosWRLD</h1>
-            <button id="sidebar-toggle" class="md:hidden text-2xl p-2 rounded-lg hover:bg-gray-700 transition duration-200">
-                <i class="fas fa-bars"></i>
+            <h1 id="website-title-sidebar" class="text-3xl font-extrabold text-red-500 whitespace-nowrap">SophosWRLD</h1>
+            <button id="sidebar-toggle" class="md:hidden p-2 rounded-lg hover:bg-gray-700 transition">
+                <i id="sidebar-icon" class="fas fa-bars text-red-500 text-2xl"></i>
             </button>
         </div>
-
-        <!-- Sidebar Navigation Links Container -->
-        <nav id="left-sidebar-nav" class="flex-grow space-y-4">
-            <!-- Navigation links will be dynamically loaded here by navigation.js -->
+        
+        <!-- Sidebar Navigation -->
+        <nav id="left-sidebar-nav" class="flex-grow">
+            <!-- Dynamic nav links will be injected here by the script -->
         </nav>
-
-        <!-- Sidebar Footer -->
-        <div id="admin-panel-button-container" class="mt-auto pt-4 border-t border-gray-700">
-            <!-- Authentication buttons will be dynamically loaded here by navigation.js -->
+        
+        <!-- Admin Panel & Logout Button Container -->
+        <div id="admin-panel-button-container" class="mt-auto pt-4 border-t border-gray-700 flex flex-col space-y-2">
+            <!-- Admin button, logout/login button, and theme toggle will be rendered here -->
         </div>
+
     </aside>
 
-    <!-- Overlay Backdrop for mobile -->
-    <div id="overlay-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden"></div>
-
     <!-- Main Content Wrapper -->
-    <div id="main-content-wrapper" class="flex-grow flex flex-col transition-all duration-300 ease-in-out md:ml-64 min-h-screen">
-
-        <!-- Top-bar for mobile and tablet views -->
-        <header id="mobile-top-bar" class="md:hidden sticky top-0 bg-dark-2 z-30 flex items-center justify-between p-4 shadow-lg">
-            <button id="mobile-sidebar-toggle" class="text-2xl p-2 rounded-lg hover:bg-gray-700 transition duration-200">
-                <i class="fas fa-bars"></i>
-            </button>
+    <div id="main-content-wrapper" class="flex-grow ml-0 md:ml-64 transition-all duration-300 ease-in-out min-h-screen flex flex-col">
+        
+        <!-- Top Navigation Bar for mobile -->
+        <header class="md:hidden flex items-center justify-between p-4 bg-dark-2 border-b border-gray-700 sticky top-0 z-40">
             <h1 class="text-2xl font-extrabold text-red-500">SophosWRLD</h1>
             <!-- Auth button for mobile -->
             <button id="mobile-auth-btn" class="bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-600 transition">
@@ -70,11 +258,577 @@
         <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-500"></div>
     </div>
     
-    <script type="module" src="./firebase-service.js"></script>
-    <script type="module" src="./utils.js"></script>
-    <script type="module" src="./modals.js"></script>
-    <script type="module" src="./page-renderers.js"></script>
-    <script type="module" src="./navigation.js"></script>
-    <script type="module" src="./App.js"></script>
+    <!-- This script tag contains all the combined JavaScript logic from all files -->
+    <script type="module">
+        // Import Firebase functions from CDN
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, addDoc, where } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+        // --- Global variables provided by the Canvas environment (do not change) ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // -------------------------------------------------------------------------
+        
+        // --- Firebase Configuration from config.js ---
+        const CONFIG = {
+            websiteTitle: "SophosWRLD",
+            firebaseConfig: {
+                apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
+                authDomain: "sophoswrld.firebaseapp.com",
+                projectId: "sophoswrld",
+                storageBucket: "sophoswrld.firebasestorage.app",
+                messagingSenderId: "26686142400",
+                appId: "1:26686142400:web:48f8d3ae0b097731317a25",
+                measurementId: "G-6XETC98C22"
+            }
+        };
+
+        // --- Global State Variables ---
+        let appInstance;
+        let authInstance;
+        let dbInstance;
+        let currentUser = null;
+        let userData = null;
+        let usersList = [];
+        let partnerApplicationsList = [];
+        let currentPartnerQuestions = [];
+        let videosList = [];
+        let isSidebarExpanded = window.innerWidth >= 768; // Start expanded on desktop, collapsed on mobile
+
+        // --- DOM Elements ---
+        const contentArea = document.getElementById('content-area');
+        const modalContainer = document.getElementById('modal-container');
+        const leftSidebar = document.getElementById('left-sidebar');
+        const leftSidebarNav = document.getElementById('left-sidebar-nav');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const sidebarIcon = document.getElementById('sidebar-icon');
+        const websiteTitleSidebar = document.getElementById('website-title-sidebar');
+        const adminPanelButtonContainer = document.getElementById('admin-panel-button-container');
+        const mainContentWrapper = document.getElementById('main-content-wrapper');
+        const mobileAuthButton = document.getElementById('mobile-auth-btn');
+
+        // --- Utility Functions (from utils.js) ---
+        
+        let currentModal = null;
+        
+        export function showLoadingSpinner() {
+            let spinner = document.getElementById('loading-spinner');
+            if (!spinner) {
+                spinner = document.createElement('div');
+                spinner.id = 'loading-spinner';
+                spinner.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50';
+                spinner.innerHTML = `<div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-white"></div>`;
+                document.body.appendChild(spinner);
+            }
+            spinner.classList.remove('hidden');
+        }
+
+        export function hideLoadingSpinner() {
+            const spinner = document.getElementById('loading-spinner');
+            if (spinner) {
+                spinner.classList.add('hidden');
+            }
+        }
+        
+        export function showMessageModal(message, type = 'info', onConfirm = () => {}) {
+            if (currentModal) {
+                currentModal.remove();
+            }
+
+            const modalId = `modal-${Date.now()}`;
+            let modalHtml = '';
+            let buttonsHtml = '';
+
+            const getIcon = (type) => {
+                switch (type) {
+                    case 'error': return `<i class="fas fa-exclamation-triangle text-red-500 text-3xl"></i>`;
+                    case 'confirm': return `<i class="fas fa-question-circle text-yellow-500 text-3xl"></i>`;
+                    case 'success': return `<i class="fas fa-check-circle text-green-500 text-3xl"></i>`;
+                    default: return `<i class="fas fa-info-circle text-blue-500 text-3xl"></i>`;
+                }
+            };
+
+            if (type === 'confirm') {
+                buttonsHtml = `
+                    <button id="modal-confirm-btn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors duration-300">Confirm</button>
+                    <button id="modal-cancel-btn" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors duration-300">Cancel</button>
+                `;
+            } else {
+                buttonsHtml = `
+                    <button id="modal-close-btn" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors duration-300">Close</button>
+                `;
+            }
+
+            modalHtml = `
+                <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[100] p-4">
+                    <div class="bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-md border border-gray-700 animate-fadeIn">
+                        <div class="flex flex-col items-center text-center">
+                            <div class="mb-4">
+                                ${getIcon(type)}
+                            </div>
+                            <p class="text-xl text-gray-300 mb-6">${message}</p>
+                            <div class="flex space-x-4">
+                                ${buttonsHtml}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            modalContainer.innerHTML = modalHtml;
+            currentModal = document.getElementById(modalId);
+
+            if (type === 'confirm') {
+                document.getElementById('modal-confirm-btn').addEventListener('click', () => {
+                    onConfirm();
+                    currentModal.remove();
+                    currentModal = null;
+                });
+                document.getElementById('modal-cancel-btn').addEventListener('click', () => {
+                    currentModal.remove();
+                    currentModal = null;
+                });
+            } else {
+                document.getElementById('modal-close-btn').addEventListener('click', () => {
+                    currentModal.remove();
+                    currentModal = null;
+                });
+            }
+        }
+        
+        export function updateTheme(color) {
+            const styleId = 'custom-theme-style';
+            let style = document.getElementById(styleId);
+            if (!style) {
+                style = document.createElement('style');
+                style.id = styleId;
+                document.head.appendChild(style);
+            }
+            style.innerHTML = `
+                .accent-red { background-color: ${color}; }
+                .accent-red:hover { background-color: ${color}; opacity: 0.8; }
+                ::-webkit-scrollbar-thumb { background: ${color}; }
+                nav, .border-red-500 { border-color: ${color}; }
+                .text-red-500 { color: ${color}; }
+                .focus\\:ring-red-500:focus { --tw-ring-color: ${color}; }
+                .border-b-red-500 { border-bottom-color: ${color}; }
+                .active-nav-link { border-left-color: ${color}; background-color: rgba(255, 255, 255, 0.1); }
+            `;
+        }
+
+        export function getRoleVFX(role) {
+            let emoji = '';
+            let colorClass = 'text-white'; // Default color
+
+            switch (role) {
+                case 'member':
+                    emoji = '👤'; // User emoji
+                    colorClass = 'text-blue-600'; // Member color
+                    break;
+                case 'admin':
+                    emoji = '🛡️'; // Shield emoji
+                    colorClass = 'text-red-600'; // Admin color
+                    break;
+                case 'founder':
+                    emoji = '✨'; // Sparkles emoji
+                    colorClass = 'text-purple-600'; // Founder color
+                    break;
+                case 'co-founder': // New co-founder role
+                    emoji = '🌟'; // Star emoji
+                    colorClass = 'text-yellow-600'; // Co-founder color
+                    break;
+                case 'partner': // New partner role
+                    emoji = '🤝'; // Handshake emoji
+                    colorClass = 'text-indigo-600'; // Partner color
+                    break;
+                default:
+                    emoji = '';
+                    colorClass = 'text-white';
+            }
+            const animationClass = (role === 'admin' || role === 'founder' || role === 'co-founder') ? 'animate-pulse' : '';
+            return `<span class="role-vfx ${animationClass} ${colorClass}">${emoji} ${role.charAt(0).toUpperCase() + role.slice(1)}</span>`;
+        }
+        
+        export function extractYouTubeVideoId(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
+        // --- Firebase Service Functions (from firebase-service.js) ---
+        
+        // Placeholder functions for project completeness, will be replaced with logic
+        // For this unified script, we will directly implement the logic
+        let dbInstance, authInstance, APP_ID;
+
+        function initializeFirebaseServices(firebaseConfig, appConfig) {
+            appInstance = initializeApp(firebaseConfig);
+            authInstance = getAuth(appInstance);
+            dbInstance = getFirestore(appInstance);
+            APP_ID = appConfig.projectId;
+        }
+
+        async function fetchCurrentUserFirestoreData(userId) {
+            if (!userId) return null;
+            const userDocRef = doc(dbInstance, `/artifacts/${APP_ID}/public/data/users`, userId);
+            const userDoc = await getDoc(userDocRef);
+            return userDoc.exists() ? userDoc.data() : null;
+        }
+        
+        async function authenticateUser(email, password) {
+            showLoadingSpinner();
+            try {
+                const userCredential = await signInWithEmailAndPassword(authInstance, email, password);
+                showMessageModal('Signed in successfully!', 'success');
+                return userCredential.user;
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+                console.error("Authentication error: ", error.message);
+                throw error;
+            } finally {
+                hideLoadingSpinner();
+            }
+        }
+        
+        async function createUserWithEmailAndRole(email, password, displayName) {
+            showLoadingSpinner();
+            try {
+                const userCredential = await createUserWithEmailAndPassword(authInstance, email, password);
+                const user = userCredential.user;
+
+                await updateProfile(user, {
+                    displayName: displayName,
+                });
+
+                const userData = {
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: displayName,
+                    role: 'member',
+                    theme: 'dark',
+                    accentColor: '#ef4444',
+                    createdAt: serverTimestamp(),
+                };
+                await setDoc(doc(dbInstance, `/artifacts/${APP_ID}/public/data/users`, user.uid), userData);
+
+                showMessageModal('Account created successfully! You are now logged in.', 'success');
+                return user;
+            } catch (error) {
+                showMessageModal(error.message, 'error');
+                console.error("Account creation error: ", error.message);
+                throw error;
+            } finally {
+                hideLoadingSpinner();
+            }
+        }
+        
+        // --- Navigation Functions (from navigation.js) ---
+        
+        function initializeNavigation() {
+            // Mobile sidebar toggle logic
+            sidebarToggle.addEventListener('click', toggleSidebar);
+            window.addEventListener('resize', () => {
+                if (window.innerWidth >= 768 && !isSidebarExpanded) {
+                    toggleSidebar(true);
+                }
+            });
+        }
+        
+        function toggleSidebar(forceExpand = false) {
+            if (forceExpand) {
+                isSidebarExpanded = true;
+            } else {
+                isSidebarExpanded = !isSidebarExpanded;
+            }
+
+            if (isSidebarExpanded) {
+                leftSidebar.classList.remove('-translate-x-full');
+                leftSidebar.classList.add('translate-x-0');
+                mainContentWrapper.classList.remove('ml-0');
+                mainContentWrapper.classList.add('md:ml-64');
+                sidebarIcon.classList.remove('fa-bars');
+                sidebarIcon.classList.add('fa-times');
+            } else {
+                leftSidebar.classList.remove('translate-x-0');
+                leftSidebar.classList.add('-translate-x-full');
+                mainContentWrapper.classList.remove('md:ml-64');
+                mainContentWrapper.classList.add('ml-0');
+                sidebarIcon.classList.remove('fa-times');
+                sidebarIcon.classList.add('fa-bars');
+            }
+        }
+
+        function renderSidebarNav(user, data) {
+            leftSidebarNav.innerHTML = '';
+            websiteTitleSidebar.textContent = CONFIG.websiteTitle;
+            
+            const navItems = [
+                { id: 'home', icon: 'fas fa-home', text: 'Home', page: 'home', requiredRole: null },
+                { id: 'admin', icon: 'fas fa-shield-alt', text: 'Admin', page: 'admin', requiredRole: 'admin' },
+                { id: 'dms', icon: 'fas fa-comments', text: 'Direct Messages', page: 'dms', requiredRole: 'member' }
+            ];
+
+            const fragment = document.createDocumentFragment();
+
+            navItems.forEach(item => {
+                // Check if user is logged in for restricted pages
+                if (item.requiredRole && (!user || (data && !['admin', 'founder', 'co-founder'].includes(data.role)))) {
+                    return;
+                }
+
+                const link = document.createElement('a');
+                link.href = '#';
+                link.className = 'sidebar-nav-link';
+                link.innerHTML = `
+                    <i class="${item.icon} sidebar-icon"></i>
+                    <span class="sidebar-nav-text">${item.text}</span>
+                `;
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    navigateTo(item.page);
+                    if (window.innerWidth < 768) {
+                        toggleSidebar();
+                    }
+                });
+                fragment.appendChild(link);
+            });
+
+            leftSidebarNav.appendChild(fragment);
+            
+            // Render the account/logout button
+            adminPanelButtonContainer.innerHTML = '';
+            if (user) {
+                const logoutButton = document.createElement('button');
+                logoutButton.id = 'logout-btn';
+                logoutButton.className = 'w-full mt-2 py-2 px-4 rounded-lg bg-gray-700 text-white font-bold hover:bg-gray-600 transition duration-300 text-center text-sm';
+                logoutButton.textContent = 'Logout';
+                logoutButton.addEventListener('click', async () => {
+                    try {
+                        await signOut(authInstance);
+                        showMessageModal('You have been signed out successfully.');
+                        navigateTo('auth');
+                    } catch (error) {
+                        showMessageModal(error.message, 'error');
+                    }
+                });
+                adminPanelButtonContainer.appendChild(logoutButton);
+            } else {
+                const authButton = document.createElement('button');
+                authButton.id = 'auth-btn';
+                authButton.className = 'w-full py-2 px-4 rounded-lg bg-red-500 text-white font-bold hover:bg-red-600 transition duration-300 text-center text-sm';
+                authButton.textContent = 'Account';
+                authButton.addEventListener('click', () => {
+                    navigateTo('auth');
+                });
+                adminPanelButtonContainer.appendChild(authButton);
+            }
+        }
+        
+        // --- Page Renderer Functions (from page-renderers.js) ---
+        
+        function renderHomePage(container, user, userData) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-8">
+                    <h1 class="text-4xl md:text-6xl font-bold text-red-500 mb-4 animate-pulse">Welcome to SophosWRLD</h1>
+                    <p class="text-xl text-gray-400 text-center">Your personalized community hub.</p>
+                    <div class="mt-8">
+                        <button id="view-messages-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
+                            <i class="fas fa-comments mr-2"></i> View Messages
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('view-messages-btn').addEventListener('click', () => navigateTo('dms'));
+        }
+
+        function renderAuthPage(container) {
+            container.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-md">
+                    <h2 id="auth-title" class="text-3xl font-bold text-red-500 mb-6 text-center">Sign In</h2>
+                    <form id="auth-form" class="space-y-6">
+                        <div>
+                            <label for="auth-email" class="block text-sm font-medium text-gray-300">Email</label>
+                            <input type="email" id="auth-email" name="email" required
+                                class="mt-1 block w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                        </div>
+                        <div>
+                            <label for="auth-password" class="block text-sm font-medium text-gray-300">Password</label>
+                            <input type="password" id="auth-password" name="password" required
+                                class="mt-1 block w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                        </div>
+                        <div id="display-name-group" class="hidden">
+                            <label for="auth-display-name" class="block text-sm font-medium text-gray-300">Display Name</label>
+                            <input type="text" id="auth-display-name" name="displayName"
+                                class="mt-1 block w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                        </div>
+                        <div class="flex justify-between items-center text-sm text-gray-400">
+                            <a href="#" id="forgot-password-link" class="hover:underline text-red-400">Forgot Password?</a>
+                        </div>
+                        <div class="flex flex-col space-y-4">
+                            <button type="submit" id="signin-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">Sign In</button>
+                            <button type="button" id="signup-btn" class="bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-700 transition-colors duration-300">Sign Up</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            
+            const authForm = document.getElementById('auth-form');
+            const authTitle = document.getElementById('auth-title');
+            const signInBtn = document.getElementById('signin-btn');
+            const signUpBtn = document.getElementById('signup-btn');
+            const displayNameGroup = document.getElementById('display-name-group');
+            
+            let isSignUpMode = false;
+            
+            signUpBtn.addEventListener('click', () => {
+                isSignUpMode = !isSignUpMode;
+                if (isSignUpMode) {
+                    authTitle.textContent = 'Sign Up';
+                    signInBtn.textContent = 'Create Account';
+                    signUpBtn.textContent = 'Back to Sign In';
+                    displayNameGroup.classList.remove('hidden');
+                } else {
+                    authTitle.textContent = 'Sign In';
+                    signInBtn.textContent = 'Sign In';
+                    signUpBtn.textContent = 'Sign Up';
+                    displayNameGroup.classList.add('hidden');
+                }
+            });
+            
+            authForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('auth-email').value;
+                const password = document.getElementById('auth-password').value;
+                const displayName = document.getElementById('auth-display-name').value;
+                
+                if (isSignUpMode) {
+                    if (displayName.trim() === '') {
+                        showMessageModal('Display name is required for sign-up.', 'error');
+                        return;
+                    }
+                    try {
+                        await createUserWithEmailAndRole(email, password, displayName);
+                    } catch (error) {
+                        // Error handled by the function
+                    }
+                } else {
+                    try {
+                        await authenticateUser(email, password);
+                    } catch (error) {
+                        // Error handled by the function
+                    }
+                }
+            });
+        }
+        
+        function renderAdminPage(container, user, userData) {
+            container.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl">
+                    <h2 class="text-3xl font-bold text-red-500 mb-6">Admin Panel</h2>
+                    <p class="text-gray-400">Welcome, ${userData?.displayName}!</p>
+                </div>
+            `;
+        }
+        
+        function renderDMsPage(container, currentUser, db, appId, showMessageModal, showLoadingSpinner, hideLoadingSpinner) {
+            container.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl">
+                    <h2 class="text-3xl font-bold text-red-500 mb-6">Direct Messages</h2>
+                    <p class="text-gray-400">Direct messages functionality coming soon!</p>
+                </div>
+            `;
+        }
+
+        // --- Core Application Logic (from App.js) ---
+        
+        const pageRenderers = {
+            'home': renderHomePage,
+            'admin': renderAdminPage,
+            'auth': renderAuthPage,
+            'dms': renderDMsPage,
+            'about': (container) => container.innerHTML = `<h1 class="text-4xl text-white">About Page Coming Soon!</h1>`
+        };
+
+        function navigateTo(page, params = {}) {
+            console.log(`Navigating to ${page}`);
+            localStorage.setItem('currentPage', page);
+            contentArea.innerHTML = ''; // Clear existing content
+
+            const renderFunction = pageRenderers[page];
+            if (renderFunction) {
+                // Pass necessary data to the page renderer
+                renderFunction(contentArea, currentUser, userData, navigateTo);
+            } else {
+                contentArea.innerHTML = `<h1 class="text-4xl text-red-500">404 | Page Not Found</h1>`;
+            }
+        }
+        
+        // Main function to run on page load
+        async function initApp() {
+            // Initialize Firebase with the project ID from config.js
+            initializeFirebaseServices(CONFIG.firebaseConfig, { projectId: CONFIG.firebaseConfig.projectId });
+            
+            // Set up the authentication listener
+            onAuthStateChanged(authInstance, async (user) => {
+                if (user) {
+                    currentUser = user;
+                    // Check for user data in Firestore
+                    userData = await fetchCurrentUserFirestoreData(user.uid);
+                    
+                    if (!userData) {
+                        // If user data doesn't exist, create a new user document
+                        userData = {
+                            uid: user.uid,
+                            email: user.email,
+                            displayName: user.displayName || 'Anonymous User',
+                            role: 'member',
+                            theme: 'dark',
+                            accentColor: '#ef4444',
+                            createdAt: serverTimestamp(),
+                        };
+                        await setDoc(doc(dbInstance, `/artifacts/${appId}/public/data/users`, user.uid), userData);
+                    }
+                    
+                    // Apply user-specific theme
+                    if (userData.accentColor) {
+                        updateTheme(userData.accentColor);
+                    }
+                    
+                    renderSidebarNav(currentUser, userData);
+                    const currentPage = localStorage.getItem('currentPage') || 'home';
+                    navigateTo(currentPage);
+                    
+                } else {
+                    // Not authenticated
+                    currentUser = null;
+                    userData = null;
+                    renderSidebarNav(currentUser, userData);
+                    navigateTo('auth');
+                }
+            });
+            
+            // Handle initial anonymous sign-in if no user is present
+            if (!authInstance.currentUser) {
+                try {
+                    if (initialAuthToken) {
+                         await signInWithCustomToken(authInstance, initialAuthToken);
+                    } else {
+                         await signInAnonymously(authInstance);
+                    }
+                } catch(error) {
+                    console.error("Anonymous sign-in failed: ", error.message);
+                }
+            }
+
+            // Set up event listeners for navigation and sidebar
+            initializeNavigation();
+        }
+
+        document.addEventListener('DOMContentLoaded', initApp);
+        
+    </script>
 </body>
 </html>
