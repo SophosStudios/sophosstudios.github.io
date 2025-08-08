@@ -10,8 +10,6 @@ let _userData = null;
 let _navigateTo = null;
 let _signOut = null;
 let _auth = null;
-let _db = null;
-let _appId = null;
 
 // DOM Elements for navigation
 const leftSidebar = document.getElementById('left-sidebar');
@@ -33,11 +31,15 @@ let isSidebarExpanded = window.innerWidth >= 768; // Start expanded on desktop, 
  * @param {HTMLElement} backdrop - The overlay backdrop element.
  */
 export function initializeNavigation(mobileToggle, backdrop) {
-    mobileToggle.addEventListener('click', toggleSidebar);
+    if (mobileToggle) {
+        mobileToggle.addEventListener('click', toggleSidebar);
+    }
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', toggleSidebar);
     }
-    backdrop.addEventListener('click', toggleSidebar);
+    if (backdrop) {
+        backdrop.addEventListener('click', toggleSidebar);
+    }
 
     // Initial state setup
     updateSidebarUI();
@@ -55,34 +57,42 @@ export function toggleSidebar() {
  * Updates the sidebar's UI state based on `isSidebarExpanded`.
  */
 function updateSidebarUI() {
-    if (isSidebarExpanded) {
-        leftSidebar.classList.add('expanded');
-        mainContentWrapper.classList.add('expanded');
-        websiteTitleSidebar.classList.remove('hidden');
-        if (window.innerWidth < 768) {
-            overlayBackdrop.classList.remove('hidden');
+    if (leftSidebar && mainContentWrapper) {
+        if (isSidebarExpanded) {
+            leftSidebar.classList.add('expanded');
+            mainContentWrapper.classList.add('expanded');
+            websiteTitleSidebar.classList.remove('hidden');
+            if (window.innerWidth < 768 && overlayBackdrop) {
+                overlayBackdrop.classList.remove('hidden');
+            }
+        } else {
+            leftSidebar.classList.remove('expanded');
+            mainContentWrapper.classList.remove('expanded');
+            websiteTitleSidebar.classList.add('hidden');
+            if (overlayBackdrop) {
+                overlayBackdrop.classList.add('hidden');
+            }
         }
-    } else {
-        leftSidebar.classList.remove('expanded');
-        mainContentWrapper.classList.remove('expanded');
-        websiteTitleSidebar.classList.add('hidden');
-        overlayBackdrop.classList.add('hidden');
     }
     
     // Update text visibility based on the final sidebar state
-    leftSidebarNav.querySelectorAll('.sidebar-nav-text').forEach(textSpan => {
-        if (isSidebarExpanded) {
-            textSpan.classList.remove('hidden');
-        } else {
-            textSpan.classList.add('hidden');
-        }
-    });
+    if (leftSidebarNav) {
+        leftSidebarNav.querySelectorAll('.sidebar-nav-text').forEach(textSpan => {
+            if (isSidebarExpanded) {
+                textSpan.classList.remove('hidden');
+            } else {
+                textSpan.classList.add('hidden');
+            }
+        });
+    }
 
     // Update the button container visibility
-    if (isSidebarExpanded && (adminButtonContainer.textContent.trim() !== '')) {
-        adminButtonContainer.classList.remove('hidden');
-    } else {
-        adminButtonContainer.classList.add('hidden');
+    if (adminButtonContainer) {
+        if (isSidebarExpanded && (adminButtonContainer.textContent.trim() !== '')) {
+            adminButtonContainer.classList.remove('hidden');
+        } else {
+            adminButtonContainer.classList.add('hidden');
+        }
     }
 }
 
@@ -120,17 +130,13 @@ function createNavLink(parentElement, text, page, iconClass) {
  * @param {function} navigateTo - The navigation function from App.js.
  * @param {function} signOut - The Firebase signOut function.
  * @param {object} auth - The Firebase auth instance.
- * @param {object} db - The Firestore db instance.
- * @param {string} appId - The app ID.
  */
-export function renderSidebarNav(currentUser, userData, navigateTo, signOut, auth, db, appId) {
+export function renderSidebarNav(currentUser, userData, navigateTo, signOut, auth) {
     _currentUser = currentUser;
     _userData = userData;
     _navigateTo = navigateTo;
     _signOut = signOut;
     _auth = auth;
-    _db = db;
-    _appId = appId;
     
     leftSidebarNav.innerHTML = '';
     adminButtonContainer.innerHTML = '';
@@ -141,8 +147,10 @@ export function renderSidebarNav(currentUser, userData, navigateTo, signOut, aut
 
     // General links
     createNavLink(generalCategory, 'Home', 'home', 'fas fa-home');
-    createNavLink(generalCategory, 'Messages', 'messages', 'fas fa-comments');
-    createNavLink(generalCategory, 'Settings', 'settings', 'fas fa-cog');
+    if (currentUser) {
+        createNavLink(generalCategory, 'Messages', 'messages', 'fas fa-comments');
+        createNavLink(generalCategory, 'Settings', 'settings', 'fas fa-cog');
+    }
 
     // Admin links (only for admins)
     if (_userData && _userData.role === 'admin') {

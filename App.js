@@ -19,6 +19,9 @@ import { renderHomePage, renderAdminPage, renderAuthPage, renderDMsPage } from '
 // Import navigation functions
 import { initializeNavigation, renderSidebarNav } from './navigation.js';
 
+// Import Firebase service functions
+import { initializeFirebaseServices, fetchAllUsersFirestore, sendDirectMessage, getDirectMessages, updateDirectMessageSeenStatus, updateUserRoleFirestore } from './firebase-service.js';
+
 // --- Global variables provided by the Canvas environment (do not change) ---
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : CONFIG.firebaseConfig;
@@ -28,10 +31,12 @@ const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+initializeFirebaseServices(firebaseConfig, CONFIG);
 
 // Global state
 let currentUser = null;
 let userData = null;
+let userList = [];
 
 // DOM Elements
 const contentArea = document.getElementById('content-area');
@@ -62,13 +67,21 @@ function navigateTo(page) {
             renderHomePage(contentArea, currentUser, userData, navigateTo);
             break;
         case 'admin':
-            renderAdminPage(contentArea, currentUser, userData, showMessageModal, showLoadingSpinner, hideLoadingSpinner, db, appId);
+            if (userData?.role === 'admin') {
+                renderAdminPage(contentArea, userList, currentUser, updateUserRoleFirestore);
+            } else {
+                contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Access Denied</h1>`;
+            }
             break;
         case 'auth':
             renderAuthPage(contentArea, auth, db, appId, showMessageModal, showLoadingSpinner, hideLoadingSpinner, navigateTo);
             break;
         case 'messages':
-            renderDMsPage(contentArea, currentUser, db, appId, showMessageModal, showLoadingSpinner, hideLoadingSpinner);
+            if (currentUser) {
+                renderDMsPage(contentArea, userList, currentUser, sendDirectMessage, getDirectMessages, updateDirectMessageSeenStatus);
+            } else {
+                contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">You must be logged in to view messages.</h1>`;
+            }
             break;
         default:
             contentArea.innerHTML = `<h1 class="text-3xl text-center text-gray-500">Page Not Found</h1>`;
@@ -77,7 +90,6 @@ function navigateTo(page) {
 }
 
 // --- Firebase Authentication Listener ---
-
 onAuthStateChanged(auth, async (user) => {
     currentUser = user;
     
@@ -86,44 +98,44 @@ onAuthStateChanged(auth, async (user) => {
         if (initialAuthToken) {
             try {
                 await signInWithCustomToken(auth, initialAuthToken);
-                console.log("Signed in with custom token.");
             } catch (error) {
                 console.error("Error signing in with custom token:", error);
             }
         }
         
-        // Fetch user data from Firestore
         const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (userDoc.exists()) {
-            userData = { id: userDoc.id, ...userDoc.data() };
-        } else {
-            // Create a new user entry if one doesn't exist
-            userData = {
-                username: user.email ? user.email.split('@')[0] : 'Guest',
-                email: user.email || 'N/A',
-                role: 'member',
-                theme: 'dark',
-                accentColor: '#ef4444'
-            };
-            await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), userData);
-        }
-        
-        // Apply user-specific theme
-        if (userData.accentColor) {
-            updateTheme(userData.accentColor);
-        }
+        onSnapshot(userDocRef, (doc) => {
+            if (doc.exists()) {
+                userData = { id: doc.id, ...doc.data() };
+                if (userData.accentColor) {
+                    updateTheme(userData.accentColor);
+                }
+            } else {
+                userData = {
+                    username: user.email ? user.email.split('@')[0] : 'Guest',
+                    email: user.email || 'N/A',
+                    role: 'member',
+                    theme: 'dark',
+                    accentColor: '#ef4444'
+                };
+                setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), userData);
+            }
+            
+            renderSidebarNav(currentUser, userData, navigateTo, signOut, auth);
+            const currentPage = localStorage.getItem('currentPage') || 'home';
+            navigateTo(currentPage);
+        });
 
-        // Render the navigation and initial page after auth state is determined
-        renderSidebarNav(currentUser, userData, navigateTo, signOut, auth, db, appId);
-        const currentPage = localStorage.getItem('currentPage') || 'home';
-        navigateTo(currentPage);
-        
+        // Real-time listener for all users
+        const usersQuery = collection(db, `/artifacts/${appId}/public/data/users`);
+        onSnapshot(usersQuery, (snapshot) => {
+            userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        });
+
     } else {
-        // Not authenticated
         userData = null;
-        renderSidebarNav(currentUser, userData, navigateTo, signOut, auth, db, appId);
+        userList = [];
+        renderSidebarNav(currentUser, userData, navigateTo, signOut, auth);
         navigateTo('auth');
     }
 });
@@ -140,7 +152,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Handle initial anonymous sign-in if no user is present
     if (!auth.currentUser) {
         try {
             await signInAnonymously(auth);
