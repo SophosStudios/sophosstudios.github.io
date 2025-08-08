@@ -46,7 +46,7 @@
         .left-sidebar.expanded {
             width: 256px;
         }
-
+        
         /* Main Content Wrapper: Adjusts margin based on sidebar state */
         .main-content-wrapper {
             margin-left: 72px;
@@ -56,7 +56,7 @@
             margin-left: 256px;
         }
 
-        /* Mobile specific styles (<= 768px) */
+        /* Mobile specific styles (<= 767px) */
         @media (max-width: 767px) {
             .left-sidebar {
                 transform: translateX(-100%);
@@ -92,10 +92,15 @@
     <!-- Left Sidebar -->
     <aside id="left-sidebar" class="left-sidebar bg-gray-800 text-gray-300 flex flex-col p-4 shadow-xl">
         <div class="flex items-center justify-between h-16 mb-6">
+            <!-- Sidebar toggle button -->
             <button id="sidebar-toggle-full" class="hidden md:block text-gray-400 hover:text-white transition-colors duration-200">
                 <i class="fas fa-bars"></i>
             </button>
-            <h1 id="website-title-sidebar" class="text-2xl font-bold text-red-500 whitespace-nowrap hidden md:block">SophosWRLD</h1>
+            <!-- Logo in expanded state -->
+            <h1 id="website-title-sidebar" class="text-2xl font-bold text-red-500 whitespace-nowrap hidden">SophosWRLD</h1>
+            <!-- Logo in collapsed state -->
+            <h1 id="website-logo-collapsed" class="text-2xl font-bold text-red-500 whitespace-nowrap md:hidden">SW</h1>
+            <!-- Close button for mobile -->
             <button id="sidebar-toggle-close" class="md:hidden text-gray-400 hover:text-white transition-colors duration-200">
                 <i class="fas fa-times"></i>
             </button>
@@ -152,14 +157,12 @@
         // You can paste your project's firebaseConfig object here.
         // It will be used if the environment's config is not available.
         const FIREBASE_CONFIG_PLACEHOLDER = {
-          apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
-          authDomain: "sophoswrld.firebaseapp.com",
-          databaseURL: "https://sophoswrld-default-rtdb.firebaseio.com",
-          projectId: "sophoswrld",
-          storageBucket: "sophoswrld.firebasestorage.app",
-          messagingSenderId: "26686142400",
-          appId: "1:26686142400:web:48f8d3ae0b097731317a25",
-          measurementId: "G-6XETC98C22"
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
         };
         
         // --- DO NOT EDIT BELOW THIS LINE ---
@@ -273,14 +276,17 @@
         function initializeNavigation() {
             if (sidebarToggleDesktop) sidebarToggleDesktop.addEventListener('click', toggleSidebar);
             if (sidebarToggleMobile) sidebarToggleMobile.addEventListener('click', () => {
-                toggleSidebar();
+                leftSidebar.classList.add('expanded');
                 overlayBackdrop.classList.remove('hidden');
             });
             if (sidebarToggleClose) sidebarToggleClose.addEventListener('click', () => {
-                toggleSidebar();
+                leftSidebar.classList.remove('expanded');
+                overlayBackrop.classList.add('hidden');
+            });
+            if (overlayBackdrop) overlayBackdrop.addEventListener('click', () => {
+                leftSidebar.classList.remove('expanded');
                 overlayBackdrop.classList.add('hidden');
             });
-            if (overlayBackdrop) overlayBackdrop.addEventListener('click', toggleSidebar);
             
             // Set initial state based on screen size
             if (window.innerWidth >= 768) {
@@ -290,31 +296,25 @@
         }
 
         function toggleSidebar() {
-            leftSidebar.classList.toggle('expanded');
+            const isExpanded = leftSidebar.classList.toggle('expanded');
             mainContentWrapper.classList.toggle('expanded');
             
-            if (window.innerWidth < 768) {
-                overlayBackdrop.classList.toggle('hidden');
-            }
-
-            const isExpanded = leftSidebar.classList.contains('expanded');
             const navTextElements = leftSidebar.querySelectorAll('.sidebar-nav-text');
             const websiteTitleSidebar = document.getElementById('website-title-sidebar');
+            const websiteLogoCollapsed = document.getElementById('website-logo-collapsed');
             const adminButtonContainer = document.getElementById('admin-panel-button-container');
-
-            navTextElements.forEach(el => {
-                if (isExpanded) {
-                    el.classList.remove('hidden');
-                } else {
-                    el.classList.add('hidden');
-                }
-            });
 
             if (isExpanded) {
                 websiteTitleSidebar.classList.remove('hidden');
-                adminButtonContainer.classList.remove('hidden');
+                websiteLogoCollapsed.classList.add('hidden');
+                navTextElements.forEach(el => el.classList.remove('hidden'));
+                if (adminButtonContainer.innerHTML.trim() !== '') {
+                    adminButtonContainer.classList.remove('hidden');
+                }
             } else {
                 websiteTitleSidebar.classList.add('hidden');
+                websiteLogoCollapsed.classList.remove('hidden');
+                navTextElements.forEach(el => el.classList.add('hidden'));
                 adminButtonContainer.classList.add('hidden');
             }
         }
@@ -325,13 +325,14 @@
             link.className = `flex items-center space-x-4 py-3 px-4 rounded-xl text-lg font-semibold text-gray-300 hover:bg-gray-700 transition-colors duration-200`;
             link.innerHTML = `
                 <i class="${iconClass} text-red-500 w-6 text-center"></i>
-                <span class="sidebar-nav-text whitespace-nowrap hidden md:inline">${text}</span>
+                <span class="sidebar-nav-text whitespace-nowrap hidden">${text}</span>
             `;
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 navigateTo(page);
                 if (window.innerWidth < 768) {
-                    toggleSidebar();
+                    leftSidebar.classList.remove('expanded');
+                    overlayBackdrop.classList.add('hidden');
                 }
             });
             parentElement.appendChild(link);
@@ -361,7 +362,7 @@
                 logoutButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
                 logoutButton.innerHTML = `
                     <i class="fas fa-sign-out-alt w-6 text-center"></i>
-                    <span class="sidebar-nav-text hidden md:inline">Sign Out</span>`;
+                    <span class="sidebar-nav-text whitespace-nowrap hidden">Sign Out</span>`;
                 logoutButton.addEventListener('click', async () => {
                     try {
                         await signOut(auth);
@@ -378,9 +379,30 @@
                 authButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
                 authButton.innerHTML = `
                     <i class="fas fa-sign-in-alt w-6 text-center"></i>
-                    <span class="sidebar-nav-text hidden md:inline">Account</span>`;
+                    <span class="sidebar-nav-text whitespace-nowrap hidden">Account</span>`;
                 authButton.addEventListener('click', () => navigateTo('auth'));
                 authContainer.appendChild(authButton);
+            }
+            
+            // Re-render the collapsed/expanded state after populating the nav links
+            const isExpanded = leftSidebar.classList.contains('expanded');
+            const navTextElements = leftSidebar.querySelectorAll('.sidebar-nav-text');
+            const websiteTitleSidebar = document.getElementById('website-title-sidebar');
+            const websiteLogoCollapsed = document.getElementById('website-logo-collapsed');
+            const adminPanelButtonContainer = document.getElementById('admin-panel-button-container');
+            
+            if (isExpanded) {
+                navTextElements.forEach(el => el.classList.remove('hidden'));
+                websiteTitleSidebar.classList.remove('hidden');
+                websiteLogoCollapsed.classList.add('hidden');
+                if (adminPanelButtonContainer.innerHTML.trim() !== '') {
+                     adminPanelButtonContainer.classList.remove('hidden');
+                }
+            } else {
+                navTextElements.forEach(el => el.classList.add('hidden'));
+                websiteTitleSidebar.classList.add('hidden');
+                websiteLogoCollapsed.classList.remove('hidden');
+                adminPanelButtonContainer.classList.add('hidden');
             }
         }
 
@@ -696,7 +718,8 @@
                 mobileAuthButton.addEventListener('click', () => {
                     navigateTo('auth');
                     if (window.innerWidth < 768) {
-                        toggleSidebar();
+                        leftSidebar.classList.remove('expanded');
+                        overlayBackdrop.classList.add('hidden');
                     }
                 });
             }
