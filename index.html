@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SophosWRLD</title>
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <!-- Inter Font -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <style>
         :root {
@@ -28,7 +31,7 @@
             border-radius: 4px;
         }
         
-        /* Left Sidebar - Collapsed by default on desktop, hidden on mobile */
+        /* Left Sidebar: Collapsed by default on desktop, hidden on mobile */
         .left-sidebar {
             width: 72px;
             transition: width 0.3s ease, transform 0.3s ease;
@@ -44,7 +47,7 @@
             width: 256px;
         }
         
-        /* Main Content Wrapper - Adjusts margin based on sidebar state */
+        /* Main Content Wrapper: Adjusts margin based on sidebar state */
         .main-content-wrapper {
             margin-left: 72px;
             transition: margin-left 0.3s ease;
@@ -120,28 +123,38 @@
         <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-500"></div>
     </div>
     
+    <!-- Overlay for mobile sidebar -->
     <div id="overlay-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden md:hidden"></div>
 
+    <!-- Left Sidebar -->
     <aside id="left-sidebar" class="left-sidebar bg-gray-800 text-gray-300 flex flex-col p-4 shadow-xl">
         <div class="flex items-center justify-between h-16 mb-6">
+            <!-- Sidebar toggle button -->
             <button id="sidebar-toggle-full" class="hidden md:block text-gray-400 hover:text-white transition-colors duration-200">
                 <i class="fas fa-bars"></i>
             </button>
+            <!-- Logo in expanded state -->
             <h1 id="website-title-sidebar" class="text-2xl font-bold text-red-500 whitespace-nowrap hidden">SophosWRLD</h1>
+            <!-- Logo in collapsed state -->
             <h1 id="website-logo-collapsed" class="text-2xl font-bold text-red-500 whitespace-nowrap md:hidden">SW</h1>
+            <!-- Close button for mobile -->
             <button id="sidebar-toggle-close" class="md:hidden text-gray-400 hover:text-white transition-colors duration-200">
                 <i class="fas fa-times"></i>
             </button>
         </div>
         
         <nav id="left-sidebar-nav" class="space-y-2 flex-grow overflow-y-auto">
-            </nav>
+            <!-- Nav links will be rendered here -->
+        </nav>
         
         <div id="admin-panel-button-container" class="mt-auto pt-4 border-t border-gray-700">
-            </div>
+            <!-- Auth/Admin button will be rendered here -->
+        </div>
     </aside>
 
+    <!-- Main Content Wrapper -->
     <div id="main-content-wrapper" class="main-content-wrapper min-h-screen">
+        <!-- Top Nav for Mobile -->
         <nav class="md:hidden bg-gray-800 text-white p-4 flex items-center justify-between shadow-md">
             <button id="mobile-sidebar-toggle" class="text-gray-400 hover:text-white transition-colors duration-200">
                 <i class="fas fa-bars"></i>
@@ -150,7 +163,9 @@
             <button id="mobile-auth-btn" class="bg-red-600 text-white font-semibold py-1 px-4 rounded-lg hover:bg-red-700 transition duration-300">Account</button>
         </nav>
 
+        <!-- Main Content Area -->
         <main id="content-area" class="p-4 md:p-8 min-h-screen">
+            <!-- Page content will be rendered here -->
             <div class="flex flex-col items-center justify-center h-full">
                 <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-500"></div>
                 <p class="mt-4 text-gray-400">Loading...</p>
@@ -158,23 +173,24 @@
         </main>
     </div>
 
+    <!-- The combined JavaScript logic -->
     <script type="module">
-        /* =================================================================
-         * 1. FIREBASE IMPORTS
-         * ================================================================= */
+        // =================================================================
+        // 1. FIREBASE IMPORTS
+        // =================================================================
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore, deleteDoc, addDoc, query, orderBy, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
-        /* =================================================================
-         * 2. CONFIGURATION & GLOBAL VARIABLES
-         * ================================================================= */
+        // =================================================================
+        // 2. CONFIGURATION & GLOBAL VARIABLES
+        // =================================================================
         const CONFIG = {
             websiteTitle: "SophosWRLD",
         };
 
-        /* --- PLACEHOLDER FOR YOUR FIREBASE CONFIGURATION --- */
+        // --- PLACEHOLDER FOR YOUR FIREBASE CONFIGURATION ---
         const FIREBASE_CONFIG_PLACEHOLDER = {
           apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
           authDomain: "sophoswrld.firebaseapp.com",
@@ -186,12 +202,12 @@
           measurementId: "G-6XETC98C22"
         };
         
-        /* --- DO NOT EDIT BELOW THIS LINE --- */
+        // --- DO NOT EDIT BELOW THIS LINE ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : FIREBASE_CONFIG_PLACEHOLDER;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        /* --- Initialize Firebase --- */
+        // --- Initialize Firebase ---
         let app;
         try {
             app = initializeApp(firebaseConfig);
@@ -209,15 +225,15 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        /* --- Global state --- */
+        // --- Global state ---
         let appCurrentUser = null;
         let appUserData = null;
         let authReady = false;
         let lastNavigatedPage = null;
 
-        /* =================================================================
-         * 3. UTILITY FUNCTIONS
-         * ================================================================= */
+        // =================================================================
+        // 3. UTILITY FUNCTIONS
+        // =================================================================
 
         /**
          * Shows a loading spinner.
@@ -283,9 +299,9 @@
             document.documentElement.style.setProperty('--accent-color', color);
         }
 
-        /* =================================================================
-         * 4. NAVIGATION LOGIC
-         * ================================================================= */
+        // =================================================================
+        // 4. NAVIGATION LOGIC
+        // =================================================================
         const leftSidebar = document.getElementById('left-sidebar');
         const leftSidebarNav = document.getElementById('left-sidebar-nav');
         const mainContentWrapper = document.getElementById('main-content-wrapper');
@@ -309,7 +325,7 @@
                 overlayBackdrop.classList.add('hidden');
             });
             
-            if (window.innerWidth <= 768) {
+            if (window.innerWidth >= 768) {
                 leftSidebar.classList.remove('expanded');
                 mainContentWrapper.classList.remove('expanded');
             }
@@ -366,7 +382,7 @@
             createNavLink(leftSidebarNav, 'Messages', 'messages', 'fas fa-envelope');
             createNavLink(leftSidebarNav, 'Settings', 'settings', 'fas fa-cog');
 
-            if (userData.role === 'admin' || userData.role === 'founder') {
+            if (userData?.role === 'admin' || userData?.role === 'founder') {
                 const adminCategory = document.createElement('div');
                 adminCategory.className = 'mt-6 pt-4 border-t border-gray-700';
                 leftSidebarNav.appendChild(adminCategory);
@@ -425,9 +441,9 @@
             }
         }
 
-        /* =================================================================
-         * 5. PAGE RENDERERS
-         * ================================================================= */
+        // =================================================================
+        // 5. PAGE RENDERERS
+        // =================================================================
         const contentArea = document.getElementById('content-area');
         
         let activeDMUserId = null;
@@ -450,7 +466,7 @@
         }
 
         function renderAdminPage() {
-            if (!appCurrentUser || (appUserData.role !== 'admin' && appUserData.role !== 'founder')) {
+            if (!appCurrentUser || (appUserData?.role !== 'admin' && appUserData?.role !== 'founder')) {
                 contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be an admin to view this page.</p></div>`;
                 return;
             }
@@ -459,30 +475,26 @@
                 <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full mx-auto">
                     <h2 class="text-3xl font-bold text-red-500 mb-6">Admin Dashboard</h2>
                     <h3 class="text-xl font-semibold text-gray-200 mb-4">Manage Users</h3>
-                    <div class="mb-4">
-                        <input type="text" id="user-search-input" placeholder="Search by name or email..." class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500">
-                    </div>
                     <div id="user-list" class="overflow-x-auto">
                         <p class="text-gray-400 text-center">Loading users...</p>
                     </div>
                 </div>
             `;
 
-            const userListContainer = document.getElementById('user-list');
-            const searchInput = document.getElementById('user-search-input');
-            let usersUnsubscribe = null;
-            let allUsers = [];
-
-            function renderUserTable(users) {
+            const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
+            onSnapshot(usersCollection, (snapshot) => {
+                const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const userListContainer = document.getElementById('user-list');
                 if (!userListContainer) return;
-
-                const filteredUsers = users.filter(user => user.id !== appCurrentUser.uid);
+                
+                // Filter out the current user from the list
+                const filteredUsers = userList.filter(user => user.id !== appCurrentUser.uid);
 
                 if (filteredUsers.length === 0) {
                     userListContainer.innerHTML = '<p class="text-gray-400 text-center">No other users found.</p>';
                     return;
                 }
-                
+
                 userListContainer.innerHTML = `
                     <table class="w-full text-left text-gray-300 min-w-[700px]">
                         <thead class="bg-gray-700">
@@ -535,7 +547,7 @@
                     select.addEventListener('change', async (event) => {
                         const userId = event.target.dataset.userId;
                         const newRole = event.target.value;
-                        const userDocRef = doc(db, `artifacts/${appId}/publicdata/users`, userId);
+                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
                         try {
                             await updateDocFirestore(userDocRef, { role: newRole });
                             showMessageModal('User role updated successfully!', 'success');
@@ -549,7 +561,7 @@
                     btn.addEventListener('click', async (event) => {
                         const userId = event.currentTarget.dataset.userId;
                         const isBanned = event.currentTarget.dataset.isBanned === 'true';
-                        const userDocRef = doc(db, `artifacts/${appId}/publicdata/users`, userId);
+                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
                         try {
                             await updateDocFirestore(userDocRef, { isBanned: !isBanned });
                             showMessageModal(`User ${!isBanned ? 'banned' : 'unbanned'} successfully!`, 'success');
@@ -575,11 +587,11 @@
                     btn.addEventListener('click', (event) => {
                         const userId = event.currentTarget.dataset.userId;
                         showMessageModal(
-                            "Are you sure you want to delete this user's data? This will NOT delete the Firebase Authentication account, which must be done manually in the console.",
+                            'Are you sure you want to delete this user\'s data? This will NOT delete the Firebase Authentication account, which must be done manually in the console.',
                             'confirm',
                             async () => {
                                 try {
-                                    const userDocRef = doc(db, `artifacts/${appId}/publicdata/users`, userId);
+                                    const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
                                     await deleteDoc(userDocRef);
                                     showMessageModal('User data deleted from Firestore. Remember to delete the user from the Firebase Authentication console.', 'success');
                                 } catch (error) {
@@ -589,22 +601,6 @@
                         );
                     });
                 });
-            }
-
-            if (usersUnsubscribe) usersUnsubscribe();
-            const usersCollection = collection(db, `artifacts/${appId}/publicdata/users`);
-            usersUnsubscribe = onSnapshot(usersCollection, (snapshot) => {
-                allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderUserTable(allUsers);
-            });
-
-            searchInput.addEventListener('input', (e) => {
-                const searchTerm = e.target.value.toLowerCase();
-                const filteredUsers = allUsers.filter(user => 
-                    user.username.toLowerCase().includes(searchTerm) || 
-                    user.email.toLowerCase().includes(searchTerm)
-                );
-                renderUserTable(filteredUsers);
             });
         }
 
@@ -662,7 +658,7 @@
                         theme: 'dark',
                         accentColor: '#ef4444'
                     };
-                    await setDoc(doc(db, `artifacts/${appId}/publicdata/users`, user.uid), newUser);
+                    await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), newUser);
                     
                     showMessageModal('Account created successfully! You are now signed in.', 'success');
                 } catch (error) {
@@ -679,8 +675,9 @@
                     try {
                         const result = await signInWithPopup(auth, provider);
                         const user = result.user;
-                        const userDocRef = doc(db, `artifacts/${appId}/publicdata/users`, user.uid);
+                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
                         const userDoc = await getDoc(userDocRef);
+
                         if (!userDoc.exists()) {
                             const newUser = {
                                 username: user.displayName || user.email.split('@')[0],
@@ -700,7 +697,7 @@
                 });
             }
         }
-
+        
         function renderSettingsPage() {
             if (!appCurrentUser || !appUserData) {
                 contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Not Logged In</h1><p class="text-center text-gray-400">Please log in to view settings.</p>`;
@@ -729,9 +726,13 @@
                 showLoadingSpinner();
                 const newUsername = document.getElementById('username').value;
                 const newAccentColor = document.getElementById('accent-color').value;
-                const userDocRef = doc(db, `artifacts/${appId}/publicdata/users`, appCurrentUser.uid);
+                const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, appCurrentUser.uid);
+
                 try {
-                    await updateDocFirestore(userDocRef, { username: newUsername, accentColor: newAccentColor });
+                    await updateDocFirestore(userDocRef, {
+                        username: newUsername,
+                        accentColor: newAccentColor
+                    });
                     updateTheme(newAccentColor);
                     showMessageModal('Settings saved successfully!', 'success');
                 } catch (error) {
@@ -741,7 +742,7 @@
                 }
             });
         }
-
+        
         function renderCreatePostModal(postId = null, title = '', content = '') {
             const modalHtml = `
                 <div id="create-post-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -760,16 +761,21 @@
             `;
             document.getElementById('modal-container').innerHTML = modalHtml;
             document.getElementById('cancel-post-btn').addEventListener('click', () => document.getElementById('create-post-modal').remove());
+
             document.getElementById('create-post-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 showLoadingSpinner();
                 const newTitle = document.getElementById('post-title').value;
                 const newContent = document.getElementById('post-content').value;
-                const postsCollection = collection(db, `artifacts/${appId}/publicdata/forums`);
+                const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
+
                 try {
                     if (postId) {
-                        const postDocRef = doc(db, `artifacts/${appId}/publicdata/forums`, postId);
-                        await updateDocFirestore(postDocRef, { title: newTitle, content: newContent });
+                        const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
+                        await updateDocFirestore(postDocRef, {
+                            title: newTitle,
+                            content: newContent
+                        });
                         showMessageModal('Post updated successfully!', 'success');
                     } else {
                         await addDoc(postsCollection, {
@@ -790,10 +796,11 @@
                 }
             });
         }
-
+        
         function renderReactionModal(postId) {
             const emojis = ['👍', '❤️', '😂', '🔥', '🤔', '🎉'];
             const emojiHtml = emojis.map(emoji => `<button class="reaction-emoji text-3xl p-2 hover:bg-gray-700 rounded-lg transition" data-emoji="${emoji}">${emoji}</button>`).join('');
+
             const modalHtml = `
                 <div id="reaction-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full border-2 border-[var(--accent-color)]">
@@ -809,20 +816,27 @@
             `;
             document.getElementById('modal-container').innerHTML = modalHtml;
             document.getElementById('cancel-reaction-btn').addEventListener('click', () => document.getElementById('reaction-modal').remove());
+
             document.querySelectorAll('.reaction-emoji').forEach(button => {
                 button.addEventListener('click', async (e) => {
                     const emoji = e.target.dataset.emoji;
-                    const postDocRef = doc(db, `artifacts/${appId}/publicdata/forums`, postId);
+                    const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
+                    
                     try {
                         const postDoc = await getDoc(postDocRef);
                         const currentReactions = postDoc.data().reactions || {};
                         const reactionKey = emoji.codePointAt(0).toString(16);
+                        
                         const newReactions = { ...currentReactions };
                         if (newReactions[reactionKey]) {
                             newReactions[reactionKey].count += 1;
                         } else {
-                            newReactions[reactionKey] = { emoji: emoji, count: 1 };
+                            newReactions[reactionKey] = {
+                                emoji: emoji,
+                                count: 1
+                            };
                         }
+                        
                         await updateDocFirestore(postDocRef, { reactions: newReactions });
                         document.getElementById('reaction-modal').remove();
                     } catch (error) {
@@ -831,19 +845,19 @@
                 });
             });
         }
-
+        
         function deletePost(postId) {
             showMessageModal(
                 'Are you sure you want to delete this post? This action cannot be undone.',
                 'confirm',
                 async () => {
                     showLoadingSpinner();
-                    const postDocRef = doc(db, `artifacts/${appId}/publicdata/forums`, postId);
+                    const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
                     try {
                         await deleteDoc(postDocRef);
                         showMessageModal('Post deleted successfully!', 'success');
                     } catch (error) {
-                        showMessageModal('Failed to delete post.', 'error');
+                        showMessageModal('Failed to delete post: ' + error.message, 'error');
                     } finally {
                         hideLoadingSpinner();
                     }
@@ -853,258 +867,522 @@
 
         function renderForumsPage() {
             if (!appCurrentUser) {
-                contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Not Logged In</h1><p class="text-center text-gray-400">Please log in to view forums.</p>`;
+                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be logged in to view the forums.</p></div>`;
                 return;
             }
             contentArea.innerHTML = `
-                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full mx-auto">
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-3xl font-bold text-red-500">Forums</h2>
-                        <button id="create-post-btn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition duration-300">
-                            <i class="fas fa-plus mr-2"></i>New Post
+                        <button id="create-post-btn" class="bg-red-600 text-white font-semibold py-2 px-5 rounded-lg hover:bg-red-700 transition-colors duration-300">
+                            <i class="fas fa-plus mr-2"></i>Create Post
                         </button>
                     </div>
-                    <div id="posts-list" class="space-y-6">
+                    <div id="posts-list" class="space-y-4">
                         <p class="text-gray-400 text-center">Loading posts...</p>
                     </div>
                 </div>
             `;
+            document.getElementById('create-post-btn').addEventListener('click', () => {
+                if (appCurrentUser) {
+                    renderCreatePostModal();
+                } else {
+                    showMessageModal('You must be signed in to create a post.', 'error');
+                }
+            });
 
-            document.getElementById('create-post-btn').addEventListener('click', () => renderCreatePostModal());
-            const postsCollection = collection(db, `artifacts/${appId}/publicdata/forums`);
+            const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
             const q = query(postsCollection, orderBy('createdAt', 'desc'));
             onSnapshot(q, (snapshot) => {
-                const postsListContainer = document.getElementById('posts-list');
-                if (!postsListContainer) return;
-                const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-                if (posts.length === 0) {
-                    postsListContainer.innerHTML = '<p class="text-gray-400 text-center">No posts found. Be the first to create one!</p>';
+                const postsList = document.getElementById('posts-list');
+                if (!postsList) return;
+                
+                if (snapshot.empty) {
+                    postsList.innerHTML = '<p class="text-gray-400 text-center">No posts yet. Be the first to create one!</p>';
                     return;
                 }
 
-                postsListContainer.innerHTML = posts.map(post => {
-                    const postDate = post.createdAt ? new Date(post.createdAt.seconds * 1000).toLocaleString() : 'N/A';
-                    const reactionsHtml = Object.values(post.reactions || {}).map(reaction => `
-                        <span class="bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-sm">${reaction.emoji} ${reaction.count}</span>
-                    `).join('');
-                    const isAuthor = appCurrentUser && post.authorId === appCurrentUser.uid;
-                    const isAdmin = appUserData && (appUserData.role === 'admin' || appUserData.role === 'founder');
+                postsList.innerHTML = snapshot.docs.map(postDoc => {
+                    const post = postDoc.data();
+                    const postId = postDoc.id;
+                    const canEditOrDelete = appUserData?.role === 'admin' || appUserData?.role === 'founder';
+
+                    const reactionsHtml = post.reactions ? Object.values(post.reactions).map(reaction => `
+                        <span class="bg-gray-700 px-2 py-1 rounded-full text-sm">${reaction.emoji} ${reaction.count}</span>
+                    `).join('') : '';
 
                     return `
-                        <div class="bg-gray-900 p-6 rounded-lg shadow-md border border-gray-700">
-                            <h3 class="text-xl font-bold text-red-500 mb-2">${post.title}</h3>
-                            <p class="text-gray-400 mb-4">${post.content}</p>
-                            <div class="flex items-center justify-between text-sm text-gray-500">
-                                <span>Posted by <span class="font-semibold text-gray-300">${post.authorName}</span> on ${postDate}</span>
-                                <div class="flex items-center space-x-2">
-                                    <button class="reaction-post-btn text-gray-400 hover:text-white transition" data-post-id="${post.id}">
-                                        <i class="fas fa-smile"></i>
-                                    </button>
-                                    ${(isAuthor || isAdmin) ? `
-                                    <button class="edit-post-btn text-blue-400 hover:text-blue-200 transition" data-post-id="${post.id}" data-post-title="${post.title}" data-post-content="${post.content}">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="delete-post-btn text-red-400 hover:text-red-200 transition" data-post-id="${post.id}">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                        <div class="bg-gray-700 p-6 rounded-lg shadow-md border border-gray-600">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="text-xl font-bold text-[var(--accent-color)]">${post.title}</h3>
+                                <div class="flex-shrink-0 text-right">
+                                    <span class="block text-sm text-gray-400">by ${post.authorName}</span>
+                                    ${canEditOrDelete ? `
+                                        <div class="mt-2 space-x-2">
+                                            <button class="edit-post-btn bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 transition" data-post-id="${postId}">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="delete-post-btn bg-red-600 text-white p-2 rounded-full hover:bg-red-700 transition" data-post-id="${postId}">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
                                     ` : ''}
                                 </div>
                             </div>
-                            <div class="mt-4 flex space-x-2">
-                                ${reactionsHtml}
+                            <p class="text-gray-300 mb-4">${post.content}</p>
+                            <div class="flex items-center space-x-4">
+                                <div class="flex space-x-2">
+                                    ${reactionsHtml}
+                                </div>
+                                <button class="add-reaction-btn bg-gray-600 text-white p-2 rounded-full hover:bg-gray-500 transition" data-post-id="${postId}">
+                                    <i class="far fa-smile"></i>
+                                </button>
                             </div>
                         </div>
                     `;
                 }).join('');
-                
-                document.querySelectorAll('.reaction-post-btn').forEach(button => {
+
+                document.querySelectorAll('.add-reaction-btn').forEach(button => {
                     button.addEventListener('click', (e) => {
-                        renderReactionModal(e.currentTarget.dataset.postId);
+                        const postId = e.currentTarget.dataset.postId;
+                        renderReactionModal(postId);
                     });
                 });
-
+                
                 document.querySelectorAll('.edit-post-btn').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        const { postId, postTitle, postContent } = e.currentTarget.dataset;
-                        renderCreatePostModal(postId, postTitle, postContent);
+                    button.addEventListener('click', async (e) => {
+                        const postId = e.currentTarget.dataset.postId;
+                        showLoadingSpinner();
+                        const postDoc = await getDoc(doc(db, `/artifacts/${appId}/public/data/forums`, postId));
+                        hideLoadingSpinner();
+                        if (postDoc.exists()) {
+                            const postData = postDoc.data();
+                            renderCreatePostModal(postId, postData.title, postData.content);
+                        } else {
+                            showMessageModal('Post not found.', 'error');
+                        }
                     });
                 });
 
                 document.querySelectorAll('.delete-post-btn').forEach(button => {
                     button.addEventListener('click', (e) => {
-                        deletePost(e.currentTarget.dataset.postId);
+                        const postId = e.currentTarget.dataset.postId;
+                        deletePost(postId);
                     });
                 });
+            });
+        }
+        
+        function getChatId(user1Id, user2Id) {
+            return [user1Id, user2Id].sort().join('-');
+        }
+        
+        // --- Simulated Calling Logic ---
+        let currentCallId = null;
+
+        function renderCallModal(callId, status, participants, callerId) {
+            const modalContainer = document.getElementById('modal-container');
+            const modalId = 'call-modal';
+            const existingModal = document.getElementById(modalId);
+            if (existingModal) existingModal.remove();
+
+            let modalHtml = '';
+            
+            if (status === 'ringing' && appCurrentUser.uid !== callerId) {
+                // Incoming call modal for the recipient
+                modalHtml = `
+                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-[var(--accent-color)] text-center">
+                            <i class="fas fa-phone-volume text-5xl text-[var(--accent-color)] mb-4 animate-pulse"></i>
+                            <p class="text-xl text-white mb-4">${participants[0].name} is ringing you...</p>
+                            <div class="flex justify-center space-x-4 mt-4">
+                                <button id="pickup-btn" class="bg-green-500 text-white px-6 py-3 rounded-full font-bold hover:bg-green-600 transition duration-300">
+                                    <i class="fas fa-phone mr-2"></i>Pick Up
+                                </button>
+                                <button id="decline-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300">
+                                    <i class="fas fa-phone-slash mr-2"></i>Decline
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (status === 'ringing' && appCurrentUser.uid === callerId) {
+                // Outgoing call modal for the caller
+                modalHtml = `
+                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-[var(--accent-color)] text-center">
+                            <i class="fas fa-phone-alt text-5xl text-[var(--accent-color)] mb-4 animate-pulse"></i>
+                            <p class="text-xl text-white mb-4">Ringing ${participants[1].name}...</p>
+                            <button id="cancel-call-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300 mt-4">
+                                <i class="fas fa-times mr-2"></i>Cancel
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (status === 'active') {
+                // Active call modal for both participants
+                const participantsHtml = participants.map(p => `<li class="flex items-center space-x-2"><i class="fas fa-user-circle"></i><span>${p.name}</span></li>`).join('');
+                modalHtml = `
+                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-green-500 text-center">
+                            <h3 class="text-2xl font-bold text-green-500 mb-4">In a Call</h3>
+                            <ul class="text-left text-lg text-gray-200 mb-6 space-y-2">
+                                ${participantsHtml}
+                            </ul>
+                            <button id="hangup-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300">
+                                <i class="fas fa-phone-slash mr-2"></i>Hang Up
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (modalHtml) {
+                modalContainer.insertAdjacentHTML('beforeend', modalHtml);
+
+                if (status === 'ringing' && appCurrentUser.uid !== callerId) {
+                    document.getElementById('pickup-btn').addEventListener('click', () => acceptCall(callId, participants));
+                    document.getElementById('decline-btn').addEventListener('click', () => endCall(callId));
+                } else if (status === 'ringing' && appCurrentUser.uid === callerId) {
+                    document.getElementById('cancel-call-btn').addEventListener('click', () => endCall(callId));
+                } else if (status === 'active') {
+                    document.getElementById('hangup-btn').addEventListener('click', () => endCall(callId));
+                }
+            } else {
+                 const existingModal = document.getElementById(modalId);
+                 if (existingModal) existingModal.remove();
+            }
+        }
+        
+        async function startCall(recipientId, recipientUsername) {
+            showMessageModal(
+                `Are you sure you want to call ${recipientUsername}?`,
+                'confirm',
+                async () => {
+                    const callsCollection = collection(db, `/artifacts/${appId}/private/data/calls`);
+                    const newCall = {
+                        callerId: appCurrentUser.uid,
+                        recipientId: recipientId,
+                        status: 'ringing',
+                        participants: [{ id: appCurrentUser.uid, name: appUserData.username }],
+                        createdAt: serverTimestamp()
+                    };
+                    try {
+                        const callDocRef = await addDoc(callsCollection, newCall);
+                        currentCallId = callDocRef.id;
+                    } catch (error) {
+                        showMessageModal('Failed to start call: ' + error.message, 'error');
+                    }
+                }
+            );
+        }
+
+        async function acceptCall(callId, currentParticipants) {
+            const callDocRef = doc(db, `/artifacts/${appId}/private/data/calls`, callId);
+            try {
+                const updatedParticipants = [...currentParticipants, { id: appCurrentUser.uid, name: appUserData.username }];
+                await updateDocFirestore(callDocRef, {
+                    status: 'active',
+                    participants: updatedParticipants
+                });
+            } catch (error) {
+                showMessageModal('Failed to accept call: ' + error.message, 'error');
+            }
+        }
+
+        async function endCall(callId) {
+            const callDocRef = doc(db, `/artifacts/${appId}/private/data/calls`, callId);
+            try {
+                await updateDocFirestore(callDocRef, {
+                    status: 'ended'
+                });
+            } catch (error) {
+                showMessageModal('Failed to end call: ' + error.message, 'error');
+            }
+        }
+
+        // Listens for incoming and outgoing calls
+        function listenForCalls() {
+            if (!appCurrentUser) return;
+            const callsCollection = collection(db, `/artifacts/${appId}/private/data/calls`);
+            const q = query(callsCollection, where('status', 'in', ['ringing', 'active']));
+            
+            if (callUnsubscribe) callUnsubscribe(); // Unsubscribe old listener
+            
+            callUnsubscribe = onSnapshot(q, (snapshot) => {
+                let foundCall = false;
+                snapshot.forEach(callDoc => {
+                    const callData = callDoc.data();
+                    const isParticipant = callData.callerId === appCurrentUser.uid || callData.recipientId === appCurrentUser.uid;
+                    
+                    if (isParticipant) {
+                        foundCall = true;
+                        currentCallId = callDoc.id;
+                        renderCallModal(callDoc.id, callData.status, callData.participants, callData.callerId);
+                    }
+                });
+                
+                // If no active or ringing call involves the current user, clear the modal
+                if (!foundCall) {
+                    const modal = document.getElementById('call-modal');
+                    if(modal) modal.remove();
+                    currentCallId = null;
+                }
             });
         }
 
         function renderMessagesPage() {
             if (!appCurrentUser) {
-                contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Not Logged In</h1><p class="text-center text-gray-400">Please log in to view messages.</p>`;
+                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be logged in to view messages.</p></div>`;
                 return;
             }
 
             contentArea.innerHTML = `
-                <div class="flex h-full bg-gray-800 rounded-lg shadow-xl border-t-4 border-red-500">
-                    <div class="w-1/3 border-r border-gray-700 p-4 overflow-y-auto">
-                        <h2 class="text-2xl font-bold text-red-500 mb-4">Direct Messages</h2>
-                        <ul id="dm-user-list" class="space-y-2">
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto flex flex-col md:flex-row h-[70vh]">
+                    <!-- User List Panel -->
+                    <div id="user-list-panel" class="w-full md:w-1/3 flex-shrink-0 border-b md:border-r border-gray-700 overflow-y-auto">
+                        <h3 class="text-xl font-bold text-[var(--accent-color)] mb-4">Users</h3>
+                        <div id="messages-user-list">
                             <p class="text-gray-400 text-center">Loading users...</p>
-                        </ul>
-                    </div>
-
-                    <div id="chat-area" class="w-2/3 flex flex-col p-4">
-                        <div id="dm-header" class="border-b border-gray-700 pb-4 mb-4 flex items-center justify-between">
-                            <h3 id="dm-recipient-name" class="text-xl font-bold text-gray-200">Select a user to chat</h3>
                         </div>
-                        <div id="dm-messages" class="flex-grow overflow-y-auto space-y-4 mb-4">
-                            </div>
-                        <form id="dm-form" class="flex items-center space-x-2 border-t border-gray-700 pt-4 hidden">
-                            <input type="text" id="dm-message-input" placeholder="Type a message..." class="flex-grow p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500">
-                            <button type="submit" class="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition"><i class="fas fa-paper-plane"></i></button>
-                        </form>
+                    </div>
+                    <!-- Chat Panel -->
+                    <div id="chat-panel" class="flex-grow w-full md:w-2/3 flex flex-col p-4 relative">
+                        <div class="flex items-center justify-center h-full text-gray-400">
+                            Select a user to start a conversation.
+                        </div>
                     </div>
                 </div>
             `;
             
-            const dmUserList = document.getElementById('dm-user-list');
-            const usersCollection = collection(db, `artifacts/${appId}/publicdata/users`);
+            listenForCalls();
+
+            const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
             onSnapshot(usersCollection, (snapshot) => {
-                const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                const otherUsers = users.filter(user => user.id !== appCurrentUser.uid);
+                const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const userListContainer = document.getElementById('messages-user-list');
+                if (!userListContainer) return;
 
-                if (otherUsers.length === 0) {
-                    dmUserList.innerHTML = '<p class="text-gray-400 text-center">No other users to message.</p>';
-                    return;
-                }
-
-                dmUserList.innerHTML = otherUsers.map(user => `
-                    <li class="dm-user-item p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors" data-user-id="${user.id}" data-user-name="${user.username}">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center text-white font-bold">${user.username.charAt(0).toUpperCase()}</div>
-                            <span class="font-semibold text-gray-300">${user.username}</span>
-                        </div>
-                    </li>
+                userListContainer.innerHTML = userList.filter(user => user.id !== appCurrentUser.uid).map(user => `
+                    <div class="user-item p-4 border-b border-gray-700 hover:bg-gray-700 cursor-pointer transition" data-user-id="${user.id}" data-username="${user.username}">
+                        <span class="font-semibold text-gray-200">${user.username}</span>
+                        <span class="block text-sm text-gray-400">${user.email}</span>
+                    </div>
                 `).join('');
 
-                dmUserList.querySelectorAll('.dm-user-item').forEach(item => {
-                    item.addEventListener('click', () => {
-                        const userId = item.dataset.userId;
-                        const userName = item.dataset.userName;
-                        openDirectMessage(userId, userName);
+                document.querySelectorAll('.user-item').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        const userId = e.currentTarget.dataset.userId;
+                        const username = e.currentTarget.dataset.username;
+                        renderChatPanel(userId, username);
                     });
                 });
             });
-
-            function openDirectMessage(userId, userName) {
-                activeDMUserId = userId;
-                document.getElementById('dm-recipient-name').innerText = `Chat with ${userName}`;
-                document.getElementById('dm-form').classList.remove('hidden');
-                
-                if (dmUnsubscribe) dmUnsubscribe();
-                const dmMessagesContainer = document.getElementById('dm-messages');
-                dmMessagesContainer.innerHTML = '';
-                const messagesCollection = collection(db, `artifacts/${appId}/publicdata/dms/${appCurrentUser.uid}/chats/${userId}/messages`);
-                const q = query(messagesCollection, orderBy('createdAt', 'asc'));
-                dmUnsubscribe = onSnapshot(q, (snapshot) => {
-                    dmMessagesContainer.innerHTML = snapshot.docs.map(doc => {
-                        const message = doc.data();
-                        const isSentByMe = message.senderId === appCurrentUser.uid;
-                        const time = message.createdAt ? new Date(message.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-                        
-                        return `
-                            <div class="flex ${isSentByMe ? 'justify-end' : 'justify-start'}">
-                                <div class="max-w-xs md:max-w-md p-3 rounded-xl ${isSentByMe ? 'bg-red-600 text-white rounded-br-none' : 'bg-gray-700 text-gray-200 rounded-bl-none'}">
-                                    <p class="text-sm break-words">${message.text}</p>
-                                    <span class="text-xs text-right mt-1 block ${isSentByMe ? 'text-gray-200' : 'text-gray-400'}">${time}</span>
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                    dmMessagesContainer.scrollTop = dmMessagesContainer.scrollHeight;
-                });
-            }
-
-            document.getElementById('dm-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const messageInput = document.getElementById('dm-message-input');
-                const messageText = messageInput.value.trim();
-                if (messageText === '' || !activeDMUserId) return;
-
-                const myMessagesCollection = collection(db, `artifacts/${appId}/publicdata/dms/${appCurrentUser.uid}/chats/${activeDMUserId}/messages`);
-                const theirMessagesCollection = collection(db, `artifacts/${appId}/publicdata/dms/${activeDMUserId}/chats/${appCurrentUser.uid}/messages`);
-
-                const messageData = {
-                    text: messageText,
-                    senderId: appCurrentUser.uid,
-                    createdAt: serverTimestamp(),
-                };
-
-                try {
-                    await addDoc(myMessagesCollection, messageData);
-                    await addDoc(theirMessagesCollection, messageData);
-                    messageInput.value = '';
-                } catch (error) {
-                    showMessageModal('Failed to send message: ' + error.message, 'error');
-                }
-            });
         }
         
-        /* =================================================================
-         * 6. MAIN APPLICATION LOGIC
-         * ================================================================= */
+        function renderChatPanel(userId, username) {
+            const chatPanel = document.getElementById('chat-panel');
+            if (!chatPanel) return;
+            
+            // Clear previous listener if one exists
+            if (dmUnsubscribe) {
+                dmUnsubscribe();
+                dmUnsubscribe = null;
+            }
+
+            activeDMUserId = userId;
+
+            chatPanel.innerHTML = `
+                <div class="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800 sticky top-0 z-10">
+                    <h4 class="text-xl font-bold text-[var(--accent-color)]">Chatting with ${username}</h4>
+                    <button id="call-user-btn" class="call-user-btn text-white p-3 rounded-full hover:bg-green-600 transition">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                </div>
+                <div id="messages-container" class="flex-grow overflow-y-auto p-4 space-y-4">
+                    <!-- Messages will be rendered here -->
+                    <p class="text-center text-gray-400">Say hello!</p>
+                </div>
+                <form id="dm-form" class="p-4 border-t border-gray-700 bg-gray-800 sticky bottom-0 z-10">
+                    <div class="flex space-x-2">
+                        <input type="text" id="dm-input" placeholder="Type a message..." class="flex-grow p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required>
+                        <button type="submit" class="bg-[var(--accent-color)] text-white px-4 py-3 rounded-lg hover:bg-opacity-80 transition">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </form>
+            `;
+            
+            document.getElementById('dm-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const messageInput = document.getElementById('dm-input');
+                const messageText = messageInput.value.trim();
+
+                if (messageText) {
+                    const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
+                    const messagesCollection = collection(db, `/artifacts/${appId}/private/data/chats/${chatId}/messages`);
+
+                    try {
+                        await addDoc(messagesCollection, {
+                            senderId: appCurrentUser.uid,
+                            text: messageText,
+                            createdAt: serverTimestamp()
+                        });
+                        messageInput.value = '';
+                    } catch (error) {
+                        showMessageModal('Failed to send message: ' + error.message, 'error');
+                    }
+                }
+            });
+
+            document.getElementById('call-user-btn').addEventListener('click', () => {
+                startCall(activeDMUserId, username);
+            });
+            
+            const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
+            const messagesCollection = collection(db, `/artifacts/${appId}/private/data/chats/${chatId}/messages`);
+            const q = query(messagesCollection, orderBy('createdAt', 'asc'));
+
+            dmUnsubscribe = onSnapshot(q, (snapshot) => {
+                const messagesContainer = document.getElementById('messages-container');
+                if (!messagesContainer) return;
+                
+                messagesContainer.innerHTML = snapshot.docs.map(msgDoc => {
+                    const message = msgDoc.data();
+                    const isSender = message.senderId === appCurrentUser.uid;
+                    const messageClass = isSender ? 'self-end bg-[var(--accent-color)] text-white' : 'self-start bg-gray-700 text-gray-200';
+                    return `
+                        <div class="flex ${isSender ? 'justify-end' : 'justify-start'}">
+                            <div class="p-3 rounded-lg max-w-xs ${messageClass}">
+                                ${message.text}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            });
+        }
+
+
+        // =================================================================
+        // 6. MAIN APP LOGIC
+        // =================================================================
 
         function navigateTo(page) {
+            if (!contentArea) {
+                console.error("Content area not found.");
+                return;
+            }
+            
+            // Clean up old listeners
+            if (dmUnsubscribe) {
+                dmUnsubscribe();
+                dmUnsubscribe = null;
+            }
+            if (callUnsubscribe) {
+                callUnsubscribe();
+                callUnsubscribe = null;
+            }
+            activeDMUserId = null;
+            
+            contentArea.innerHTML = '';
             lastNavigatedPage = page;
-            showLoadingSpinner();
-            switch(page) {
+            localStorage.setItem('currentPage', page);
+            
+            if (appUserData && appUserData.isBanned && page !== 'auth') {
+                showMessageModal('Your account has been banned.', 'error');
+                localStorage.removeItem('currentPage');
+                navigateTo('auth');
+                return;
+            }
+
+            switch (page) {
                 case 'home':
                     renderHomePage();
                     break;
                 case 'admin':
                     renderAdminPage();
                     break;
-                case 'forums':
-                    renderForumsPage();
-                    break;
-                case 'settings':
-                    renderSettingsPage();
+                case 'auth':
+                    renderAuthPage();
                     break;
                 case 'messages':
                     renderMessagesPage();
                     break;
-                case 'auth':
+                case 'settings':
+                    renderSettingsPage();
+                    break;
+                case 'forums':
+                    renderForumsPage();
+                    break;
                 default:
-                    renderAuthPage();
+                    contentArea.innerHTML = `<h1 class="text-3xl text-center text-gray-500">Page Not Found</h1>`;
                     break;
             }
-            hideLoadingSpinner();
         }
 
         onAuthStateChanged(auth, async (user) => {
             appCurrentUser = user;
+            authReady = true;
+
             if (user) {
-                const userDocRef = doc(db, `artifacts/${appId}/publicdata/users`, user.uid);
+                const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
                 const userDoc = await getDoc(userDocRef);
+                
                 if (userDoc.exists()) {
-                    appUserData = userDoc.data();
-                    updateTheme(appUserData.accentColor);
+                    appUserData = { id: userDoc.id, ...userDoc.data() };
                 } else {
-                    showMessageModal('User data not found. Please contact support.', 'error');
-                    await signOut(auth);
+                    appUserData = {
+                        username: user.displayName || user.email.split('@')[0] || 'Guest',
+                        email: user.email || 'N/A',
+                        role: 'member',
+                        isBanned: false,
+                        theme: 'dark',
+                        accentColor: '#ef4444'
+                    };
+                    await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), appUserData);
+                }
+                
+                if (appUserData.accentColor) {
+                    updateTheme(appUserData.accentColor);
+                }
+                
+                renderSidebarNav(appCurrentUser, appUserData);
+                
+                const currentPage = localStorage.getItem('currentPage');
+                if (currentPage && currentPage !== 'auth') {
+                    navigateTo(currentPage);
+                } else {
+                    navigateTo('home');
                 }
             } else {
                 appUserData = null;
-                updateTheme('#ef4444');
+                renderSidebarNav(appCurrentUser, appUserData);
+                navigateTo('auth');
             }
-            authReady = true;
-            renderSidebarNav(appCurrentUser, appUserData);
-            navigateTo(lastNavigatedPage || (appCurrentUser ? 'home' : 'auth'));
         });
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             initializeNavigation();
+            const mobileAuthButton = document.getElementById('mobile-auth-btn');
+            if(mobileAuthButton) {
+                mobileAuthButton.addEventListener('click', () => {
+                    navigateTo('auth');
+                    if (window.innerWidth < 768) {
+                        leftSidebar.classList.remove('expanded');
+                        overlayBackdrop.classList.add('hidden');
+                    }
+                });
+            }
+            
+            if (initialAuthToken) {
+                try {
+                     await signInWithCustomToken(auth, initialAuthToken);
+                } catch (error) {
+                     console.error("Error signing in with custom token:", error);
+                     navigateTo('auth');
+                }
+            }
         });
     </script>
 </body>
