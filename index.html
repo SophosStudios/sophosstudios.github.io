@@ -470,8 +470,11 @@
                 const userListContainer = document.getElementById('user-list');
                 if (!userListContainer) return;
                 
-                if (userList.length === 0) {
-                    userListContainer.innerHTML = '<p class="text-gray-400 text-center">No users found.</p>';
+                // Filter out the current user from the list
+                const filteredUsers = userList.filter(user => user.id !== appCurrentUser.uid);
+
+                if (filteredUsers.length === 0) {
+                    userListContainer.innerHTML = '<p class="text-gray-400 text-center">No other users found.</p>';
                     return;
                 }
 
@@ -487,7 +490,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            ${userList.filter(user => user.id !== appCurrentUser.uid).map(user => `
+                            ${filteredUsers.map(user => `
                                 <tr class="border-b border-gray-700 hover:bg-gray-700/50">
                                     <td class="p-3">${user.username}</td>
                                     <td class="p-3">${user.email}</td>
