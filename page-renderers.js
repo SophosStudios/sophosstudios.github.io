@@ -17,6 +17,7 @@ import {
     showEditPartnerCardModal, showReviewApplicationModal, showEditQuestionModal,
     showAddEditVideoModal, showEditPartnerTOSModal
 } from './modals.js';
+import { getFirestore, collection, query, onSnapshot, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // Global state and functions passed from App.js
 let _currentUser = null;
@@ -127,21 +128,71 @@ export function renderSettingsPage(contentArea, currentUser, userData, navigateT
 }
 
 /**
- * Renders the Forum page.
+ * Renders the Forum page with real-time posts.
  * @param {HTMLElement} contentArea - The main content area DOM element.
  * @param {object} currentUser - The current authenticated user.
  * @param {object} userData - The current user's data from Firestore.
- * @param {object} firebaseService - The firebase service object.
+ * @param {object} firebaseService - Object containing the db and auth instances.
  */
 export function renderForumPage(contentArea, currentUser, userData, firebaseService) {
     contentArea.innerHTML = `
-        <div class="p-6 md:p-12 text-center bg-gray-900 rounded-lg shadow-lg">
-            <h1 class="text-4xl md:text-6xl font-bold text-white mb-4">SophosWRLD Forum</h1>
-            <p class="text-lg md:text-xl text-gray-300">
-                Welcome to the forum! This is where the community connects.
-                This is a placeholder for the forum content.
-            </p>
+        <div class="p-4 md:p-8 w-full max-w-4xl mx-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-3xl md:text-4xl font-bold text-white">Forum</h1>
+                ${currentUser ? `
+                    <button id="create-post-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 transform hover:scale-105">
+                        <i class="fas fa-plus mr-2"></i>Create Post
+                    </button>
+                ` : ''}
+            </div>
+            <div id="posts-container" class="space-y-6">
+                <!-- Posts will be rendered here dynamically -->
+                <p class="text-center text-gray-500">Loading posts...</p>
+            </div>
         </div>
     `;
-    // Add event listeners or other forum-specific logic here later.
+
+    // Real-time listener for forum posts
+    const db = firebaseService.db;
+    const postsCollectionRef = collection(db, `/artifacts/sophoswrld/public/data/posts`);
+    const q = query(postsCollectionRef, orderBy('timestamp', 'desc'));
+
+    onSnapshot(q, (snapshot) => {
+        const postsContainer = document.getElementById('posts-container');
+        if (!postsContainer) return; // Exit if the container is not found
+
+        const postsHtml = snapshot.docs.map(doc => {
+            const post = doc.data();
+            const postDate = post.timestamp ? post.timestamp.toDate().toLocaleString() : 'N/A';
+            return `
+                <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                    <div class="flex items-center mb-2">
+                        <div class="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center text-lg font-bold text-white mr-3">
+                            ${post.authorName ? post.authorName.charAt(0).toUpperCase() : 'U'}
+                        </div>
+                        <div>
+                            <p class="text-white font-semibold">${post.authorName || 'Anonymous'}</p>
+                            <p class="text-sm text-gray-400">${postDate}</p>
+                        </div>
+                    </div>
+                    <h3 class="text-xl font-bold text-blue-400 mb-2">${post.title || 'No Title'}</h3>
+                    <p class="text-gray-300">${post.content || 'No content.'}</p>
+                </div>
+            `;
+        }).join('');
+
+        postsContainer.innerHTML = postsHtml || '<p class="text-center text-gray-500">No posts yet. Be the first to create one!</p>';
+    }, (error) => {
+        console.error("Error fetching posts:", error);
+        showMessageModal("Failed to load forum posts. Please try again later.", 'error');
+    });
+
+    // Event listener for the create post button
+    const createPostBtn = document.getElementById('create-post-btn');
+    if (createPostBtn) {
+        createPostBtn.addEventListener('click', () => {
+            // Placeholder for the modal to create a new post
+            showMessageModal("Create Post functionality will be implemented here.", 'info');
+        });
+    }
 }
