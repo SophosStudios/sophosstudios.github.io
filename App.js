@@ -14,7 +14,7 @@ import CONFIG from './config.js';
 import { showLoadingSpinner, hideLoadingSpinner, showMessageModal, updateTheme } from './utils.js';
 
 // Import all page renderers
-import { renderHomePage, renderAdminPage, renderAuthPage, renderDMsPage, renderSettingsPage } from './page-renderers.js';
+import { renderHomePage, renderAdminPage, renderAuthPage, renderDMsPage, renderSettingsPage, renderForumPage } from './page-renderers.js';
 
 // Import navigation functions
 import { initializeNavigation, renderSidebarNav } from './navigation.js';
@@ -66,6 +66,9 @@ function navigateTo(page) {
     switch (page) {
         case 'home':
             renderHomePage(contentArea, currentUser, userData, navigateTo);
+            break;
+        case 'forum':
+            renderForumPage(contentArea, currentUser, userData, firebaseService);
             break;
         case 'admin':
             if (userData?.role === 'admin') {
@@ -205,11 +208,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Attempt anonymous sign-in, but handle the error if it's not enabled
     if (!auth.currentUser) {
         try {
             await signInAnonymously(auth);
         } catch(error) {
             console.error("Anonymous sign-in failed: ", error);
+            // If anonymous sign-in fails, we simply proceed, and the onAuthStateChanged
+            // listener above will handle the unauthenticated state by navigating to 'auth'.
         }
     }
 });
