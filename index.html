@@ -99,7 +99,22 @@
         .action-btn-group button:hover span {
             display: inline;
         }
-
+        .call-user-btn {
+            background-color: #22c55e;
+            color: white;
+            padding: 10px;
+            border-radius: 9999px; /* Tailwind's rounded-full */
+            font-size: 1.25rem; /* Tailwind's text-xl */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .call-user-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .call-user-btn:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200">
@@ -165,7 +180,7 @@
         // =================================================================
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore, deleteDoc, addDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore, deleteDoc, addDoc, query, orderBy, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
         // =================================================================
@@ -214,6 +229,7 @@
         let appCurrentUser = null;
         let appUserData = null;
         let authReady = false;
+        let lastNavigatedPage = null;
 
         // =================================================================
         // 3. UTILITY FUNCTIONS
@@ -432,6 +448,7 @@
         
         let activeDMUserId = null;
         let dmUnsubscribe = null;
+        let callUnsubscribe = null;
 
         function renderHomePage() {
             contentArea.innerHTML = `
@@ -455,10 +472,10 @@
             }
 
             contentArea.innerHTML = `
-                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto">
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full mx-auto">
                     <h2 class="text-3xl font-bold text-red-500 mb-6">Admin Dashboard</h2>
                     <h3 class="text-xl font-semibold text-gray-200 mb-4">Manage Users</h3>
-                    <div id="user-list" class="space-y-4">
+                    <div id="user-list" class="overflow-x-auto">
                         <p class="text-gray-400 text-center">Loading users...</p>
                     </div>
                 </div>
@@ -479,7 +496,7 @@
                 }
 
                 userListContainer.innerHTML = `
-                    <table class="w-full text-left text-gray-300">
+                    <table class="w-full text-left text-gray-300 min-w-[700px]">
                         <thead class="bg-gray-700">
                             <tr>
                                 <th class="p-3">Username</th>
@@ -495,7 +512,7 @@
                                     <td class="p-3">${user.username}</td>
                                     <td class="p-3">${user.email}</td>
                                     <td class="p-3">
-                                        <select class="role-select bg-gray-600 p-2 rounded" data-user-id="${user.id}">
+                                        <select class="role-select bg-gray-600 p-2 rounded" data-user-id="${user.id}" ${appUserData.role !== 'founder' ? 'disabled' : ''}>
                                             <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
                                             <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
                                             <option value="founder" ${user.role === 'founder' ? 'selected' : ''}>Founder</option>
@@ -960,28 +977,158 @@
             return [user1Id, user2Id].sort().join('-');
         }
         
-        function startCall(recipientId, recipientUsername) {
+        // --- Simulated Calling Logic ---
+        let currentCallId = null;
+
+        function renderCallModal(callId, status, participants, callerId) {
+            const modalContainer = document.getElementById('modal-container');
+            const modalId = 'call-modal';
+            const existingModal = document.getElementById(modalId);
+            if (existingModal) existingModal.remove();
+
+            let modalHtml = '';
+            
+            if (status === 'ringing' && appCurrentUser.uid !== callerId) {
+                // Incoming call modal for the recipient
+                modalHtml = `
+                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-[var(--accent-color)] text-center">
+                            <i class="fas fa-phone-volume text-5xl text-[var(--accent-color)] mb-4 animate-pulse"></i>
+                            <p class="text-xl text-white mb-4">${participants[0].name} is ringing you...</p>
+                            <div class="flex justify-center space-x-4 mt-4">
+                                <button id="pickup-btn" class="bg-green-500 text-white px-6 py-3 rounded-full font-bold hover:bg-green-600 transition duration-300">
+                                    <i class="fas fa-phone mr-2"></i>Pick Up
+                                </button>
+                                <button id="decline-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300">
+                                    <i class="fas fa-phone-slash mr-2"></i>Decline
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (status === 'ringing' && appCurrentUser.uid === callerId) {
+                // Outgoing call modal for the caller
+                modalHtml = `
+                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-[var(--accent-color)] text-center">
+                            <i class="fas fa-phone-alt text-5xl text-[var(--accent-color)] mb-4 animate-pulse"></i>
+                            <p class="text-xl text-white mb-4">Ringing ${participants[1].name}...</p>
+                            <button id="cancel-call-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300 mt-4">
+                                <i class="fas fa-times mr-2"></i>Cancel
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (status === 'active') {
+                // Active call modal for both participants
+                const participantsHtml = participants.map(p => `<li class="flex items-center space-x-2"><i class="fas fa-user-circle"></i><span>${p.name}</span></li>`).join('');
+                modalHtml = `
+                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-green-500 text-center">
+                            <h3 class="text-2xl font-bold text-green-500 mb-4">In a Call</h3>
+                            <ul class="text-left text-lg text-gray-200 mb-6 space-y-2">
+                                ${participantsHtml}
+                            </ul>
+                            <button id="hangup-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300">
+                                <i class="fas fa-phone-slash mr-2"></i>Hang Up
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (modalHtml) {
+                modalContainer.insertAdjacentHTML('beforeend', modalHtml);
+
+                if (status === 'ringing' && appCurrentUser.uid !== callerId) {
+                    document.getElementById('pickup-btn').addEventListener('click', () => acceptCall(callId, participants));
+                    document.getElementById('decline-btn').addEventListener('click', () => endCall(callId));
+                } else if (status === 'ringing' && appCurrentUser.uid === callerId) {
+                    document.getElementById('cancel-call-btn').addEventListener('click', () => endCall(callId));
+                } else if (status === 'active') {
+                    document.getElementById('hangup-btn').addEventListener('click', () => endCall(callId));
+                }
+            } else {
+                 const existingModal = document.getElementById(modalId);
+                 if (existingModal) existingModal.remove();
+            }
+        }
+        
+        async function startCall(recipientId, recipientUsername) {
             showMessageModal(
                 `Are you sure you want to call ${recipientUsername}?`,
                 'confirm',
-                () => {
-                    // This block runs if the user clicks "Yes"
-                    const callId = `call-${Math.random().toString(36).substring(2, 11)}`;
-                    showMessageModal(
-                        `<p class="text-lg animate-pulse">Ringing ${recipientUsername}... (Call ID: ${callId})</p><p class="text-sm mt-2 text-gray-400">This is a simulated call.</p>`,
-                        'info'
-                    );
-
-                    // Simulate the other person getting a call.
-                    // In a real-world app, this would be a Firestore update or a push notification.
-                    setTimeout(() => {
-                        showMessageModal(
-                            `${appUserData.username} is ringing you!`,
-                            'info'
-                        );
-                    }, 5000);
+                async () => {
+                    const callsCollection = collection(db, `/artifacts/${appId}/private/data/calls`);
+                    const newCall = {
+                        callerId: appCurrentUser.uid,
+                        recipientId: recipientId,
+                        status: 'ringing',
+                        participants: [{ id: appCurrentUser.uid, name: appUserData.username }],
+                        createdAt: serverTimestamp()
+                    };
+                    try {
+                        const callDocRef = await addDoc(callsCollection, newCall);
+                        currentCallId = callDocRef.id;
+                    } catch (error) {
+                        showMessageModal('Failed to start call: ' + error.message, 'error');
+                    }
                 }
             );
+        }
+
+        async function acceptCall(callId, currentParticipants) {
+            const callDocRef = doc(db, `/artifacts/${appId}/private/data/calls`, callId);
+            try {
+                const updatedParticipants = [...currentParticipants, { id: appCurrentUser.uid, name: appUserData.username }];
+                await updateDocFirestore(callDocRef, {
+                    status: 'active',
+                    participants: updatedParticipants
+                });
+            } catch (error) {
+                showMessageModal('Failed to accept call: ' + error.message, 'error');
+            }
+        }
+
+        async function endCall(callId) {
+            const callDocRef = doc(db, `/artifacts/${appId}/private/data/calls`, callId);
+            try {
+                await updateDocFirestore(callDocRef, {
+                    status: 'ended'
+                });
+            } catch (error) {
+                showMessageModal('Failed to end call: ' + error.message, 'error');
+            }
+        }
+
+        // Listens for incoming and outgoing calls
+        function listenForCalls() {
+            if (!appCurrentUser) return;
+            const callsCollection = collection(db, `/artifacts/${appId}/private/data/calls`);
+            const q = query(callsCollection, where('status', 'in', ['ringing', 'active']));
+            
+            if (callUnsubscribe) callUnsubscribe(); // Unsubscribe old listener
+            
+            callUnsubscribe = onSnapshot(q, (snapshot) => {
+                let foundCall = false;
+                snapshot.forEach(callDoc => {
+                    const callData = callDoc.data();
+                    const isParticipant = callData.callerId === appCurrentUser.uid || callData.recipientId === appCurrentUser.uid;
+                    
+                    if (isParticipant) {
+                        foundCall = true;
+                        currentCallId = callDoc.id;
+                        renderCallModal(callDoc.id, callData.status, callData.participants, callData.callerId);
+                    }
+                });
+                
+                // If no active or ringing call involves the current user, clear the modal
+                if (!foundCall) {
+                    const modal = document.getElementById('call-modal');
+                    if(modal) modal.remove();
+                    currentCallId = null;
+                }
+            });
         }
 
         function renderMessagesPage() {
@@ -1008,6 +1155,8 @@
                 </div>
             `;
             
+            listenForCalls();
+
             const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
             onSnapshot(usersCollection, (snapshot) => {
                 const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -1038,6 +1187,7 @@
             // Clear previous listener if one exists
             if (dmUnsubscribe) {
                 dmUnsubscribe();
+                dmUnsubscribe = null;
             }
 
             activeDMUserId = userId;
@@ -1045,7 +1195,7 @@
             chatPanel.innerHTML = `
                 <div class="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800 sticky top-0 z-10">
                     <h4 class="text-xl font-bold text-[var(--accent-color)]">Chatting with ${username}</h4>
-                    <button id="call-user-btn" class="bg-green-500 text-white p-2 rounded-lg hover:bg-green-600 transition">
+                    <button id="call-user-btn" class="call-user-btn text-white p-3 rounded-full hover:bg-green-600 transition">
                         <i class="fas fa-phone"></i>
                     </button>
                 </div>
@@ -1129,9 +1279,14 @@
                 dmUnsubscribe();
                 dmUnsubscribe = null;
             }
+            if (callUnsubscribe) {
+                callUnsubscribe();
+                callUnsubscribe = null;
+            }
             activeDMUserId = null;
             
             contentArea.innerHTML = '';
+            lastNavigatedPage = page;
             localStorage.setItem('currentPage', page);
             
             if (appUserData && appUserData.isBanned && page !== 'auth') {
@@ -1191,11 +1346,15 @@
                 if (appUserData.accentColor) {
                     updateTheme(appUserData.accentColor);
                 }
-
-                renderSidebarNav(appCurrentUser, appUserData);
-                const currentPage = localStorage.getItem('currentPage') || 'home';
-                navigateTo(currentPage);
                 
+                renderSidebarNav(appCurrentUser, appUserData);
+                
+                const currentPage = localStorage.getItem('currentPage');
+                if (currentPage && currentPage !== 'auth') {
+                    navigateTo(currentPage);
+                } else {
+                    navigateTo('home');
+                }
             } else {
                 appUserData = null;
                 renderSidebarNav(appCurrentUser, appUserData);
