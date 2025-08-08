@@ -15,7 +15,7 @@ import { updateTheme } from './utils.js';
 
 // Import Firebase core and auth services
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, addDoc, where } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 
@@ -90,15 +90,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize Firebase services
     initializeFirebaseServices(firebaseConfig, CONFIG);
 
-    // Handle initial anonymous sign-in or custom token sign-in
-    try {
-        if (initialAuthToken) {
+    // If a custom auth token is provided, sign in with it.
+    // The onAuthStateChanged listener will handle the rest.
+    if (initialAuthToken) {
+        try {
             await signInWithCustomToken(auth, initialAuthToken);
-        } else if (!auth.currentUser) {
-            await signInAnonymously(auth);
+        } catch (error) {
+            console.error("Custom token authentication failed:", error);
         }
-    } catch (error) {
-        console.error("Authentication failed:", error);
     }
     
     // Set up the Firebase Auth state change listener
@@ -114,22 +113,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (userData.accentColor) {
                 updateTheme(userData.accentColor);
             }
+            // Initialize and render navigation with the latest user state
+            Navigation.initializeNavigation(currentUser, userData, navigateTo, CONFIG);
+            Navigation.renderNav();
+            
+            // Initialize page renderers with the latest user state
+            PageRenderers.initializeRenderers(currentUser, userData, navigateTo, CONFIG);
+
+            // Navigate to a page after authentication state is confirmed.
+            const currentPage = localStorage.getItem('currentPage') || 'home';
+            navigateTo(currentPage);
         } else {
+            // User is not signed in.
             currentUser = null;
             userData = null;
             updateTheme('#ff0000'); // Default to red accent for unauthenticated users
+            
+            // Initialize and render navigation for a logged-out user
+            Navigation.initializeNavigation(currentUser, userData, navigateTo, CONFIG);
+            Navigation.renderNav();
+            
+            // Initialize page renderers for a logged-out user
+            PageRenderers.initializeRenderers(currentUser, userData, navigateTo, CONFIG);
+            
+            // Redirect to the login page
+            navigateTo('login');
         }
-        
-        // Initialize and render navigation with the latest user state
-        Navigation.initializeNavigation(currentUser, userData, navigateTo, CONFIG);
-        Navigation.renderNav();
-        
-        // Initialize page renderers with the latest user state
-        PageRenderers.initializeRenderers(currentUser, userData, navigateTo, CONFIG);
-
-        // Navigate to a page after authentication state is confirmed.
-        const currentPage = localStorage.getItem('currentPage') || 'home';
-        navigateTo(currentPage);
     });
 
     // Event listeners for the top nav home button
