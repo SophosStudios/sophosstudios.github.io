@@ -31,7 +31,7 @@
             border-radius: 4px;
         }
         
-        /* Left Sidebar: Collapsed by default on desktop, hidden on mobile */
+        /* Left Sidebar - Collapsed by default on desktop, hidden on mobile */
         .left-sidebar {
             width: 72px;
             transition: width 0.3s ease, transform 0.3s ease;
@@ -47,7 +47,7 @@
             width: 256px;
         }
         
-        /* Main Content Wrapper: Adjusts margin based on sidebar state */
+        /* Main Content Wrapper - Adjusts margin based on sidebar state */
         .main-content-wrapper {
             margin-left: 72px;
             transition: margin-left 0.3s ease;
@@ -114,6 +114,33 @@
         }
         .call-user-btn:active {
             transform: scale(0.95);
+        }
+        
+        /* New styling for video and call UI */
+        .video-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+        }
+        .video-large {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .video-small {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            width: 25%;
+            max-width: 200px;
+            border: 2px solid white;
+            border-radius: 0.5rem;
+            z-index: 10;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
     </style>
 </head>
@@ -212,7 +239,7 @@
         try {
             app = initializeApp(firebaseConfig);
         } catch (error) {
-            console.error("Firebase initialization failed:", error);
+            console.error("Firebase initialization failed", error);
             document.getElementById('content-area').innerHTML = `
                 <div class="text-center p-8">
                     <h1 class="text-3xl font-bold text-red-500">Configuration Error</h1>
@@ -398,7 +425,8 @@
                 logoutButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
                 logoutButton.innerHTML = `
                     <i class="fas fa-sign-out-alt w-6 text-center"></i>
-                    <span class="sidebar-nav-text whitespace-nowrap hidden">Sign Out</span>`;
+                    <span class="sidebar-nav-text whitespace-nowrap hidden">Sign Out</span>
+                `;
                 logoutButton.addEventListener('click', async () => {
                     try {
                         await signOut(auth);
@@ -415,23 +443,23 @@
                 authButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
                 authButton.innerHTML = `
                     <i class="fas fa-sign-in-alt w-6 text-center"></i>
-                    <span class="sidebar-nav-text whitespace-nowrap hidden">Account</span>`;
+                    <span class="sidebar-nav-text whitespace-nowrap hidden">Account</span>
+                `;
                 authButton.addEventListener('click', () => navigateTo('auth'));
                 authContainer.appendChild(authButton);
             }
-            
             const isExpanded = leftSidebar.classList.contains('expanded');
             const navTextElements = leftSidebar.querySelectorAll('.sidebar-nav-text');
             const websiteTitleSidebar = document.getElementById('website-title-sidebar');
             const websiteLogoCollapsed = document.getElementById('website-logo-collapsed');
             const adminPanelButtonContainer = document.getElementById('admin-panel-button-container');
-            
+
             if (isExpanded) {
                 navTextElements.forEach(el => el.classList.remove('hidden'));
                 websiteTitleSidebar.classList.remove('hidden');
                 websiteLogoCollapsed.classList.add('hidden');
                 if (adminPanelButtonContainer.innerHTML.trim() !== '') {
-                     adminPanelButtonContainer.classList.remove('hidden');
+                    adminPanelButtonContainer.classList.remove('hidden');
                 }
             } else {
                 navTextElements.forEach(el => el.classList.add('hidden'));
@@ -445,14 +473,13 @@
         // 5. PAGE RENDERERS
         // =================================================================
         const contentArea = document.getElementById('content-area');
-        
         let activeDMUserId = null;
         let dmUnsubscribe = null;
         let callUnsubscribe = null;
 
         function renderHomePage() {
             contentArea.innerHTML = `
-                <div class="flex flex-col items-center justify-center p-8 text-center">
+                <div class="flex flex-col items-center justify-center p-8 text-center h-full">
                     <h1 class="text-4xl md:text-6xl font-bold text-red-500 mb-4 animate-pulse">Welcome to SophosWRLD</h1>
                     <p class="text-xl text-gray-400">Your personalized community hub.</p>
                     <div class="mt-8">
@@ -466,8 +493,11 @@
         }
 
         function renderAdminPage() {
-            if (!appCurrentUser || (appUserData?.role !== 'admin' && appUserData?.role !== 'founder')) {
-                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be an admin to view this page.</p></div>`;
+            if (!appCurrentUser || (appUserData.role !== 'admin' && appUserData.role !== 'founder')) {
+                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto">
+                    <h1 class="text-3xl text-center text-red-500">Access Denied</h1>
+                    <p class="text-center text-gray-400">You must be an admin to view this page.</p>
+                </div>`;
                 return;
             }
 
@@ -481,12 +511,13 @@
                 </div>
             `;
 
-            const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
+            const usersCollection = collection(db, `artifacts/${appId}/public/data/users`);
+
             onSnapshot(usersCollection, (snapshot) => {
                 const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 const userListContainer = document.getElementById('user-list');
                 if (!userListContainer) return;
-                
+
                 // Filter out the current user from the list
                 const filteredUsers = userList.filter(user => user.id !== appCurrentUser.uid);
 
@@ -508,803 +539,234 @@
                         </thead>
                         <tbody>
                             ${filteredUsers.map(user => `
-                                <tr class="border-b border-gray-700 hover:bg-gray-700/50">
-                                    <td class="p-3">${user.username}</td>
+                                <tr class="border-b border-gray-700 hover:bg-gray-700">
+                                    <td class="p-3">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-10 h-10 rounded-full flex items-center justify-center bg-red-600 text-white font-bold">
+                                                ${user.name.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <div class="font-bold">${user.name}</div>
+                                                <div class="text-sm text-gray-400">UID: ${user.id}</div>
+                                            </div>
+                                        </div>
+                                    </td>
                                     <td class="p-3">${user.email}</td>
                                     <td class="p-3">
-                                        <select class="role-select bg-gray-600 p-2 rounded" data-user-id="${user.id}" ${appUserData.role !== 'founder' ? 'disabled' : ''}>
-                                            <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
-                                            <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                                            <option value="founder" ${user.role === 'founder' ? 'selected' : ''}>Founder</option>
-                                        </select>
-                                    </td>
-                                    <td class="p-3">
-                                        <span class="p-2 rounded-full text-xs font-semibold ${user.isBanned ? 'bg-red-500' : 'bg-green-500'}">
-                                            ${user.isBanned ? 'Banned' : 'Active'}
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'founder' ? 'bg-yellow-800 text-yellow-300' : user.role === 'admin' ? 'bg-red-800 text-red-300' : 'bg-gray-600 text-gray-300'}">
+                                            ${user.role}
                                         </span>
                                     </td>
-                                    <td class="p-3 space-x-2 flex action-btn-group">
-                                        <button class="ban-btn bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition" data-user-id="${user.id}" data-is-banned="${user.isBanned}">
-                                            <i class="fas fa-ban"></i>
-                                            <span class="ml-2">${user.isBanned ? 'Unban' : 'Ban'}</span>
-                                        </button>
-                                        <button class="reset-password-btn bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition" data-user-id="${user.id}" data-user-email="${user.email}">
-                                            <i class="fas fa-key"></i>
-                                            <span class="ml-2">Reset Password</span>
-                                        </button>
-                                        <button class="delete-btn bg-red-600 text-white rounded-lg hover:bg-red-700 transition" data-user-id="${user.id}">
-                                            <i class="fas fa-trash"></i>
-                                            <span class="ml-2">Delete</span>
-                                        </button>
+                                    <td class="p-3">
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${user.status === 'online' ? 'bg-green-600 text-green-100' : 'bg-gray-600 text-gray-100'}">
+                                            ${user.status}
+                                        </span>
+                                    </td>
+                                    <td class="p-3">
+                                        <button class="bg-red-600 text-white px-3 py-1 rounded-md text-sm font-semibold hover:bg-red-700 transition" onclick="deleteUser('${user.id}')">Delete</button>
                                     </td>
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
                 `;
-                
-                userListContainer.querySelectorAll('.role-select').forEach(select => {
-                    select.addEventListener('change', async (event) => {
-                        const userId = event.target.dataset.userId;
-                        const newRole = event.target.value;
-                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
-                        try {
-                            await updateDocFirestore(userDocRef, { role: newRole });
-                            showMessageModal('User role updated successfully!', 'success');
-                        } catch (error) {
-                            showMessageModal('Failed to update user role.', 'error');
-                        }
-                    });
-                });
-
-                userListContainer.querySelectorAll('.ban-btn').forEach(btn => {
-                    btn.addEventListener('click', async (event) => {
-                        const userId = event.currentTarget.dataset.userId;
-                        const isBanned = event.currentTarget.dataset.isBanned === 'true';
-                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
-                        try {
-                            await updateDocFirestore(userDocRef, { isBanned: !isBanned });
-                            showMessageModal(`User ${!isBanned ? 'banned' : 'unbanned'} successfully!`, 'success');
-                        } catch (error) {
-                            showMessageModal('Failed to update user ban status.', 'error');
-                        }
-                    });
-                });
-
-                userListContainer.querySelectorAll('.reset-password-btn').forEach(btn => {
-                    btn.addEventListener('click', async (event) => {
-                        const userEmail = event.currentTarget.dataset.userEmail;
-                        try {
-                            await sendPasswordResetEmail(auth, userEmail);
-                            showMessageModal('Password reset email sent successfully!', 'success');
-                        } catch (error) {
-                            showMessageModal(`Failed to send password reset email: ${error.message}`, 'error');
-                        }
-                    });
-                });
-
-                userListContainer.querySelectorAll('.delete-btn').forEach(btn => {
-                    btn.addEventListener('click', (event) => {
-                        const userId = event.currentTarget.dataset.userId;
-                        showMessageModal(
-                            'Are you sure you want to delete this user\'s data? This will NOT delete the Firebase Authentication account, which must be done manually in the console.',
-                            'confirm',
-                            async () => {
-                                try {
-                                    const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
-                                    await deleteDoc(userDocRef);
-                                    showMessageModal('User data deleted from Firestore. Remember to delete the user from the Firebase Authentication console.', 'success');
-                                } catch (error) {
-                                    showMessageModal('Failed to delete user data.', 'error');
-                                }
-                            }
-                        );
-                    });
-                });
             });
-        }
-
-        function renderAuthPage() {
-            contentArea.innerHTML = `
-                <div class="max-w-md mx-auto bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500">
-                    <h2 class="text-3xl font-bold text-center mb-6 text-red-500">Join or Sign In</h2>
-                    <form id="auth-form" class="space-y-4">
-                        <input type="email" id="auth-email" placeholder="Email" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500">
-                        <input type="password" id="auth-password" placeholder="Password" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500">
-                        <div class="flex items-center justify-between pt-2">
-                            <button type="submit" id="signin-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">Sign In</button>
-                            <button type="button" id="signup-btn" class="bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-700 transition-colors duration-300">Sign Up</button>
-                        </div>
-                    </form>
-                    <div class="mt-6">
-                        <p class="text-center text-gray-400 mb-4">or</p>
-                        <button id="google-signin-btn" class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors duration-300 flex items-center justify-center space-x-2">
-                            <i class="fab fa-google"></i>
-                            <span>Sign in with Google</span>
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            const authForm = document.getElementById('auth-form');
-            const emailInput = document.getElementById('auth-email');
-            const passwordInput = document.getElementById('auth-password');
-            const googleBtn = document.getElementById('google-signin-btn');
-
-            document.getElementById('signin-btn').addEventListener('click', async (e) => {
-                e.preventDefault();
-                showLoadingSpinner();
-                try {
-                    await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
-                } catch (error) {
-                    showMessageModal(error.message, 'error');
-                } finally {
-                    hideLoadingSpinner();
-                }
-            });
-
-            document.getElementById('signup-btn').addEventListener('click', async (e) => {
-                e.preventDefault();
-                showLoadingSpinner();
-                try {
-                    const userCredential = await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
-                    const user = userCredential.user;
-                    
-                    const newUser = {
-                        username: user.email.split('@')[0],
-                        email: user.email,
-                        role: 'member',
-                        isBanned: false,
-                        theme: 'dark',
-                        accentColor: '#ef4444'
-                    };
-                    await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), newUser);
-                    
-                    showMessageModal('Account created successfully! You are now signed in.', 'success');
-                } catch (error) {
-                    showMessageModal(error.message, 'error');
-                } finally {
-                    hideLoadingSpinner();
-                }
-            });
-
-            if (googleBtn) {
-                googleBtn.addEventListener('click', async () => {
-                    showLoadingSpinner();
-                    const provider = new GoogleAuthProvider();
-                    try {
-                        const result = await signInWithPopup(auth, provider);
-                        const user = result.user;
-                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
-                        const userDoc = await getDoc(userDocRef);
-
-                        if (!userDoc.exists()) {
-                            const newUser = {
-                                username: user.displayName || user.email.split('@')[0],
-                                email: user.email,
-                                role: 'member',
-                                isBanned: false,
-                                theme: 'dark',
-                                accentColor: '#ef4444'
-                            };
-                            await setDoc(userDocRef, newUser);
-                        }
-                    } catch (error) {
-                        showMessageModal(`Google sign-in failed: ${error.message}`, 'error');
-                    } finally {
-                        hideLoadingSpinner();
-                    }
-                });
-            }
         }
         
-        function renderSettingsPage() {
-            if (!appCurrentUser || !appUserData) {
-                contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Not Logged In</h1><p class="text-center text-gray-400">Please log in to view settings.</p>`;
-                return;
-            }
-
-            contentArea.innerHTML = `
-                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-lg mx-auto">
-                    <h2 class="text-3xl font-bold text-red-500 mb-6">Settings</h2>
-                    <form id="settings-form" class="space-y-6">
-                        <div>
-                            <label for="username" class="block text-lg font-semibold text-gray-300 mb-2">Username</label>
-                            <input type="text" id="username" value="${appUserData.username}" class="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-red-500">
-                        </div>
-                        <div>
-                            <label for="accent-color" class="block text-lg font-semibold text-gray-300 mb-2">Accent Color</label>
-                            <input type="color" id="accent-color" value="${appUserData.accentColor}" class="w-full h-12 p-1 bg-gray-700 rounded-lg cursor-pointer">
-                        </div>
-                        <button type="submit" id="save-settings-btn" class="w-full bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">Save Changes</button>
-                    </form>
-                </div>
-            `;
-
-            document.getElementById('settings-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
+        async function deleteUser(userId) {
+            showMessageModal(`Are you sure you want to delete this user?`, 'confirm', async () => {
                 showLoadingSpinner();
-                const newUsername = document.getElementById('username').value;
-                const newAccentColor = document.getElementById('accent-color').value;
-                const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, appCurrentUser.uid);
-
                 try {
-                    await updateDocFirestore(userDocRef, {
-                        username: newUsername,
-                        accentColor: newAccentColor
-                    });
-                    updateTheme(newAccentColor);
-                    showMessageModal('Settings saved successfully!', 'success');
+                    const userRef = doc(db, `artifacts/${appId}/public/data/users`, userId);
+                    await deleteDoc(userRef);
+                    showMessageModal('User deleted successfully.', 'success');
                 } catch (error) {
-                    showMessageModal('Error saving settings: ' + error.message, 'error');
+                    console.error("Error deleting user:", error);
+                    showMessageModal(`Error deleting user: ${error.message}`, 'error');
                 } finally {
                     hideLoadingSpinner();
                 }
             });
         }
         
-        function renderCreatePostModal(postId = null, title = '', content = '') {
-            const modalHtml = `
-                <div id="create-post-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-lg w-full border-2 border-[var(--accent-color)]">
-                        <h3 class="text-2xl font-bold text-[var(--accent-color)] mb-4">${postId ? 'Edit Post' : 'Create New Post'}</h3>
-                        <form id="create-post-form" class="space-y-4">
-                            <input type="text" id="post-title" placeholder="Post Title" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" value="${title}" required>
-                            <textarea id="post-content" placeholder="What's on your mind?" rows="5" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required>${content}</textarea>
-                            <div class="flex justify-end space-x-2">
-                                <button type="button" id="cancel-post-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Cancel</button>
-                                <button type="submit" class="bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg hover:bg-opacity-80 transition">${postId ? 'Save Changes' : 'Post'}</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            `;
-            document.getElementById('modal-container').innerHTML = modalHtml;
-            document.getElementById('cancel-post-btn').addEventListener('click', () => document.getElementById('create-post-modal').remove());
-
-            document.getElementById('create-post-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                showLoadingSpinner();
-                const newTitle = document.getElementById('post-title').value;
-                const newContent = document.getElementById('post-content').value;
-                const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
-
-                try {
-                    if (postId) {
-                        const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
-                        await updateDocFirestore(postDocRef, {
-                            title: newTitle,
-                            content: newContent
-                        });
-                        showMessageModal('Post updated successfully!', 'success');
-                    } else {
-                        await addDoc(postsCollection, {
-                            title: newTitle,
-                            content: newContent,
-                            authorId: appCurrentUser.uid,
-                            authorName: appUserData.username,
-                            createdAt: serverTimestamp(),
-                            reactions: {}
-                        });
-                        showMessageModal('Post created successfully!', 'success');
-                    }
-                    document.getElementById('create-post-modal').remove();
-                } catch (error) {
-                    showMessageModal('Error processing post: ' + error.message, 'error');
-                } finally {
-                    hideLoadingSpinner();
-                }
-            });
-        }
-        
-        function renderReactionModal(postId) {
-            const emojis = ['👍', '❤️', '😂', '🔥', '🤔', '🎉'];
-            const emojiHtml = emojis.map(emoji => `<button class="reaction-emoji text-3xl p-2 hover:bg-gray-700 rounded-lg transition" data-emoji="${emoji}">${emoji}</button>`).join('');
-
-            const modalHtml = `
-                <div id="reaction-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full border-2 border-[var(--accent-color)]">
-                        <h3 class="text-2xl font-bold text-[var(--accent-color)] mb-4">React to Post</h3>
-                        <div class="flex justify-around items-center space-x-2">
-                            ${emojiHtml}
-                        </div>
-                        <div class="flex justify-end mt-4">
-                            <button id="cancel-reaction-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Cancel</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.getElementById('modal-container').innerHTML = modalHtml;
-            document.getElementById('cancel-reaction-btn').addEventListener('click', () => document.getElementById('reaction-modal').remove());
-
-            document.querySelectorAll('.reaction-emoji').forEach(button => {
-                button.addEventListener('click', async (e) => {
-                    const emoji = e.target.dataset.emoji;
-                    const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
-                    
-                    try {
-                        const postDoc = await getDoc(postDocRef);
-                        const currentReactions = postDoc.data().reactions || {};
-                        const reactionKey = emoji.codePointAt(0).toString(16);
-                        
-                        const newReactions = { ...currentReactions };
-                        if (newReactions[reactionKey]) {
-                            newReactions[reactionKey].count += 1;
-                        } else {
-                            newReactions[reactionKey] = {
-                                emoji: emoji,
-                                count: 1
-                            };
-                        }
-                        
-                        await updateDocFirestore(postDocRef, { reactions: newReactions });
-                        document.getElementById('reaction-modal').remove();
-                    } catch (error) {
-                        showMessageModal('Failed to add reaction: ' + error.message, 'error');
-                    }
-                });
-            });
-        }
-        
-        function deletePost(postId) {
-            showMessageModal(
-                'Are you sure you want to delete this post? This action cannot be undone.',
-                'confirm',
-                async () => {
-                    showLoadingSpinner();
-                    const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
-                    try {
-                        await deleteDoc(postDocRef);
-                        showMessageModal('Post deleted successfully!', 'success');
-                    } catch (error) {
-                        showMessageModal('Failed to delete post: ' + error.message, 'error');
-                    } finally {
-                        hideLoadingSpinner();
-                    }
-                }
-            );
-        }
-
         function renderForumsPage() {
             if (!appCurrentUser) {
-                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be logged in to view the forums.</p></div>`;
+                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto">
+                    <h1 class="text-3xl text-center text-red-500">Access Denied</h1>
+                    <p class="text-center text-gray-400">You must be logged in to view the forums.</p>
+                </div>`;
                 return;
             }
+
             contentArea.innerHTML = `
-                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-3xl font-bold text-red-500">Forums</h2>
-                        <button id="create-post-btn" class="bg-red-600 text-white font-semibold py-2 px-5 rounded-lg hover:bg-red-700 transition-colors duration-300">
-                            <i class="fas fa-plus mr-2"></i>Create Post
-                        </button>
-                    </div>
-                    <div id="posts-list" class="space-y-4">
-                        <p class="text-gray-400 text-center">Loading posts...</p>
-                    </div>
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full mx-auto">
+                    <h2 class="text-3xl font-bold text-red-500 mb-6">Community Forums</h2>
+                    <p class="text-gray-400">Forums are coming soon! Check back later.</p>
                 </div>
             `;
-            document.getElementById('create-post-btn').addEventListener('click', () => {
-                if (appCurrentUser) {
-                    renderCreatePostModal();
-                } else {
-                    showMessageModal('You must be signed in to create a post.', 'error');
-                }
-            });
-
-            const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
-            const q = query(postsCollection, orderBy('createdAt', 'desc'));
-            onSnapshot(q, (snapshot) => {
-                const postsList = document.getElementById('posts-list');
-                if (!postsList) return;
-                
-                if (snapshot.empty) {
-                    postsList.innerHTML = '<p class="text-gray-400 text-center">No posts yet. Be the first to create one!</p>';
-                    return;
-                }
-
-                postsList.innerHTML = snapshot.docs.map(postDoc => {
-                    const post = postDoc.data();
-                    const postId = postDoc.id;
-                    const canEditOrDelete = appUserData?.role === 'admin' || appUserData?.role === 'founder';
-
-                    const reactionsHtml = post.reactions ? Object.values(post.reactions).map(reaction => `
-                        <span class="bg-gray-700 px-2 py-1 rounded-full text-sm">${reaction.emoji} ${reaction.count}</span>
-                    `).join('') : '';
-
-                    return `
-                        <div class="bg-gray-700 p-6 rounded-lg shadow-md border border-gray-600">
-                            <div class="flex justify-between items-start mb-2">
-                                <h3 class="text-xl font-bold text-[var(--accent-color)]">${post.title}</h3>
-                                <div class="flex-shrink-0 text-right">
-                                    <span class="block text-sm text-gray-400">by ${post.authorName}</span>
-                                    ${canEditOrDelete ? `
-                                        <div class="mt-2 space-x-2">
-                                            <button class="edit-post-btn bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 transition" data-post-id="${postId}">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button class="delete-post-btn bg-red-600 text-white p-2 rounded-full hover:bg-red-700 transition" data-post-id="${postId}">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                            <p class="text-gray-300 mb-4">${post.content}</p>
-                            <div class="flex items-center space-x-4">
-                                <div class="flex space-x-2">
-                                    ${reactionsHtml}
-                                </div>
-                                <button class="add-reaction-btn bg-gray-600 text-white p-2 rounded-full hover:bg-gray-500 transition" data-post-id="${postId}">
-                                    <i class="far fa-smile"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-
-                document.querySelectorAll('.add-reaction-btn').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        const postId = e.currentTarget.dataset.postId;
-                        renderReactionModal(postId);
-                    });
-                });
-                
-                document.querySelectorAll('.edit-post-btn').forEach(button => {
-                    button.addEventListener('click', async (e) => {
-                        const postId = e.currentTarget.dataset.postId;
-                        showLoadingSpinner();
-                        const postDoc = await getDoc(doc(db, `/artifacts/${appId}/public/data/forums`, postId));
-                        hideLoadingSpinner();
-                        if (postDoc.exists()) {
-                            const postData = postDoc.data();
-                            renderCreatePostModal(postId, postData.title, postData.content);
-                        } else {
-                            showMessageModal('Post not found.', 'error');
-                        }
-                    });
-                });
-
-                document.querySelectorAll('.delete-post-btn').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        const postId = e.currentTarget.dataset.postId;
-                        deletePost(postId);
-                    });
-                });
-            });
-        }
-        
-        function getChatId(user1Id, user2Id) {
-            return [user1Id, user2Id].sort().join('-');
-        }
-        
-        // --- Simulated Calling Logic ---
-        let currentCallId = null;
-
-        function renderCallModal(callId, status, participants, callerId) {
-            const modalContainer = document.getElementById('modal-container');
-            const modalId = 'call-modal';
-            const existingModal = document.getElementById(modalId);
-            if (existingModal) existingModal.remove();
-
-            let modalHtml = '';
-            
-            if (status === 'ringing' && appCurrentUser.uid !== callerId) {
-                // Incoming call modal for the recipient
-                modalHtml = `
-                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-[var(--accent-color)] text-center">
-                            <i class="fas fa-phone-volume text-5xl text-[var(--accent-color)] mb-4 animate-pulse"></i>
-                            <p class="text-xl text-white mb-4">${participants[0].name} is ringing you...</p>
-                            <div class="flex justify-center space-x-4 mt-4">
-                                <button id="pickup-btn" class="bg-green-500 text-white px-6 py-3 rounded-full font-bold hover:bg-green-600 transition duration-300">
-                                    <i class="fas fa-phone mr-2"></i>Pick Up
-                                </button>
-                                <button id="decline-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300">
-                                    <i class="fas fa-phone-slash mr-2"></i>Decline
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            } else if (status === 'ringing' && appCurrentUser.uid === callerId) {
-                // Outgoing call modal for the caller
-                modalHtml = `
-                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-[var(--accent-color)] text-center">
-                            <i class="fas fa-phone-alt text-5xl text-[var(--accent-color)] mb-4 animate-pulse"></i>
-                            <p class="text-xl text-white mb-4">Ringing ${participants[1].name}...</p>
-                            <button id="cancel-call-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300 mt-4">
-                                <i class="fas fa-times mr-2"></i>Cancel
-                            </button>
-                        </div>
-                    </div>
-                `;
-            } else if (status === 'active') {
-                // Active call modal for both participants
-                const participantsHtml = participants.map(p => `<li class="flex items-center space-x-2"><i class="fas fa-user-circle"></i><span>${p.name}</span></li>`).join('');
-                modalHtml = `
-                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-green-500 text-center">
-                            <h3 class="text-2xl font-bold text-green-500 mb-4">In a Call</h3>
-                            <ul class="text-left text-lg text-gray-200 mb-6 space-y-2">
-                                ${participantsHtml}
-                            </ul>
-                            <button id="hangup-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300">
-                                <i class="fas fa-phone-slash mr-2"></i>Hang Up
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }
-
-            if (modalHtml) {
-                modalContainer.insertAdjacentHTML('beforeend', modalHtml);
-
-                if (status === 'ringing' && appCurrentUser.uid !== callerId) {
-                    document.getElementById('pickup-btn').addEventListener('click', () => acceptCall(callId, participants));
-                    document.getElementById('decline-btn').addEventListener('click', () => endCall(callId));
-                } else if (status === 'ringing' && appCurrentUser.uid === callerId) {
-                    document.getElementById('cancel-call-btn').addEventListener('click', () => endCall(callId));
-                } else if (status === 'active') {
-                    document.getElementById('hangup-btn').addEventListener('click', () => endCall(callId));
-                }
-            } else {
-                 const existingModal = document.getElementById(modalId);
-                 if (existingModal) existingModal.remove();
-            }
-        }
-        
-        async function startCall(recipientId, recipientUsername) {
-            showMessageModal(
-                `Are you sure you want to call ${recipientUsername}?`,
-                'confirm',
-                async () => {
-                    const callsCollection = collection(db, `/artifacts/${appId}/private/data/calls`);
-                    const newCall = {
-                        callerId: appCurrentUser.uid,
-                        recipientId: recipientId,
-                        status: 'ringing',
-                        participants: [{ id: appCurrentUser.uid, name: appUserData.username }],
-                        createdAt: serverTimestamp()
-                    };
-                    try {
-                        const callDocRef = await addDoc(callsCollection, newCall);
-                        currentCallId = callDocRef.id;
-                    } catch (error) {
-                        showMessageModal('Failed to start call: ' + error.message, 'error');
-                    }
-                }
-            );
-        }
-
-        async function acceptCall(callId, currentParticipants) {
-            const callDocRef = doc(db, `/artifacts/${appId}/private/data/calls`, callId);
-            try {
-                const updatedParticipants = [...currentParticipants, { id: appCurrentUser.uid, name: appUserData.username }];
-                await updateDocFirestore(callDocRef, {
-                    status: 'active',
-                    participants: updatedParticipants
-                });
-            } catch (error) {
-                showMessageModal('Failed to accept call: ' + error.message, 'error');
-            }
-        }
-
-        async function endCall(callId) {
-            const callDocRef = doc(db, `/artifacts/${appId}/private/data/calls`, callId);
-            try {
-                await updateDocFirestore(callDocRef, {
-                    status: 'ended'
-                });
-            } catch (error) {
-                showMessageModal('Failed to end call: ' + error.message, 'error');
-            }
-        }
-
-        // Listens for incoming and outgoing calls
-        function listenForCalls() {
-            if (!appCurrentUser) return;
-            const callsCollection = collection(db, `/artifacts/${appId}/private/data/calls`);
-            const q = query(callsCollection, where('status', 'in', ['ringing', 'active']));
-            
-            if (callUnsubscribe) callUnsubscribe(); // Unsubscribe old listener
-            
-            callUnsubscribe = onSnapshot(q, (snapshot) => {
-                let foundCall = false;
-                snapshot.forEach(callDoc => {
-                    const callData = callDoc.data();
-                    const isParticipant = callData.callerId === appCurrentUser.uid || callData.recipientId === appCurrentUser.uid;
-                    
-                    if (isParticipant) {
-                        foundCall = true;
-                        currentCallId = callDoc.id;
-                        renderCallModal(callDoc.id, callData.status, callData.participants, callData.callerId);
-                    }
-                });
-                
-                // If no active or ringing call involves the current user, clear the modal
-                if (!foundCall) {
-                    const modal = document.getElementById('call-modal');
-                    if(modal) modal.remove();
-                    currentCallId = null;
-                }
-            });
         }
 
         function renderMessagesPage() {
             if (!appCurrentUser) {
-                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be logged in to view messages.</p></div>`;
+                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto">
+                    <h1 class="text-3xl text-center text-red-500">Access Denied</h1>
+                    <p class="text-center text-gray-400">You must be logged in to view messages.</p>
+                </div>`;
                 return;
             }
-
             contentArea.innerHTML = `
-                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto flex flex-col md:flex-row h-[70vh]">
-                    <!-- User List Panel -->
-                    <div id="user-list-panel" class="w-full md:w-1/3 flex-shrink-0 border-b md:border-r border-gray-700 overflow-y-auto">
-                        <h3 class="text-xl font-bold text-[var(--accent-color)] mb-4">Users</h3>
-                        <div id="messages-user-list">
-                            <p class="text-gray-400 text-center">Loading users...</p>
+                <div class="flex flex-col md:flex-row h-[calc(100vh-120px)] bg-gray-800 rounded-lg shadow-xl overflow-hidden border-t-4 border-red-500">
+                    <!-- Left Panel: User List -->
+                    <div id="users-panel" class="w-full md:w-1/3 border-r border-gray-700 p-4 overflow-y-auto">
+                        <h3 class="text-2xl font-bold text-red-500 mb-4">Users</h3>
+                        <div id="user-list" class="space-y-2">
+                            <p class="text-gray-400">Loading users...</p>
                         </div>
                     </div>
-                    <!-- Chat Panel -->
-                    <div id="chat-panel" class="flex-grow w-full md:w-2/3 flex flex-col p-4 relative">
-                        <div class="flex items-center justify-center h-full text-gray-400">
-                            Select a user to start a conversation.
+
+                    <!-- Right Panel: Chat/Call Window -->
+                    <div id="chat-panel" class="w-full md:w-2/3 flex flex-col p-4 bg-gray-900">
+                        <div class="flex-grow flex items-center justify-center text-gray-400 text-center">
+                            Select a user to start a conversation or a call.
                         </div>
                     </div>
                 </div>
             `;
-            
-            listenForCalls();
+            // Set up a listener for all users to render the user list
+            const usersCollection = collection(db, `artifacts/${appId}/public/data/users`);
+            const usersQuery = query(usersCollection, where('id', '!=', appCurrentUser.uid));
 
-            const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
-            onSnapshot(usersCollection, (snapshot) => {
-                const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                const userListContainer = document.getElementById('messages-user-list');
-                if (!userListContainer) return;
-
-                userListContainer.innerHTML = userList.filter(user => user.id !== appCurrentUser.uid).map(user => `
-                    <div class="user-item p-4 border-b border-gray-700 hover:bg-gray-700 cursor-pointer transition" data-user-id="${user.id}" data-username="${user.username}">
-                        <span class="font-semibold text-gray-200">${user.username}</span>
-                        <span class="block text-sm text-gray-400">${user.email}</span>
-                    </div>
-                `).join('');
-
-                document.querySelectorAll('.user-item').forEach(item => {
-                    item.addEventListener('click', (e) => {
-                        const userId = e.currentTarget.dataset.userId;
-                        const username = e.currentTarget.dataset.username;
-                        renderChatPanel(userId, username);
-                    });
-                });
+            onSnapshot(usersQuery, (snapshot) => {
+                const userList = document.getElementById('user-list');
+                if (!userList) return;
+                userList.innerHTML = snapshot.docs.map(doc => {
+                    const user = doc.data();
+                    return `
+                        <div class="flex items-center justify-between p-3 rounded-lg hover:bg-gray-700 cursor-pointer transition-colors duration-200" onclick="renderChatPanel('${user.id}', '${user.name}')">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-600 text-white font-bold">
+                                    ${user.name.charAt(0)}
+                                </div>
+                                <div>
+                                    <div class="font-bold">${user.name}</div>
+                                    <div class="text-sm text-gray-400">UID: ${user.id}</div>
+                                </div>
+                            </div>
+                            <span class="w-3 h-3 rounded-full ${user.status === 'online' ? 'bg-green-500' : 'bg-gray-500'}"></span>
+                        </div>
+                    `;
+                }).join('');
             });
         }
+
+        function renderSettingsPage() {
+            contentArea.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto">
+                    <h2 class="text-3xl font-bold text-red-500 mb-6">Settings</h2>
+                    <p class="text-gray-400">Settings page content coming soon...</p>
+                </div>
+            `;
+        }
         
-        function renderChatPanel(userId, username) {
+        async function renderChatPanel(otherUserId, otherUserName) {
+            activeDMUserId = otherUserId;
             const chatPanel = document.getElementById('chat-panel');
             if (!chatPanel) return;
             
-            // Clear previous listener if one exists
-            if (dmUnsubscribe) {
-                dmUnsubscribe();
-                dmUnsubscribe = null;
-            }
-
-            activeDMUserId = userId;
-
+            // Clean up any old listeners
+            if (dmUnsubscribe) dmUnsubscribe();
+            if (callUnsubscribe) callUnsubscribe();
+            
             chatPanel.innerHTML = `
-                <div class="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800 sticky top-0 z-10">
-                    <h4 class="text-xl font-bold text-[var(--accent-color)]">Chatting with ${username}</h4>
-                    <button id="call-user-btn" class="call-user-btn text-white p-3 rounded-full hover:bg-green-600 transition">
-                        <i class="fas fa-phone"></i>
-                    </button>
-                </div>
-                <div id="messages-container" class="flex-grow overflow-y-auto p-4 space-y-4">
-                    <!-- Messages will be rendered here -->
-                    <p class="text-center text-gray-400">Say hello!</p>
-                </div>
-                <form id="dm-form" class="p-4 border-t border-gray-700 bg-gray-800 sticky bottom-0 z-10">
-                    <div class="flex space-x-2">
-                        <input type="text" id="dm-input" placeholder="Type a message..." class="flex-grow p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required>
-                        <button type="submit" class="bg-[var(--accent-color)] text-white px-4 py-3 rounded-lg hover:bg-opacity-80 transition">
-                            <i class="fas fa-paper-plane"></i>
+                <div class="flex justify-between items-center border-b border-gray-700 pb-4 mb-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 rounded-full flex items-center justify-center bg-blue-600 text-white text-xl font-bold">
+                            ${otherUserName.charAt(0)}
+                        </div>
+                        <h3 class="text-2xl font-semibold">${otherUserName}</h3>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button id="call-btn" class="call-user-btn">
+                            <i class="fas fa-video"></i>
                         </button>
                     </div>
-                </form>
+                </div>
+                <div id="messages-list" class="flex-grow overflow-y-auto space-y-4 p-4 rounded-lg bg-gray-800 mb-4">
+                    <!-- Messages will be loaded here -->
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="message-input" placeholder="Type a message..." class="flex-grow bg-gray-700 text-gray-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-red-500">
+                    <button id="send-btn" class="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
             `;
-            
-            document.getElementById('dm-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const messageInput = document.getElementById('dm-input');
-                const messageText = messageInput.value.trim();
 
-                if (messageText) {
-                    const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
-                    const messagesCollection = collection(db, `/artifacts/${appId}/private/data/chats/${chatId}/messages`);
+            document.getElementById('call-btn').addEventListener('click', () => startCall(otherUserId));
 
-                    try {
-                        await addDoc(messagesCollection, {
-                            senderId: appCurrentUser.uid,
-                            text: messageText,
-                            createdAt: serverTimestamp()
-                        });
-                        messageInput.value = '';
-                    } catch (error) {
-                        showMessageModal('Failed to send message: ' + error.message, 'error');
-                    }
-                }
-            });
+            // Determine chat ID (alphabetical order for consistency)
+            const chatUsers = [appCurrentUser.uid, otherUserId].sort();
+            const chatId = `${chatUsers[0]}-${chatUsers[1]}`;
 
-            document.getElementById('call-user-btn').addEventListener('click', () => {
-                startCall(activeDMUserId, username);
-            });
-            
-            const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
-            const messagesCollection = collection(db, `/artifacts/${appId}/private/data/chats/${chatId}/messages`);
-            const q = query(messagesCollection, orderBy('createdAt', 'asc'));
+            const messagesCollection = collection(db, `artifacts/${appId}/private/data/chats/${chatId}/messages`);
+            const messagesQuery = query(messagesCollection, orderBy('timestamp'));
 
-            dmUnsubscribe = onSnapshot(q, (snapshot) => {
-                const messagesContainer = document.getElementById('messages-container');
-                if (!messagesContainer) return;
-                
-                messagesContainer.innerHTML = snapshot.docs.map(msgDoc => {
-                    const message = msgDoc.data();
+            dmUnsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+                const messagesList = document.getElementById('messages-list');
+                if (!messagesList) return;
+                messagesList.innerHTML = snapshot.docs.map(doc => {
+                    const message = doc.data();
                     const isSender = message.senderId === appCurrentUser.uid;
-                    const messageClass = isSender ? 'self-end bg-[var(--accent-color)] text-white' : 'self-start bg-gray-700 text-gray-200';
                     return `
                         <div class="flex ${isSender ? 'justify-end' : 'justify-start'}">
-                            <div class="p-3 rounded-lg max-w-xs ${messageClass}">
-                                ${message.text}
+                            <div class="max-w-xs md:max-w-md p-3 rounded-lg ${isSender ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-200'}">
+                                <p>${message.text}</p>
+                                <span class="text-xs ${isSender ? 'text-gray-200' : 'text-gray-400'}">${new Date(message.timestamp?.toDate()).toLocaleTimeString()}</span>
                             </div>
                         </div>
                     `;
                 }).join('');
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                messagesList.scrollTop = messagesList.scrollHeight;
             });
+            
+            document.getElementById('send-btn').addEventListener('click', () => sendMessage(chatId));
+            document.getElementById('message-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage(chatId);
+                }
+            });
+            
+            // Listen for incoming and outgoing calls
+            listenForCalls();
         }
 
+        async function sendMessage(chatId) {
+            const messageInput = document.getElementById('message-input');
+            const messageText = messageInput.value.trim();
+            if (messageText === '') return;
 
-        // =================================================================
-        // 6. MAIN APP LOGIC
-        // =================================================================
-
-        function navigateTo(page) {
-            if (!contentArea) {
-                console.error("Content area not found.");
-                return;
-            }
-            
-            // Clean up old listeners
-            if (dmUnsubscribe) {
-                dmUnsubscribe();
-                dmUnsubscribe = null;
-            }
-            if (callUnsubscribe) {
-                callUnsubscribe();
-                callUnsubscribe = null;
-            }
-            activeDMUserId = null;
-            
-            contentArea.innerHTML = '';
+            const messagesCollection = collection(db, `artifacts/${appId}/private/data/chats/${chatId}/messages`);
+            await addDoc(messagesCollection, {
+                senderId: appCurrentUser.uid,
+                text: messageText,
+                timestamp: serverTimestamp()
+            });
+            messageInput.value = '';
+        }
+        
+        function navigateTo(page, otherUserId = null, otherUserName = null) {
+            showLoadingSpinner();
+            if (dmUnsubscribe) dmUnsubscribe();
+            if (callUnsubscribe) callUnsubscribe();
             lastNavigatedPage = page;
             localStorage.setItem('currentPage', page);
             
-            if (appUserData && appUserData.isBanned && page !== 'auth') {
-                showMessageModal('Your account has been banned.', 'error');
-                localStorage.removeItem('currentPage');
-                navigateTo('auth');
-                return;
-            }
-
             switch (page) {
                 case 'home':
                     renderHomePage();
                     break;
-                case 'admin':
-                    renderAdminPage();
-                    break;
-                case 'auth':
-                    renderAuthPage();
+                case 'forums':
+                    renderForumsPage();
                     break;
                 case 'messages':
                     renderMessagesPage();
@@ -1312,50 +774,492 @@
                 case 'settings':
                     renderSettingsPage();
                     break;
-                case 'forums':
-                    renderForumsPage();
+                case 'admin':
+                    renderAdminPage();
                     break;
-                default:
-                    contentArea.innerHTML = `<h1 class="text-3xl text-center text-gray-500">Page Not Found</h1>`;
+                case 'auth':
+                    renderAuthPage();
                     break;
+            }
+            hideLoadingSpinner();
+        }
+        
+        // =================================================================
+        // 6. AUTHENTICATION
+        // =================================================================
+        function renderAuthPage() {
+            // Placeholder for Auth page content
+            contentArea.innerHTML = `
+                <div class="flex justify-center items-center h-[calc(100vh-120px)]">
+                    <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md border-t-4 border-red-500">
+                        <h2 class="text-3xl font-bold text-red-500 mb-6 text-center">Account</h2>
+                        <form id="auth-form" class="space-y-4">
+                            <div>
+                                <label for="auth-email" class="block text-sm font-medium text-gray-400">Email address</label>
+                                <input type="email" id="auth-email" required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-red-500 focus:border-red-500">
+                            </div>
+                            <div>
+                                <label for="auth-password" class="block text-sm font-medium text-gray-400">Password</label>
+                                <input type="password" id="auth-password" required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-red-500 focus:border-red-500">
+                            </div>
+                            <button type="submit" id="login-btn" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                Sign In
+                            </button>
+                            <button type="button" id="register-btn" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                Register
+                            </button>
+                            <button type="button" id="google-login-btn" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                <i class="fab fa-google mr-2"></i> Sign In with Google
+                            </button>
+                            <button type="button" id="reset-password-btn" class="w-full text-center py-2 text-sm text-gray-400 hover:text-red-500">
+                                Forgot Password?
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            `;
+            
+            const authForm = document.getElementById('auth-form');
+            if(authForm) {
+                authForm.addEventListener('submit', handleLogin);
+            }
+            document.getElementById('register-btn').addEventListener('click', handleRegister);
+            document.getElementById('google-login-btn').addEventListener('click', handleGoogleLogin);
+            document.getElementById('reset-password-btn').addEventListener('click', handlePasswordReset);
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            showLoadingSpinner();
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                showMessageModal(`Login failed: ${error.message}`, 'error');
+                console.error("Login failed:", error);
+            } finally {
+                hideLoadingSpinner();
             }
         }
 
-        onAuthStateChanged(auth, async (user) => {
-            appCurrentUser = user;
-            authReady = true;
+        async function handleRegister() {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            if (!email || !password) {
+                showMessageModal("Please enter both email and password.", 'error');
+                return;
+            }
+            showLoadingSpinner();
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                const userDocRef = doc(db, `artifacts/${appId}/public/data/users`, user.uid);
+                await setDoc(userDocRef, {
+                    id: user.uid,
+                    name: user.email.split('@')[0],
+                    email: user.email,
+                    role: 'member',
+                    status: 'online',
+                    createdAt: serverTimestamp(),
+                });
+                showMessageModal("Registration successful! You are now logged in.", 'success');
+            } catch (error) {
+                showMessageModal(`Registration failed: ${error.message}`, 'error');
+                console.error("Registration failed:", error);
+            } finally {
+                hideLoadingSpinner();
+            }
+        }
+        
+        async function handleGoogleLogin() {
+            const provider = new GoogleAuthProvider();
+            showLoadingSpinner();
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                showMessageModal(`Google login failed: ${error.message}`, 'error');
+                console.error("Google login failed:", error);
+            } finally {
+                hideLoadingSpinner();
+            }
+        }
 
+        async function handlePasswordReset() {
+            const email = document.getElementById('auth-email').value;
+            if (!email) {
+                showMessageModal("Please enter your email address to reset your password.", 'info');
+                return;
+            }
+            showLoadingSpinner();
+            try {
+                await sendPasswordResetEmail(auth, email);
+                showMessageModal("Password reset email sent. Please check your inbox.", 'success');
+            } catch (error) {
+                showMessageModal(`Error sending password reset email: ${error.message}`, 'error');
+                console.error("Password reset failed:", error);
+            } finally {
+                hideLoadingSpinner();
+            }
+        }
+
+        // =================================================================
+        // 7. WEBRTC IMPLEMENTATION
+        // =================================================================
+
+        let peerConnection;
+        let localStream;
+        let remoteStream;
+        let callRef;
+        let callUnsubscribeWebRTC;
+        const configuration = {'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}]};
+        
+        /**
+         * Sets up the local and remote video elements in a modal.
+         * @param {string} callerName - The name of the person initiating the call.
+         */
+        function renderCallPanel(callerName) {
+            const modalContainer = document.getElementById('modal-container');
+            modalContainer.innerHTML = `
+                <div id="call-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-90 transition-opacity duration-300">
+                    <div class="relative w-full h-full p-4 flex flex-col items-center justify-center">
+                        <div id="video-grid" class="video-container">
+                            <video id="remote-video" autoplay class="video-large rounded-lg"></video>
+                            <video id="local-video" autoplay muted class="video-small rounded-lg"></video>
+                        </div>
+                        <div class="mt-4 flex space-x-4">
+                            <button id="end-call-btn" class="bg-red-600 text-white p-4 rounded-full text-xl shadow-lg hover:bg-red-700 transition">
+                                <i class="fas fa-phone-slash"></i>
+                            </button>
+                            <button id="mute-btn" class="bg-gray-600 text-white p-4 rounded-full text-xl shadow-lg hover:bg-gray-700 transition">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                            <button id="video-toggle-btn" class="bg-gray-600 text-white p-4 rounded-full text-xl shadow-lg hover:bg-gray-700 transition">
+                                <i class="fas fa-video"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            // Add event listeners to the new buttons
+            document.getElementById('end-call-btn').addEventListener('click', endCall);
+            document.getElementById('mute-btn').addEventListener('click', toggleAudio);
+            document.getElementById('video-toggle-btn').addEventListener('click', toggleVideo);
+        }
+
+        /**
+         * Closes the call modal and cleans up WebRTC resources.
+         */
+        function closeCallModal() {
+            const callModal = document.getElementById('call-modal');
+            if (callModal) {
+                callModal.remove();
+            }
+        }
+        
+        /**
+         * Handles the call initiation process.
+         * @param {string} recipientId - The UID of the user to call.
+         */
+        async function startCall(recipientId) {
+            console.log(`Starting call with ${recipientId}`);
+            showLoadingSpinner();
+            
+            try {
+                // Get local video and audio stream
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                renderCallPanel();
+                document.getElementById('local-video').srcObject = localStream;
+                
+                peerConnection = new RTCPeerConnection(configuration);
+
+                // Add local stream tracks to the peer connection
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+
+                // Get remote stream
+                remoteStream = new MediaStream();
+                document.getElementById('remote-video').srcObject = remoteStream;
+                peerConnection.ontrack = event => {
+                    event.streams[0].getTracks().forEach(track => {
+                        remoteStream.addTrack(track);
+                    });
+                };
+
+                // Create a new document for the call in Firestore
+                const callsCollection = collection(db, `artifacts/${appId}/private/data/calls`);
+                callRef = await addDoc(callsCollection, {
+                    callerId: appCurrentUser.uid,
+                    recipientId: recipientId,
+                    status: 'ringing',
+                    createdAt: serverTimestamp()
+                });
+                console.log("Call document created with ID:", callRef.id);
+
+                // Create a 'candidates' subcollection for both caller and recipient
+                const callerCandidatesCollection = collection(callRef, 'callerCandidates');
+                peerConnection.onicecandidate = async event => {
+                    if (event.candidate) {
+                        await addDoc(callerCandidatesCollection, event.candidate.toJSON());
+                    }
+                };
+
+                // Create the offer
+                const offerDescription = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offerDescription);
+                await updateDocFirestore(callRef, { offer: { sdp: offerDescription.sdp, type: offerDescription.type } });
+
+                hideLoadingSpinner();
+                showMessageModal(`Calling ${recipientId}...`);
+
+                // Listen for changes on the call document (e.g., recipient's answer)
+                callUnsubscribeWebRTC = onSnapshot(callRef, (snapshot) => {
+                    const data = snapshot.data();
+                    if (data?.answer && !peerConnection.currentRemoteDescription) {
+                        const answerDescription = new RTCSessionDescription(data.answer);
+                        peerConnection.setRemoteDescription(answerDescription);
+                    }
+                    if (data?.status === 'accepted') {
+                        // The call has been accepted, modal will be updated by the listener
+                        console.log("Call accepted!");
+                        showMessageModal("Call connected!", "success");
+                    }
+                    if (data?.status === 'ended') {
+                        // The call has been ended by the other user
+                        showMessageModal("Call has been ended.", "info");
+                        endCall();
+                    }
+                });
+
+                // Listen for recipient's ICE candidates
+                const recipientCandidatesCollection = collection(callRef, 'recipientCandidates');
+                onSnapshot(recipientCandidatesCollection, (snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === 'added') {
+                            const candidate = new RTCIceCandidate(change.doc.data());
+                            peerConnection.addIceCandidate(candidate);
+                        }
+                    });
+                });
+
+            } catch (error) {
+                hideLoadingSpinner();
+                console.error("Error starting call:", error);
+                showMessageModal(`Failed to start call: ${error.message}`, 'error');
+            }
+        }
+        
+        /**
+         * Listens for incoming calls by querying Firestore.
+         */
+        function listenForCalls() {
+            if (!appCurrentUser) return;
+            
+            const callsCollection = collection(db, `artifacts/${appId}/private/data/calls`);
+            const q = query(callsCollection, where('recipientId', '==', appCurrentUser.uid), where('status', '==', 'ringing'));
+
+            // Cleanup previous listener if it exists
+            if(callUnsubscribe) callUnsubscribe();
+            
+            callUnsubscribe = onSnapshot(q, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                        const callData = change.doc.data();
+                        const callerId = callData.callerId;
+                        
+                        showMessageModal(`Incoming call from ${callerId}!`, 'confirm', () => {
+                            acceptCall(change.doc.id, callData);
+                        });
+                    }
+                });
+            });
+        }
+        
+        /**
+         * Handles accepting an incoming call.
+         * @param {string} callId - The ID of the call document in Firestore.
+         * @param {object} callData - The call document data.
+         */
+        async function acceptCall(callId, callData) {
+            console.log(`Accepting call from ${callData.callerId}`);
+            showLoadingSpinner();
+            
+            try {
+                // Get local video and audio stream
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                renderCallPanel();
+                document.getElementById('local-video').srcObject = localStream;
+                
+                peerConnection = new RTCPeerConnection(configuration);
+
+                // Add local stream tracks
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+
+                // Get remote stream
+                remoteStream = new MediaStream();
+                document.getElementById('remote-video').srcObject = remoteStream;
+                peerConnection.ontrack = event => {
+                    event.streams[0].getTracks().forEach(track => {
+                        remoteStream.addTrack(track);
+                    });
+                };
+                
+                callRef = doc(db, `artifacts/${appId}/private/data/calls`, callId);
+
+                // Listen for caller's ICE candidates
+                const callerCandidatesCollection = collection(callRef, 'callerCandidates');
+                onSnapshot(callerCandidatesCollection, (snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === 'added') {
+                            const candidate = new RTCIceCandidate(change.doc.data());
+                            peerConnection.addIceCandidate(candidate);
+                        }
+                    });
+                });
+                
+                // Create a 'recipientCandidates' subcollection
+                const recipientCandidatesCollection = collection(callRef, 'recipientCandidates');
+                peerConnection.onicecandidate = async event => {
+                    if (event.candidate) {
+                        await addDoc(recipientCandidatesCollection, event.candidate.toJSON());
+                    }
+                };
+                
+                // Set the remote description (offer from the caller)
+                const offerDescription = callData.offer;
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offerDescription));
+
+                // Create an answer and set it as the local description
+                const answerDescription = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answerDescription);
+
+                // Update the call document with the answer and status
+                const answer = {
+                    type: answerDescription.type,
+                    sdp: answerDescription.sdp,
+                };
+                await updateDocFirestore(callRef, { answer: answer, status: 'accepted' });
+                
+                hideLoadingSpinner();
+                showMessageModal("Call connected!", "success");
+
+                // Listen for status changes (e.g., caller hangs up)
+                callUnsubscribeWebRTC = onSnapshot(callRef, (snapshot) => {
+                    const data = snapshot.data();
+                    if (data?.status === 'ended') {
+                        showMessageModal("Call has been ended.", "info");
+                        endCall();
+                    }
+                });
+
+            } catch (error) {
+                hideLoadingSpinner();
+                console.error("Error accepting call:", error);
+                showMessageModal(`Failed to accept call: ${error.message}`, 'error');
+            }
+        }
+        
+        /**
+         * Ends the current call and cleans up resources.
+         */
+        async function endCall() {
+            if (peerConnection) {
+                peerConnection.close();
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            if (remoteStream) {
+                remoteStream.getTracks().forEach(track => track.stop());
+            }
+            if (callRef) {
+                await updateDocFirestore(callRef, { status: 'ended' });
+                // Clean up the document after a delay
+                setTimeout(async () => {
+                    await deleteDoc(callRef);
+                }, 5000); // Wait 5 seconds before deleting the call document
+            }
+            if (callUnsubscribeWebRTC) callUnsubscribeWebRTC();
+            
+            peerConnection = null;
+            localStream = null;
+            remoteStream = null;
+            callRef = null;
+            
+            closeCallModal();
+            showMessageModal("Call ended.", "info");
+        }
+        
+        /**
+         * Toggles the local audio track on or off.
+         */
+        function toggleAudio() {
+            const audioTrack = localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                const icon = document.querySelector('#mute-btn i');
+                icon.className = audioTrack.enabled ? 'fas fa-microphone' : 'fas fa-microphone-slash';
+            }
+        }
+
+        /**
+         * Toggles the local video track on or off.
+         */
+        function toggleVideo() {
+            const videoTrack = localStream.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                const icon = document.querySelector('#video-toggle-btn i');
+                icon.className = videoTrack.enabled ? 'fas fa-video' : 'fas fa-video-slash';
+            }
+        }
+
+        // =================================================================
+        // 8. APP INITIALIZATION
+        // =================================================================
+
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
-                const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
-                const userDoc = await getDoc(userDocRef);
-                
-                if (userDoc.exists()) {
-                    appUserData = { id: userDoc.id, ...userDoc.data() };
-                } else {
-                    appUserData = {
-                        username: user.displayName || user.email.split('@')[0] || 'Guest',
-                        email: user.email || 'N/A',
-                        role: 'member',
-                        isBanned: false,
-                        theme: 'dark',
-                        accentColor: '#ef4444'
-                    };
-                    await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), appUserData);
-                }
-                
-                if (appUserData.accentColor) {
-                    updateTheme(appUserData.accentColor);
-                }
-                
-                renderSidebarNav(appCurrentUser, appUserData);
-                
-                const currentPage = localStorage.getItem('currentPage');
-                if (currentPage && currentPage !== 'auth') {
-                    navigateTo(currentPage);
-                } else {
-                    navigateTo('home');
-                }
+                appCurrentUser = user;
+                // Fetch user data and listen for changes
+                const userDocRef = doc(db, `artifacts/${appId}/public/data/users`, user.uid);
+                onSnapshot(userDocRef, (doc) => {
+                    if (doc.exists()) {
+                        appUserData = doc.data();
+                        renderSidebarNav(appCurrentUser, appUserData);
+                    } else {
+                        // Handle case where user data does not exist (e.g., first-time Google sign-in)
+                        appUserData = { id: user.uid, name: user.displayName || 'User', email: user.email, role: 'member', status: 'online' };
+                        setDoc(userDocRef, appUserData, { merge: true });
+                        renderSidebarNav(appCurrentUser, appUserData);
+                    }
+                    if (!authReady) {
+                        authReady = true;
+                        // Set user status to 'online'
+                        updateDocFirestore(userDocRef, { status: 'online' });
+                        // Start listening for incoming calls
+                        listenForCalls();
+                        
+                        const currentPage = localStorage.getItem('currentPage');
+                        if (currentPage && currentPage !== 'auth' && lastNavigatedPage !== currentPage) {
+                             navigateTo(currentPage);
+                        } else if (lastNavigatedPage === 'auth') {
+                            navigateTo('home');
+                        } else {
+                            navigateTo('home');
+                        }
+                    }
+                });
             } else {
+                // User is signed out
+                if (appCurrentUser) {
+                    const userDocRef = doc(db, `artifacts/${appId}/public/data/users`, appCurrentUser.uid);
+                    await updateDocFirestore(userDocRef, { status: 'offline' });
+                }
+                appCurrentUser = null;
                 appUserData = null;
                 renderSidebarNav(appCurrentUser, appUserData);
                 navigateTo('auth');
@@ -1379,7 +1283,7 @@
                 try {
                      await signInWithCustomToken(auth, initialAuthToken);
                 } catch (error) {
-                     console.error("Error signing in with custom token:", error);
+                     console.error("Error signing in with custom token", error);
                      navigateTo('auth');
                 }
             }
