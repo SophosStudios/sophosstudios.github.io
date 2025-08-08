@@ -152,7 +152,7 @@
         // 1. FIREBASE IMPORTS
         // =================================================================
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
@@ -677,22 +677,22 @@
                     }
                 });
             }
+            
+            // Handle initial anonymous sign-in if no user is present
+            if (!auth.currentUser && !initialAuthToken) {
+                try {
+                    await signInAnonymously(auth);
+                } catch (error) {
+                    console.error("Error signing in anonymously:", error);
+                }
+            } else if (!auth.currentUser && initialAuthToken) {
+                try {
+                     await signInWithCustomToken(auth, initialAuthToken);
+                } catch (error) {
+                     console.error("Error signing in with custom token:", error);
+                }
+            }
         });
-
-        // Handle initial anonymous sign-in if no user is present
-        if (!auth.currentUser && !initialAuthToken) {
-            try {
-                await signInAnonymously(auth);
-            } catch (error) {
-                console.error("Error signing in anonymously:", error);
-            }
-        } else if (!auth.currentUser && initialAuthToken) {
-            try {
-                 await signInWithCustomToken(auth, initialAuthToken);
-            } catch (error) {
-                 console.error("Error signing in with custom token:", error);
-            }
-        }
     </script>
 </body>
 </html>
