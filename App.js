@@ -214,14 +214,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Attempt anonymous sign-in, but handle the error if it's not enabled
-    if (!auth.currentUser) {
-        try {
-            await signInAnonymously(auth);
-        } catch(error) {
-            console.error("Anonymous sign-in failed: ", error);
-            // If anonymous sign-in fails, we simply proceed, and the onAuthStateChanged
-            // listener above will handle the unauthenticated state by navigating to 'auth'.
-        }
-    }
 });
