@@ -1,3 +1,4 @@
+/* src/style.css */
 /* Futuristic style.css */
 
 /* Custom CSS for Inter font and general body styles with a dark, futuristic theme */
@@ -7,6 +8,9 @@ body {
     color: #E0E0E0; /* Light gray for readability */
     transition: background-color 0.5s ease;
 }
+.bg-dark-1 { background-color: #121212; }
+.bg-dark-2 { background-color: #1a1a1a; }
+.text-light-1 { color: #E0E0E0; }
 
 /* Basic transition for sidebar and content area with a more dynamic effect */
 #left-sidebar, #main-content-wrapper {
@@ -30,28 +34,35 @@ body {
     display: block;
     animation: fadeIn 0.3s ease-in-out forwards;
 }
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+
+/* Styles for the loading spinner */
+#loading-spinner {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(28, 28, 30, 0.75);
+    z-index: 9999;
 }
 
-/* Scrollbar styles for a custom, futuristic look */
+/* Scrollbar styles for a futuristic look */
 ::-webkit-scrollbar {
     width: 8px;
-    background-color: #121212;
+    height: 8px;
 }
-
+::-webkit-scrollbar-track {
+    background: #2c2c2c; /* Dark track */
+}
 ::-webkit-scrollbar-thumb {
-    background-color: #4a5568; /* A darker gray */
+    background: #00e5ff; /* Neon blue thumb */
     border-radius: 4px;
-    border: 2px solid #121212;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-    background-color: #a0aec0; /* Lighter gray on hover */
+    background: #00b8e0; /* Darker neon on hover */
 }
 
-/* Switch component styles from the user's provided snippet */
+/* Style for switch toggle */
 .switch {
     position: relative;
     display: inline-block;
@@ -104,4 +115,53 @@ input:checked + .slider:before {
 }
 .slider.round:before {
     border-radius: 50%;
+}
+
+/* Keyframes for animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* Additional styling for the main content area */
+#content-area {
+    min-height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding-bottom: 2rem;
+}
+
+/* Sidebar styling */
+#left-sidebar {
+    width: 64px;
+}
+#left-sidebar.expanded {
+    width: 256px;
+    transform: translateX(0);
+}
+#main-content-wrapper.expanded {
+    margin-left: 256px;
+}
+@media (min-width: 768px) {
+    #left-sidebar {
+        transform: translateX(0);
+    }
+    #main-content-wrapper {
+        margin-left: 64px;
+    }
+    #left-sidebar.expanded {
+        width: 256px;
+    }
+    #main-content-wrapper.expanded {
+        margin-left: 256px;
+    }
+    #mobile-top-bar {
+        display: none;
+    }
 }

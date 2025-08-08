@@ -16,7 +16,7 @@ export function showLoadingSpinner() {
         spinner = document.createElement('div');
         spinner.id = 'loading-spinner';
         spinner.className = 'fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50';
-        spinner.innerHTML = `<div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-500"></div>`;
+        spinner.innerHTML = `<div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-white"></div>`;
         document.body.appendChild(spinner);
     }
     spinner.classList.remove('hidden');
@@ -35,110 +35,60 @@ export function hideLoadingSpinner() {
 /**
  * Displays a message modal.
  * @param {string} message - The message to display.
- * @param {string} type - 'info', 'error', 'confirm', 'success'.
+ * @param {string} type - 'info', 'error', 'success', or 'confirm'.
  * @param {function} onConfirm - Callback for 'confirm' type.
  */
 export function showMessageModal(message, type = 'info', onConfirm = null) {
-    // Hide any existing modal first
-    if (currentModal) {
-        currentModal.remove();
-        currentModal = null;
-    }
+    const modalContainer = document.getElementById('modal-container');
+    const modalId = 'message-modal';
+    const existingModal = document.getElementById(modalId);
+    if (existingModal) existingModal.remove();
 
-    const modalContainer = document.getElementById('message-modal-container');
-    const modalDiv = document.createElement('div');
-    modalDiv.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]';
-    modalDiv.innerHTML = `
-        <div class="bg-gray-800 text-white p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 border-t-4 border-${type === 'error' ? 'red' : type === 'confirm' ? 'yellow' : 'blue'}-500 transform scale-95 transition-transform duration-200">
-            <p class="text-center font-semibold text-lg mb-4">${message}</p>
-            <div class="flex justify-end space-x-4">
-                ${type === 'confirm' ? `<button id="cancel-btn" class="px-4 py-2 bg-gray-600 rounded-lg text-white font-bold hover:bg-gray-500">Cancel</button>` : ''}
-                <button id="ok-btn" class="px-4 py-2 bg-red-600 rounded-lg text-white font-bold hover:bg-red-700">
-                    ${type === 'confirm' ? 'Confirm' : 'OK'}
-                </button>
+    const modalHtml = `
+        <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-sm w-full border-2 border-red-500">
+                <p class="text-lg text-gray-200 mb-4">${message}</p>
+                <div class="flex justify-end space-x-2">
+                    ${type === 'confirm' ? `
+                        <button id="modal-confirm-btn" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition">Confirm</button>
+                    ` : ''}
+                    <button id="modal-close-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Close</button>
+                </div>
             </div>
         </div>
     `;
-    
-    modalContainer.appendChild(modalDiv);
-    currentModal = modalDiv;
+    modalContainer.insertAdjacentHTML('beforeend', modalHtml);
 
-    const okButton = modalDiv.querySelector('#ok-btn');
-    okButton.addEventListener('click', () => {
-        if (type === 'confirm' && onConfirm) {
+    document.getElementById('modal-close-btn').addEventListener('click', () => document.getElementById(modalId).remove());
+    if (type === 'confirm' && onConfirm) {
+        document.getElementById('modal-confirm-btn').addEventListener('click', () => {
             onConfirm();
-        }
-        currentModal.remove();
-        currentModal = null;
-    });
-
-    if (type === 'confirm') {
-        const cancelButton = modalDiv.querySelector('#cancel-btn');
-        cancelButton.addEventListener('click', () => {
-            currentModal.remove();
-            currentModal = null;
+            document.getElementById(modalId).remove();
         });
     }
 }
 
 /**
- * Updates the body's background image with a specific image URL.
- * @param {string} imageUrl - The URL of the image to set.
+ * Updates the website's theme with a new accent color.
+ * @param {string} color - The new hex color for the accent.
  */
-export function updateBodyBackground(imageUrl) {
-    document.body.style.backgroundImage = `url('${imageUrl}')`;
-}
-
-/**
- * Extracts a YouTube video ID from various YouTube URL formats.
- * @param {string} url - The YouTube URL.
- * @returns {string|null} The video ID, or null if not found.
- */
-export function extractYouTubeVideoId(url) {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    if (match && match[2].length === 11) {
-        return match[2];
-    } else {
-        return null;
+export function updateTheme(color) {
+    const styleId = 'custom-theme-style';
+    let style = document.getElementById(styleId);
+    if (!style) {
+        style = document.createElement('style');
+        style.id = styleId;
+        document.head.appendChild(style);
     }
+    style.innerHTML = `
+        .accent-red { background-color: ${color}; }
+        .accent-red:hover { background-color: ${color}; opacity: 0.8; }
+        ::-webkit-scrollbar-thumb { background: ${color}; }
+        nav, .border-red-500 { border-color: ${color}; }
+        .text-red-500 { color: ${color}; }
+        .focus\\:ring-red-500:focus { --tw-ring-color: ${color}; }
+        .bg-red-600 { background-color: ${color}; }
+        .hover\\:bg-red-700:hover { background-color: ${color}; opacity: 0.8; }
+        .text-red-400 { color: ${color}; opacity: 0.8; }
+    `;
 }
-
-/**
- * Gets the VFX (emoji and color class) for a given role.
- * @param {string} role - The user's role.
- * @returns {string} HTML string with emoji and styled role text.
- */
-export function getRoleVFX(role) {
-    let emoji = '';
-    let colorClass = 'text-white'; // Default color
-
-    switch (role) {
-        case 'member':
-            emoji = '👤';
-            colorClass = 'text-blue-600';
-            break;
-        case 'admin':
-            emoji = '🛡️';
-            colorClass = 'text-red-600';
-            break;
-        case 'founder':
-            emoji = '✨';
-            colorClass = 'text-purple-600';
-            break;
-        case 'co-founder':
-            emoji = '🌟';
-            colorClass = 'text-yellow-600';
-            break;
-        case 'partner':
-            emoji = '🤝';
-            colorClass = 'text-indigo-600';
-            break;
-        default:
-            emoji = '';
-            colorClass = 'text-white';
-    }
-    const animationClass = (role === 'admin' || role === 'founder' || role === 'co-founder') ? 'animate-pulse' : '';
-    return `<span class="mr-1">${emoji}</span><span class="${colorClass} font-bold ${animationClass}">${role.toUpperCase()}</span>`;
-}
-

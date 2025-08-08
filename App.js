@@ -1,111 +1,151 @@
-// src/App.js
+// App.js
 // This script contains the entire application logic, including Firebase initialization
-// and new features like forum, post management, reactions, comments, and enhanced backgrounds.
+// and all feature-specific functions for SophosWRLD.
 
-// Import Firebase functions
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+// Import Firebase services
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, collection, query, onSnapshot, deleteDoc, orderBy, serverTimestamp, addDoc, where } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
-// Import all services and renderers
-import CONFIG from './config.js';
-import { initializeFirebaseServices, fetchCurrentUserFirestoreData } from './firebase-service.js';
-import { initializeNavigation } from './navigation.js';
-import {
-    initializePageRenderers,
-    renderHomePage,
-    renderAboutPage,
-    renderAuthPage,
-    renderForumPage,
-    renderAdminPage,
-    renderProfilePage,
-    renderPartnerApplicationPage,
-    renderManagePartnerAppsPage,
-    renderManageVideosPage
-} from './page-renderers.js';
-import { initializeModalModule } from './modals.js';
-import { showLoadingSpinner, hideLoadingSpinner } from './utils.js';
+// Import configuration from config.js
+import CONFIG from './config.js'; 
 
-// DOM Elements
-const contentArea = document.getElementById('content-area');
+// Import utility functions
+import { showLoadingSpinner, hideLoadingSpinner, showMessageModal, updateTheme } from './utils.js';
 
-// Global state variables
+// Import all page renderers
+import { renderHomePage, renderAdminPage, renderAuthPage, renderDMsPage } from './page-renderers.js';
+
+// Import navigation functions
+import { initializeNavigation, renderSidebarNav } from './navigation.js';
+
+// --- Global variables provided by the Canvas environment (do not change) ---
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : CONFIG.firebaseConfig;
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// Global state
 let currentUser = null;
 let userData = null;
 
-// Initialize Firebase services with the configuration from config.js
-initializeFirebaseServices(CONFIG.firebaseConfig, CONFIG);
-const auth = getAuth();
+// DOM Elements
+const contentArea = document.getElementById('content-area');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
+const overlayBackdrop = document.getElementById('overlay-backdrop');
+const modalContainer = document.getElementById('modal-container');
+const mobileAuthButton = document.getElementById('mobile-auth-btn');
+
+// --- Navigation and Routing ---
 
 /**
- * Main navigation function to render different pages.
- * @param {string} pageName - The name of the page to render.
+ * Handles navigation to different pages.
+ * @param {string} page - The page to render.
  */
-function navigateTo(pageName) {
-    contentArea.dataset.currentPage = pageName;
-    switch (pageName) {
+function navigateTo(page) {
+    if (!contentArea) {
+        console.error("Content area not found.");
+        return;
+    }
+    
+    // Clear the content area
+    contentArea.innerHTML = '';
+    
+    // Render the new page based on the page name
+    switch (page) {
         case 'home':
-            renderHomePage();
-            break;
-        case 'about':
-            renderAboutPage();
-            break;
-        case 'auth':
-            renderAuthPage();
-            break;
-        case 'forum':
-            renderForumPage();
+            renderHomePage(contentArea, currentUser, userData, navigateTo);
             break;
         case 'admin':
-            renderAdminPage();
+            renderAdminPage(contentArea, currentUser, userData, showMessageModal, showLoadingSpinner, hideLoadingSpinner, db, appId);
             break;
-        case 'profile':
-            renderProfilePage();
+        case 'auth':
+            renderAuthPage(contentArea, auth, db, appId, showMessageModal, showLoadingSpinner, hideLoadingSpinner, navigateTo);
             break;
-        case 'partner-application':
-            renderPartnerApplicationPage();
-            break;
-        case 'manage-partner-apps':
-            renderManagePartnerAppsPage();
-            break;
-        case 'manage-videos':
-            renderManageVideosPage();
+        case 'messages':
+            renderDMsPage(contentArea, currentUser, db, appId, showMessageModal, showLoadingSpinner, hideLoadingSpinner);
             break;
         default:
-            renderHomePage();
+            contentArea.innerHTML = `<h1 class="text-3xl text-center text-gray-500">Page Not Found</h1>`;
             break;
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Set up the Firebase Auth state change listener
-    onAuthStateChanged(auth, async (user) => {
-        showLoadingSpinner();
-        if (user) {
-            currentUser = user;
-            userData = await fetchCurrentUserFirestoreData(currentUser);
-            // Re-initialize modules with the new user data
-            initializeNavigation(currentUser, userData, navigateTo, CONFIG);
-            initializePageRenderers(currentUser, userData, navigateTo, CONFIG);
-            initializeModalModule(currentUser, userData, navigateTo, null, CONFIG);
+// --- Firebase Authentication Listener ---
 
-            // Re-render the current page to reflect the logged-in state
-            const currentPage = contentArea.dataset.currentPage || 'home';
-            navigateTo(currentPage);
-        } else {
-            currentUser = null;
-            userData = null;
-            // Re-initialize modules for logged-out state
-            initializeNavigation(currentUser, userData, navigateTo, CONFIG);
-            initializePageRenderers(currentUser, userData, navigateTo, CONFIG);
-            initializeModalModule(currentUser, userData, navigateTo, null, CONFIG);
-
-            // Navigate to home if user logs out
-            navigateTo('home');
+onAuthStateChanged(auth, async (user) => {
+    currentUser = user;
+    
+    if (user) {
+        // Sign in with custom token if available
+        if (initialAuthToken) {
+            try {
+                await signInWithCustomToken(auth, initialAuthToken);
+                console.log("Signed in with custom token.");
+            } catch (error) {
+                console.error("Error signing in with custom token:", error);
+            }
         }
-        hideLoadingSpinner();
-    });
+        
+        // Fetch user data from Firestore
+        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+            userData = { id: userDoc.id, ...userDoc.data() };
+        } else {
+            // Create a new user entry if one doesn't exist
+            userData = {
+                username: user.email ? user.email.split('@')[0] : 'Guest',
+                email: user.email || 'N/A',
+                role: 'member',
+                theme: 'dark',
+                accentColor: '#ef4444'
+            };
+            await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), userData);
+        }
+        
+        // Apply user-specific theme
+        if (userData.accentColor) {
+            updateTheme(userData.accentColor);
+        }
 
-    // Initial navigation on page load
-    if (!contentArea.dataset.currentPage) {
-        navigateTo('home');
+        // Render the navigation and initial page after auth state is determined
+        renderSidebarNav(currentUser, userData, navigateTo, signOut, auth, db, appId);
+        const currentPage = localStorage.getItem('currentPage') || 'home';
+        navigateTo(currentPage);
+        
+    } else {
+        // Not authenticated
+        userData = null;
+        renderSidebarNav(currentUser, userData, navigateTo, signOut, auth, db, appId);
+        navigateTo('auth');
+    }
+});
+
+
+document.addEventListener('DOMContentLoaded', async () => {
+    initializeNavigation(mobileSidebarToggle, overlayBackdrop);
+    
+    // Set up click listener for the mobile auth button
+    if(mobileAuthButton) {
+        mobileAuthButton.addEventListener('click', () => {
+            navigateTo('auth');
+            toggleSidebar();
+        });
+    }
+
+    // Handle initial anonymous sign-in if no user is present
+    if (!auth.currentUser) {
+        try {
+            await signInAnonymously(auth);
+        } catch(error) {
+            console.error("Anonymous sign-in failed: ", error);
+        }
     }
 });
