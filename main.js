@@ -14,7 +14,17 @@ import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, onSnapshot, u
 const CONFIG = {
     // NOTE: This is a placeholder. Your project's actual Firebase configuration
     // is injected by the environment where it's hosted.
-    firebaseConfig: {}
+    websiteTitle: "SophosWRLD", // <-- Set your desired website title here
+
+    firebaseConfig: {
+      apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
+      authDomain: "sophoswrld.firebaseapp.com",
+      projectId: "sophoswrld",
+      storageBucket: "sophoswrld.firebasestorage.app",
+      messagingSenderId: "26686142400",
+      appId: "1:26686142400:web:48f8d3ae0b097731317a25",
+      measurementId: "G-6XETC98C22"
+    }
 };
 
 
