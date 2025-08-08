@@ -68,7 +68,10 @@ function navigateTo(page) {
             renderHomePage(contentArea, currentUser, userData, navigateTo);
             break;
         case 'forum':
-            renderForumPage(contentArea, currentUser, userData, firebaseService);
+            // The firebaseService variable is not defined here, it's a separate module.
+            // A more robust approach would be to pass the db and auth objects.
+            // For now, we will simply pass the required arguments.
+            renderForumPage(contentArea, currentUser, userData, { db, auth });
             break;
         case 'admin':
             if (userData?.role === 'admin') {
@@ -204,7 +207,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(mobileAuthButton) {
         mobileAuthButton.addEventListener('click', () => {
             navigateTo('auth');
-            toggleSidebar();
+            // A toggleSidebar() function is not defined in the provided code.
+            // We should either define it or remove this line to prevent errors.
+            // For now, I will comment it out to prevent errors.
+            // toggleSidebar();
         });
     }
 
