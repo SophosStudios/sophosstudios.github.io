@@ -142,7 +142,7 @@
         // 1. FIREBASE IMPORTS
         // =================================================================
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
@@ -283,7 +283,7 @@
             });
             if (sidebarToggleClose) sidebarToggleClose.addEventListener('click', () => {
                 leftSidebar.classList.remove('expanded');
-                overlayBackrop.classList.add('hidden');
+                overlayBackdrop.classList.add('hidden');
             });
             if (overlayBackdrop) overlayBackdrop.addEventListener('click', () => {
                 leftSidebar.classList.remove('expanded');
@@ -430,7 +430,7 @@
 
         function renderAdminPage() {
             if (!appCurrentUser || appUserData?.role !== 'admin') {
-                contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be an admin to view this page.</p>`;
+                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be an admin to view this page.</p></div>`;
                 return;
             }
 
@@ -504,26 +504,33 @@
                 <div class="max-w-md mx-auto bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500">
                     <h2 class="text-3xl font-bold text-center mb-6 text-red-500">Join or Sign In</h2>
                     <form id="auth-form" class="space-y-4">
-                        <input type="email" id="auth-email" placeholder="Email" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500" required>
-                        <input type="password" id="auth-password" placeholder="Password" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                        <input type="email" id="auth-email" placeholder="Email" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500">
+                        <input type="password" id="auth-password" placeholder="Password" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500">
                         <div class="flex items-center justify-between pt-2">
                             <button type="submit" id="signin-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">Sign In</button>
                             <button type="button" id="signup-btn" class="bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-700 transition-colors duration-300">Sign Up</button>
                         </div>
                     </form>
+                    <div class="mt-6">
+                        <p class="text-center text-gray-400 mb-4">or</p>
+                        <button id="google-signin-btn" class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors duration-300 flex items-center justify-center space-x-2">
+                            <i class="fab fa-google"></i>
+                            <span>Sign in with Google</span>
+                        </button>
+                    </div>
                 </div>
             `;
 
             const authForm = document.getElementById('auth-form');
             const emailInput = document.getElementById('auth-email');
             const passwordInput = document.getElementById('auth-password');
+            const googleBtn = document.getElementById('google-signin-btn');
 
             document.getElementById('signin-btn').addEventListener('click', async (e) => {
                 e.preventDefault();
                 showLoadingSpinner();
                 try {
                     await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
-                    navigateTo('home');
                 } catch (error) {
                     showMessageModal(error.message, 'error');
                 } finally {
@@ -547,14 +554,41 @@
                     };
                     await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), newUser);
                     
-                    showMessageModal('Account created successfully! Please sign in.', 'success');
-                    navigateTo('auth');
+                    showMessageModal('Account created successfully! You are now signed in.', 'success');
                 } catch (error) {
                     showMessageModal(error.message, 'error');
                 } finally {
                     hideLoadingSpinner();
                 }
             });
+
+            if (googleBtn) {
+                googleBtn.addEventListener('click', async () => {
+                    showLoadingSpinner();
+                    const provider = new GoogleAuthProvider();
+                    try {
+                        const result = await signInWithPopup(auth, provider);
+                        const user = result.user;
+                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
+                        const userDoc = await getDoc(userDocRef);
+
+                        if (!userDoc.exists()) {
+                            const newUser = {
+                                username: user.displayName || user.email.split('@')[0],
+                                email: user.email,
+                                role: 'member',
+                                theme: 'dark',
+                                accentColor: '#ef4444'
+                            };
+                            await setDoc(userDocRef, newUser);
+                        }
+                    } catch (error) {
+                        showMessageModal(`Google sign-in failed: ${error.message}`, 'error');
+                    } finally {
+                        hideLoadingSpinner();
+                    }
+                });
+            }
         }
 
         function renderSettingsPage() {
@@ -688,7 +722,7 @@
                     appUserData = { id: userDoc.id, ...userDoc.data() };
                 } else {
                     appUserData = {
-                        username: user.email ? user.email.split('@')[0] : 'Guest',
+                        username: user.displayName || user.email.split('@')[0] || 'Guest',
                         email: user.email || 'N/A',
                         role: 'member',
                         theme: 'dark',
@@ -734,7 +768,7 @@
                      navigateTo('auth');
                 }
             } else {
-                navigateTo('auth');
+                 // The onAuthStateChanged listener handles navigation, so we don't need a default here.
             }
         });
     </script>
