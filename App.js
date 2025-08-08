@@ -14,13 +14,13 @@ import CONFIG from './config.js';
 import { showLoadingSpinner, hideLoadingSpinner, showMessageModal, updateTheme } from './utils.js';
 
 // Import all page renderers
-import { renderHomePage, renderAdminPage, renderAuthPage, renderDMsPage } from './page-renderers.js';
+import { renderHomePage, renderAdminPage, renderAuthPage, renderDMsPage, renderSettingsPage } from './page-renderers.js';
 
 // Import navigation functions
 import { initializeNavigation, renderSidebarNav } from './navigation.js';
 
 // Import Firebase service functions
-import { initializeFirebaseServices, fetchAllUsersFirestore, sendDirectMessage, getDirectMessages, updateDirectMessageSeenStatus, updateUserRoleFirestore } from './firebase-service.js';
+import { initializeFirebaseServices, updateUserRoleFirestore, sendDirectMessage, getDirectMessages, updateDirectMessageSeenStatus } from './firebase-service.js';
 
 // --- Global variables provided by the Canvas environment (do not change) ---
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -45,6 +45,7 @@ const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
 const overlayBackdrop = document.getElementById('overlay-backdrop');
 const modalContainer = document.getElementById('modal-container');
 const mobileAuthButton = document.getElementById('mobile-auth-btn');
+const googleProvider = new GoogleAuthProvider();
 
 // --- Navigation and Routing ---
 
@@ -74,7 +75,7 @@ function navigateTo(page) {
             }
             break;
         case 'auth':
-            renderAuthPage(contentArea, auth, db, appId, showMessageModal, showLoadingSpinner, hideLoadingSpinner, navigateTo);
+            renderAuthPage(contentArea, handleEmailPasswordSignIn, handleEmailPasswordSignUp, handleGoogleSignIn);
             break;
         case 'messages':
             if (currentUser) {
@@ -83,9 +84,61 @@ function navigateTo(page) {
                 contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">You must be logged in to view messages.</h1>`;
             }
             break;
+        case 'settings':
+            renderSettingsPage(contentArea, currentUser, userData, navigateTo);
+            break;
         default:
             contentArea.innerHTML = `<h1 class="text-3xl text-center text-gray-500">Page Not Found</h1>`;
             break;
+    }
+}
+
+/**
+ * Handles email/password sign-up.
+ * @param {string} email 
+ * @param {string} password 
+ */
+async function handleEmailPasswordSignUp(email, password) {
+    try {
+        showLoadingSpinner();
+        await createUserWithEmailAndPassword(auth, email, password);
+        showMessageModal('Sign up successful! Welcome to SophosWRLD.', 'success');
+    } catch (error) {
+        showMessageModal(error.message, 'error');
+    } finally {
+        hideLoadingSpinner();
+    }
+}
+
+/**
+ * Handles email/password sign-in.
+ * @param {string} email 
+ * @param {string} password 
+ */
+async function handleEmailPasswordSignIn(email, password) {
+    try {
+        showLoadingSpinner();
+        await signInWithEmailAndPassword(auth, email, password);
+        showMessageModal('Sign in successful!', 'success');
+    } catch (error) {
+        showMessageModal(error.message, 'error');
+    } finally {
+        hideLoadingSpinner();
+    }
+}
+
+/**
+ * Handles Google Sign-In with a pop-up.
+ */
+async function handleGoogleSignIn() {
+    try {
+        showLoadingSpinner();
+        await signInWithPopup(auth, googleProvider);
+        showMessageModal('Google Sign-In successful!', 'success');
+    } catch (error) {
+        showMessageModal(error.message, 'error');
+    } finally {
+        hideLoadingSpinner();
     }
 }
 
