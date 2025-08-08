@@ -257,9 +257,9 @@
                         <p class="text-lg text-gray-200 mb-4">${message}</p>
                         <div class="flex justify-end space-x-2">
                             ${type === 'confirm' ? `
-                                <button id="modal-confirm-btn" class="bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg hover:bg-opacity-80 transition">Confirm</button>
+                                <button id="modal-confirm-btn" class="bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg hover:bg-opacity-80 transition">Yes</button>
                             ` : ''}
-                            <button id="modal-close-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Close</button>
+                            <button id="modal-close-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">${type === 'confirm' ? 'Cancel' : 'Close'}</button>
                         </div>
                     </div>
                 </div>
@@ -366,7 +366,7 @@
             createNavLink(leftSidebarNav, 'Messages', 'messages', 'fas fa-envelope');
             createNavLink(leftSidebarNav, 'Settings', 'settings', 'fas fa-cog');
 
-            if (userData?.role === 'admin') {
+            if (userData?.role === 'admin' || userData?.role === 'founder') {
                 const adminCategory = document.createElement('div');
                 adminCategory.className = 'mt-6 pt-4 border-t border-gray-700';
                 leftSidebarNav.appendChild(adminCategory);
@@ -449,7 +449,7 @@
         }
 
         function renderAdminPage() {
-            if (!appCurrentUser || appUserData?.role !== 'admin') {
+            if (!appCurrentUser || (appUserData?.role !== 'admin' && appUserData?.role !== 'founder')) {
                 contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be an admin to view this page.</p></div>`;
                 return;
             }
@@ -498,6 +498,7 @@
                                         <select class="role-select bg-gray-600 p-2 rounded" data-user-id="${user.id}">
                                             <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
                                             <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                            <option value="founder" ${user.role === 'founder' ? 'selected' : ''}>Founder</option>
                                         </select>
                                     </td>
                                     <td class="p-3">
@@ -725,17 +726,17 @@
             });
         }
         
-        function renderCreatePostModal() {
+        function renderCreatePostModal(postId = null, title = '', content = '') {
             const modalHtml = `
                 <div id="create-post-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-lg w-full border-2 border-[var(--accent-color)]">
-                        <h3 class="text-2xl font-bold text-[var(--accent-color)] mb-4">Create New Post</h3>
+                        <h3 class="text-2xl font-bold text-[var(--accent-color)] mb-4">${postId ? 'Edit Post' : 'Create New Post'}</h3>
                         <form id="create-post-form" class="space-y-4">
-                            <input type="text" id="post-title" placeholder="Post Title" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required>
-                            <textarea id="post-content" placeholder="What's on your mind?" rows="5" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required></textarea>
+                            <input type="text" id="post-title" placeholder="Post Title" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" value="${title}" required>
+                            <textarea id="post-content" placeholder="What's on your mind?" rows="5" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required>${content}</textarea>
                             <div class="flex justify-end space-x-2">
                                 <button type="button" id="cancel-post-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Cancel</button>
-                                <button type="submit" class="bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg hover:bg-opacity-80 transition">Post</button>
+                                <button type="submit" class="bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg hover:bg-opacity-80 transition">${postId ? 'Save Changes' : 'Post'}</button>
                             </div>
                         </form>
                     </div>
@@ -747,23 +748,32 @@
             document.getElementById('create-post-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 showLoadingSpinner();
-                const title = document.getElementById('post-title').value;
-                const content = document.getElementById('post-content').value;
+                const newTitle = document.getElementById('post-title').value;
+                const newContent = document.getElementById('post-content').value;
                 const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
 
                 try {
-                    await addDoc(postsCollection, {
-                        title,
-                        content,
-                        authorId: appCurrentUser.uid,
-                        authorName: appUserData.username,
-                        createdAt: serverTimestamp(),
-                        reactions: {}
-                    });
+                    if (postId) {
+                        const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
+                        await updateDocFirestore(postDocRef, {
+                            title: newTitle,
+                            content: newContent
+                        });
+                        showMessageModal('Post updated successfully!', 'success');
+                    } else {
+                        await addDoc(postsCollection, {
+                            title: newTitle,
+                            content: newContent,
+                            authorId: appCurrentUser.uid,
+                            authorName: appUserData.username,
+                            createdAt: serverTimestamp(),
+                            reactions: {}
+                        });
+                        showMessageModal('Post created successfully!', 'success');
+                    }
                     document.getElementById('create-post-modal').remove();
-                    showMessageModal('Post created successfully!', 'success');
                 } catch (error) {
-                    showMessageModal('Error creating post: ' + error.message, 'error');
+                    showMessageModal('Error processing post: ' + error.message, 'error');
                 } finally {
                     hideLoadingSpinner();
                 }
@@ -818,6 +828,25 @@
                 });
             });
         }
+        
+        function deletePost(postId) {
+            showMessageModal(
+                'Are you sure you want to delete this post? This action cannot be undone.',
+                'confirm',
+                async () => {
+                    showLoadingSpinner();
+                    const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
+                    try {
+                        await deleteDoc(postDocRef);
+                        showMessageModal('Post deleted successfully!', 'success');
+                    } catch (error) {
+                        showMessageModal('Failed to delete post: ' + error.message, 'error');
+                    } finally {
+                        hideLoadingSpinner();
+                    }
+                }
+            );
+        }
 
         function renderForumsPage() {
             if (!appCurrentUser) {
@@ -859,16 +888,29 @@
                 postsList.innerHTML = snapshot.docs.map(postDoc => {
                     const post = postDoc.data();
                     const postId = postDoc.id;
-                    
+                    const canEditOrDelete = appUserData?.role === 'admin' || appUserData?.role === 'founder';
+
                     const reactionsHtml = post.reactions ? Object.values(post.reactions).map(reaction => `
                         <span class="bg-gray-700 px-2 py-1 rounded-full text-sm">${reaction.emoji} ${reaction.count}</span>
                     `).join('') : '';
 
                     return `
                         <div class="bg-gray-700 p-6 rounded-lg shadow-md border border-gray-600">
-                            <div class="flex justify-between items-center mb-2">
+                            <div class="flex justify-between items-start mb-2">
                                 <h3 class="text-xl font-bold text-[var(--accent-color)]">${post.title}</h3>
-                                <span class="text-sm text-gray-400">by ${post.authorName}</span>
+                                <div class="flex-shrink-0 text-right">
+                                    <span class="block text-sm text-gray-400">by ${post.authorName}</span>
+                                    ${canEditOrDelete ? `
+                                        <div class="mt-2 space-x-2">
+                                            <button class="edit-post-btn bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 transition" data-post-id="${postId}">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="delete-post-btn bg-red-600 text-white p-2 rounded-full hover:bg-red-700 transition" data-post-id="${postId}">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    ` : ''}
+                                </div>
                             </div>
                             <p class="text-gray-300 mb-4">${post.content}</p>
                             <div class="flex items-center space-x-4">
@@ -889,6 +931,28 @@
                         renderReactionModal(postId);
                     });
                 });
+                
+                document.querySelectorAll('.edit-post-btn').forEach(button => {
+                    button.addEventListener('click', async (e) => {
+                        const postId = e.currentTarget.dataset.postId;
+                        showLoadingSpinner();
+                        const postDoc = await getDoc(doc(db, `/artifacts/${appId}/public/data/forums`, postId));
+                        hideLoadingSpinner();
+                        if (postDoc.exists()) {
+                            const postData = postDoc.data();
+                            renderCreatePostModal(postId, postData.title, postData.content);
+                        } else {
+                            showMessageModal('Post not found.', 'error');
+                        }
+                    });
+                });
+
+                document.querySelectorAll('.delete-post-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const postId = e.currentTarget.dataset.postId;
+                        deletePost(postId);
+                    });
+                });
             });
         }
         
@@ -897,11 +961,26 @@
         }
         
         function startCall(recipientId, recipientUsername) {
-            // Placeholder for real-time communication
-            const callId = `call-${Math.random().toString(36).substring(2, 11)}`;
             showMessageModal(
-                `<p class="text-lg">Initiating call with ${recipientUsername}...</p><p class="text-sm mt-2">Call ID: ${callId}</p>`,
-                'info'
+                `Are you sure you want to call ${recipientUsername}?`,
+                'confirm',
+                () => {
+                    // This block runs if the user clicks "Yes"
+                    const callId = `call-${Math.random().toString(36).substring(2, 11)}`;
+                    showMessageModal(
+                        `<p class="text-lg animate-pulse">Ringing ${recipientUsername}... (Call ID: ${callId})</p><p class="text-sm mt-2 text-gray-400">This is a simulated call.</p>`,
+                        'info'
+                    );
+
+                    // Simulate the other person getting a call.
+                    // In a real-world app, this would be a Firestore update or a push notification.
+                    setTimeout(() => {
+                        showMessageModal(
+                            `${appUserData.username} is ringing you!`,
+                            'info'
+                        );
+                    }, 5000);
+                }
             );
         }
 
