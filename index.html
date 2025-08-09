@@ -500,6 +500,7 @@
         let currentPageId = 'home';
         let unsubscribeFromCalls = null; // Variable to hold the unsubscribe function
         let unsubscribeFromMessages = null;
+        let unsubscribeFromForums = null;
         let activeCallUnsubscribe = null;
 
         function navigateTo(pageId, params = {}) {
@@ -523,6 +524,7 @@
             // Clean up any active listeners and streams before navigating
             if (callUnsubscribe) callUnsubscribe();
             if (unsubscribeFromMessages) unsubscribeFromMessages();
+            if (unsubscribeFromForums) unsubscribeFromForums();
             if (activeCallUnsubscribe) activeCallUnsubscribe();
             hangUp();
             
@@ -644,11 +646,99 @@
         
         function showForumsPage() {
             contentArea.innerHTML = `
-                <h1 class="text-4xl font-bold text-red-500 mb-6">Forums</h1>
-                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
-                    <p class="text-gray-400">This is a placeholder for the forums. You can add topics, posts, and comments here.</p>
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <h1 class="text-4xl font-bold text-red-500 mb-6">Forums</h1>
+                    
+                    <!-- Create New Post Form -->
+                    <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                        <h2 class="text-2xl font-semibold text-white mb-4">Create a New Post</h2>
+                        <form id="new-post-form" class="space-y-4">
+                            <input type="text" id="post-title" class="w-full p-3 rounded-lg bg-gray-700 text-white border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Post Title" required>
+                            <textarea id="post-content" class="w-full p-3 rounded-lg bg-gray-700 text-white border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500" rows="4" placeholder="What's on your mind?" required></textarea>
+                            <button type="submit" class="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition duration-300 ease-in-out">
+                                Post
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Forum Posts List -->
+                    <div id="forum-posts-container" class="space-y-4">
+                        <p class="text-center text-gray-500">Loading forum posts...</p>
+                    </div>
                 </div>
             `;
+            
+            const newPostForm = document.getElementById('new-post-form');
+            const postTitleInput = document.getElementById('post-title');
+            const postContentInput = document.getElementById('post-content');
+            const forumPostsContainer = document.getElementById('forum-posts-container');
+            
+            // Listen for new posts in the public collection
+            const postsCollectionRef = collection(db, `artifacts/${appId}/public/data/forums`);
+            const q = query(postsCollectionRef, orderBy('createdAt', 'desc'));
+            
+            unsubscribeFromForums = onSnapshot(q, async (snapshot) => {
+                forumPostsContainer.innerHTML = '';
+                if (snapshot.empty) {
+                    forumPostsContainer.innerHTML = `<p class="text-center text-gray-500">No posts yet. Be the first to post!</p>`;
+                }
+                
+                // Fetch all user profiles once to avoid repeated calls
+                const usersMap = {};
+                const usersSnapshot = await getDocs(collection(db, `artifacts/${appId}/users`));
+                usersSnapshot.forEach(userDoc => {
+                    const userId = userDoc.id;
+                    const profileRef = doc(db, `artifacts/${appId}/users/${userId}/userData`, 'profile');
+                    getDoc(profileRef).then(profileSnap => {
+                         if (profileSnap.exists()) {
+                             usersMap[userId] = profileSnap.data().username;
+                         }
+                    });
+                });
+                
+                snapshot.forEach(docSnap => {
+                    const post = docSnap.data();
+                    const authorName = usersMap[post.authorId] || 'Anonymous';
+                    const postHtml = `
+                        <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+                            <h3 class="text-xl font-bold text-red-500">${post.title}</h3>
+                            <p class="text-sm text-gray-400 mt-1">
+                                by <span class="font-semibold text-white">${authorName}</span> on ${post.createdAt ? new Date(post.createdAt.toDate()).toLocaleString() : 'N/A'}
+                            </p>
+                            <p class="text-gray-300 mt-4">${post.content}</p>
+                        </div>
+                    `;
+                    forumPostsContainer.insertAdjacentHTML('beforeend', postHtml);
+                });
+            });
+            
+            newPostForm.addEventListener('submit', async (e) => {
+                 e.preventDefault();
+                 if (!appCurrentUser) {
+                     showMessageModal('You must be signed in to post to the forums.', 'error');
+                     return;
+                 }
+                 
+                 const postTitle = postTitleInput.value;
+                 const postContent = postContentInput.value;
+                 
+                 const newPost = {
+                     title: postTitle,
+                     content: postContent,
+                     authorId: appCurrentUser.uid,
+                     createdAt: serverTimestamp(),
+                 };
+                 
+                 try {
+                     await addDoc(postsCollectionRef, newPost);
+                     postTitleInput.value = '';
+                     postContentInput.value = '';
+                     showMessageModal('Post created successfully!', 'success');
+                 } catch (error) {
+                     console.error("Error adding post:", error);
+                     showMessageModal(`Failed to create post: ${error.message}`, 'error');
+                 }
+            });
         }
         
         // Messaging page rendering
