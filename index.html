@@ -177,6 +177,15 @@
             font-weight: 500;
             cursor: pointer;
         }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #374151; /* dark:bg-gray-700 */
+            color: white;
+            border-radius: 0.5rem;
+            border: 1px solid #4b5563; /* dark:border-gray-600 */
+        }
     </style>
 </head>
 <body class="flex flex-col md:flex-row h-screen overflow-hidden">
@@ -229,8 +238,8 @@
     <script type="module">
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -257,6 +266,7 @@
         let appCurrentUser = null;
         let appUserData = null;
         let userId = null;
+        let isAdmin = false;
 
         // Custom Message Box function
         function showMessageBox(message) {
@@ -292,18 +302,21 @@
             { id: 'store', icon: 'fas fa-store', text: 'Store' },
             { id: 'wrld-shop', icon: 'fas fa-shopping-bag', text: 'WRLD-SHOP' },
             { id: 'settings', icon: 'fas fa-cog', text: 'Settings' },
+            { id: 'admin-dashboard', icon: 'fas fa-user-shield', text: 'Admin' },
             { id: 'logout', icon: 'fas fa-sign-out-alt', text: 'Sign Out' },
         ];
 
         const renderSidebarNav = (user) => {
             sidebarNavContainer.innerHTML = '';
             
-            // Filter nav items based on authentication status
-            let itemsToRender = user ? navItems : navItems.filter(item => item.id !== 'logout');
-
-            // Add Sign In button if user is not authenticated
-            if (!user) {
-                itemsToRender.push({ id: 'auth', icon: 'fas fa-sign-in-alt', text: 'Sign In' });
+            let itemsToRender = [];
+            if (user) {
+                itemsToRender = navItems.filter(item => item.id !== 'auth');
+                if (!isAdmin) {
+                    itemsToRender = itemsToRender.filter(item => item.id !== 'admin-dashboard');
+                }
+            } else {
+                itemsToRender = navItems.filter(item => item.id === 'home' || item.id === 'auth');
             }
 
             itemsToRender.forEach(item => {
@@ -328,11 +341,15 @@
                 return;
             }
 
-            // Check if user is authenticated before navigating to protected pages
-            if (!appCurrentUser && page !== 'auth') {
+            if (!appCurrentUser && page !== 'auth' && page !== 'home') {
                 showMessageBox('You must be signed in to view this page.');
                 navigateTo('auth');
                 return;
+            }
+
+            if (page === 'admin-dashboard' && !isAdmin) {
+                 showMessageBox('You do not have permission to view this page.');
+                 return;
             }
 
             currentPage = page;
@@ -340,7 +357,6 @@
             updateActiveNav();
             renderPage(page);
 
-            // Close sidebar on mobile after navigation
             if (window.innerWidth <= 768) {
                 leftSidebar.classList.remove('expanded');
                 overlayBackdrop.classList.add('hidden');
@@ -385,15 +401,77 @@
                     pageContent = `<h1 class="text-3xl font-bold mb-4">Settings</h1>
                                   <p>Manage your account settings here.</p>`;
                     break;
+                case 'admin-dashboard':
+                    pageContent = `
+                        <h1 class="text-3xl font-bold mb-4">Admin Dashboard</h1>
+                        <p class="mb-6">Manage store items and currency prices from here.</p>
+                        
+                        <div class="grid md:grid-cols-2 gap-8">
+                            <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                                <h2 class="text-xl font-bold mb-4">Store Items</h2>
+                                <form id="add-store-item-form">
+                                    <div class="mb-4">
+                                        <label for="item-name" class="block text-sm font-medium text-gray-400">Item Name</label>
+                                        <input type="text" id="item-name" class="form-input mt-1" placeholder="e.g., Health Potion" required>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label for="item-price" class="block text-sm font-medium text-gray-400">Price (in Currency)</label>
+                                        <input type="number" id="item-price" class="form-input mt-1" placeholder="e.g., 50" required>
+                                    </div>
+                                    <button type="submit" class="w-full py-2 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition">
+                                        Add/Update Item
+                                    </button>
+                                </form>
+                                <div id="store-items-list" class="mt-6 space-y-4">
+                                    <!-- Store items will be rendered here -->
+                                </div>
+                            </div>
+
+                            <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                                <h2 class="text-xl font-bold mb-4">Currency Prices</h2>
+                                <form id="update-currency-form">
+                                    <div class="mb-4">
+                                        <label for="currency-name" class="block text-sm font-medium text-gray-400">Currency Name</label>
+                                        <input type="text" id="currency-name" class="form-input mt-1" placeholder="e.g., Gold" required>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label for="currency-price" class="block text-sm font-medium text-gray-400">Price (in USD)</label>
+                                        <input type="number" id="currency-price" class="form-input mt-1" step="0.01" placeholder="e.g., 0.99" required>
+                                    </div>
+                                    <button type="submit" class="w-full py-2 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition">
+                                        Update Currency
+                                    </button>
+                                </form>
+                                <div id="currency-prices-list" class="mt-6 space-y-4">
+                                    <!-- Currency prices will be rendered here -->
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    break;
                 case 'auth':
                     pageContent = `<div class="flex flex-col items-center justify-center h-full">
                                       <h1 class="text-4xl font-extrabold text-red-500 mb-6">SophosWRLD</h1>
                                       <div class="bg-gray-800 p-8 rounded-xl shadow-lg w-full max-w-md">
                                           <h2 class="text-2xl font-bold text-center text-white mb-6">Sign In / Sign Up</h2>
-                                          <p class="text-center text-gray-400 mb-8">Please sign in to continue.</p>
-                                          <button id="auth-sign-in" class="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition duration-300 ease-in-out transform hover:scale-105">
-                                              Sign In
-                                          </button>
+                                          <form id="auth-form" class="space-y-4">
+                                              <div>
+                                                  <label for="auth-email" class="sr-only">Email</label>
+                                                  <input type="email" id="auth-email" class="form-input" placeholder="Email" required>
+                                              </div>
+                                              <div>
+                                                  <label for="auth-password" class="sr-only">Password</label>
+                                                  <input type="password" id="auth-password" class="form-input" placeholder="Password" required>
+                                              </div>
+                                              <button type="submit" id="sign-in-btn" class="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition duration-300 ease-in-out transform hover:scale-105">
+                                                  Sign In
+                                              </button>
+                                          </form>
+                                          <div class="mt-6 text-center">
+                                              <button id="sign-up-toggle-btn" class="text-red-400 hover:text-red-300 text-sm">
+                                                  Don't have an account? Sign Up
+                                              </button>
+                                          </div>
                                       </div>
                                   </div>`;
                     break;
@@ -403,11 +481,145 @@
             }
             mainContent.innerHTML = pageContent;
             
-            // Add a placeholder event listener for the sign-in button
             if (page === 'auth') {
-                 document.getElementById('auth-sign-in').addEventListener('click', () => {
-                     showMessageBox("Sign in functionality is not yet implemented. Please implement an authentication method to continue.");
-                 });
+                const authForm = document.getElementById('auth-form');
+                const signInBtn = document.getElementById('sign-in-btn');
+                const signUpToggleBtn = document.getElementById('sign-up-toggle-btn');
+                let isSignUp = false;
+
+                signUpToggleBtn.addEventListener('click', () => {
+                    isSignUp = !isSignUp;
+                    if (isSignUp) {
+                        signInBtn.textContent = 'Sign Up';
+                        signUpToggleBtn.textContent = 'Already have an account? Sign In';
+                    } else {
+                        signInBtn.textContent = 'Sign In';
+                        signUpToggleBtn.textContent = 'Don\'t have an account? Sign Up';
+                    }
+                });
+
+                authForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('auth-email').value;
+                    const password = document.getElementById('auth-password').value;
+
+                    try {
+                        if (isSignUp) {
+                            await createUserWithEmailAndPassword(auth, email, password);
+                            showMessageBox("Account created successfully! You are now signed in.");
+                        } else {
+                            await signInWithEmailAndPassword(auth, email, password);
+                            showMessageBox("Signed in successfully!");
+                        }
+                    } catch (error) {
+                        console.error("Authentication error:", error);
+                        showMessageBox(`Authentication failed: ${error.message}`);
+                    }
+                });
+            }
+
+            if (page === 'admin-dashboard') {
+                const storeItemsList = document.getElementById('store-items-list');
+                const currencyPricesList = document.getElementById('currency-prices-list');
+                const addStoreItemForm = document.getElementById('add-store-item-form');
+                const updateCurrencyForm = document.getElementById('update-currency-form');
+
+                // Real-time listener for store items
+                onSnapshot(doc(db, `artifacts/${appId}/public/data/storeData`, 'items'), (docSnap) => {
+                    if (docSnap.exists()) {
+                        const items = docSnap.data().items || [];
+                        storeItemsList.innerHTML = items.map(item => `
+                            <div class="p-4 bg-gray-700 rounded-lg flex justify-between items-center">
+                                <div>
+                                    <p class="font-bold">${item.name}</p>
+                                    <p class="text-sm text-gray-400">Price: ${item.price}</p>
+                                </div>
+                                <button data-item-name="${item.name}" class="delete-item-btn text-red-400 hover:text-red-300">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        `).join('');
+
+                        document.querySelectorAll('.delete-item-btn').forEach(button => {
+                            button.addEventListener('click', async (e) => {
+                                const itemName = e.currentTarget.dataset.itemName;
+                                const currentItems = (docSnap.data().items || []).filter(item => item.name !== itemName);
+                                await setDoc(doc(db, `artifacts/${appId}/public/data/storeData`, 'items'), { items: currentItems });
+                                showMessageBox(`Item '${itemName}' deleted.`);
+                            });
+                        });
+                    }
+                });
+
+                // Real-time listener for currency prices
+                onSnapshot(doc(db, `artifacts/${appId}/public/data/currencyData`, 'prices'), (docSnap) => {
+                    if (docSnap.exists()) {
+                        const prices = docSnap.data() || {};
+                        currencyPricesList.innerHTML = Object.entries(prices).map(([name, price]) => `
+                            <div class="p-4 bg-gray-700 rounded-lg flex justify-between items-center">
+                                <div>
+                                    <p class="font-bold">${name}</p>
+                                    <p class="text-sm text-gray-400">1 ${name} = ${price} USD</p>
+                                </div>
+                                <button data-currency-name="${name}" class="delete-currency-btn text-red-400 hover:text-red-300">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        `).join('');
+                        
+                        document.querySelectorAll('.delete-currency-btn').forEach(button => {
+                             button.addEventListener('click', async (e) => {
+                                const currencyName = e.currentTarget.dataset.currencyName;
+                                const currentPrices = docSnap.data() || {};
+                                delete currentPrices[currencyName];
+                                await setDoc(doc(db, `artifacts/${appId}/public/data/currencyData`, 'prices'), currentPrices);
+                                showMessageBox(`Currency '${currencyName}' deleted.`);
+                             });
+                        });
+                    }
+                });
+
+
+                addStoreItemForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const itemName = document.getElementById('item-name').value;
+                    const itemPrice = document.getElementById('item-price').value;
+                    const itemsDocRef = doc(db, `artifacts/${appId}/public/data/storeData`, 'items');
+
+                    try {
+                        const itemsDoc = await getDoc(itemsDocRef);
+                        const currentItems = itemsDoc.exists() ? (itemsDoc.data().items || []) : [];
+                        const newItem = { name: itemName, price: parseInt(itemPrice) };
+                        const updatedItems = [...currentItems.filter(item => item.name !== itemName), newItem];
+                        await setDoc(itemsDocRef, { items: updatedItems });
+                        showMessageBox(`Store item '${itemName}' updated.`);
+                        addStoreItemForm.reset();
+                    } catch (error) {
+                        console.error("Error updating store item:", error);
+                        showMessageBox("Failed to update store item.");
+                    }
+                });
+
+                updateCurrencyForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const currencyName = document.getElementById('currency-name').value;
+                    const currencyPrice = parseFloat(document.getElementById('currency-price').value);
+                    const pricesDocRef = doc(db, `artifacts/${appId}/public/data/currencyData`, 'prices');
+
+                    try {
+                        const pricesDoc = await getDoc(pricesDocRef);
+                        const currentPrices = pricesDoc.exists() ? pricesDoc.data() : {};
+                        await setDoc(pricesDocRef, {
+                            ...currentPrices,
+                            [currencyName]: currencyPrice
+                        });
+                        showMessageBox(`Currency '${currencyName}' updated.`);
+                        updateCurrencyForm.reset();
+                    } catch (error) {
+                        console.error("Error updating currency price:", error);
+                        showMessageBox("Failed to update currency price.");
+                    }
+                });
             }
         };
 
@@ -447,6 +659,13 @@
                 return newUserData;
             }
         };
+        
+        // Check for admin role
+        const checkAdminStatus = async (uid) => {
+            const adminDocRef = doc(db, `artifacts/${appId}/public/data/roles`, uid);
+            const adminDocSnap = await getDoc(adminDocRef);
+            return adminDocSnap.exists() && adminDocSnap.data().isAdmin === true;
+        };
 
         // Firebase Auth State Listener
         onAuthStateChanged(auth, async (user) => {
@@ -454,6 +673,7 @@
             if (user) {
                 userId = user.uid;
                 appUserData = await getUserData(user.uid);
+                isAdmin = await checkAdminStatus(user.uid);
                 renderSidebarNav(appCurrentUser);
                 
                 const currentPageFromStorage = localStorage.getItem('currentPage');
@@ -465,6 +685,7 @@
             } else {
                 appUserData = null;
                 userId = null;
+                isAdmin = false;
                 renderSidebarNav(appCurrentUser);
                 navigateTo('auth');
             }
@@ -483,7 +704,6 @@
                 });
             }
             
-            // Use the initial auth token for sign in if it exists
             if (initialAuthToken) {
                 try {
                      await signInWithCustomToken(auth, initialAuthToken);
