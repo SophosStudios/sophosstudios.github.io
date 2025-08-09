@@ -31,748 +31,1111 @@
             border-radius: 4px;
         }
         
-        /* Left Sidebar Collapsed by default on desktop, hidden on mobile */
+        /* Left Sidebar - Collapsed by default on desktop, hidden on mobile */
         .left-sidebar {
             width: 72px;
-            transition: width 0.3s ease-in-out;
-            z-index: 50;
+            transition: width 0.3s ease, transform 0.3s ease;
+            position: fixed;
+            z-index: 40;
+            height: 100vh;
             background-color: #1f2937; /* dark:bg-gray-800 */
+            flex-shrink: 0;
         }
 
+        /* Sidebar Expanded State */
         .left-sidebar.expanded {
             width: 256px;
         }
+        
+        /* Main Content Wrapper - Adjusts margin based on sidebar state */
+        .main-content-wrapper {
+            margin-left: 72px;
+            transition: margin-left 0.3s ease;
+        }
+        .main-content-wrapper.expanded {
+            margin-left: 256px;
+        }
 
-        /* Mobile sidebar */
-        @media (max-width: 768px) {
+        /* Mobile specific styles (<= 767px) */
+        @media (max-width: 767px) {
             .left-sidebar {
-                position: fixed;
-                top: 0;
-                left: -256px;
-                height: 100%;
-                width: 256px;
-                transition: left 0.3s ease-in-out;
+                transform: translateX(-100%);
             }
             .left-sidebar.expanded {
-                left: 0;
+                transform: translateX(0);
+            }
+            .main-content-wrapper {
+                margin-left: 0;
             }
         }
-
-        .left-sidebar-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 64px;
-            padding: 0 1rem;
-            color: white;
-            border-bottom: 1px solid #374151; /* dark:border-gray-700 */
+        
+        /* Dynamic theme classes based on accent color */
+        .accent-red { background-color: var(--accent-color); }
+        .accent-red:hover { background-color: var(--accent-color); opacity: 0.8; }
+        nav.border-red-500, .border-red-500 { border-color: var(--accent-color); }
+        .text-red-500 { color: var(--accent-color); }
+        .focus\:ring-red-500:focus { --tw-ring-color: var(--accent-color); }
+        .bg-red-600 { background-color: var(--accent-color); }
+        .hover\:bg-red-700:hover { background-color: var(--accent-color); opacity: 0.8; }
+        .text-red-400 { color: var(--accent-color); opacity: 0.8; }
+        
+        /* New styling for hover-to-expand buttons */
+        .action-btn-group button {
+            transition: width 0.3s ease, padding 0.3s ease, background-color 0.3s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            width: 40px; /* Initial width for just the icon */
+            padding: 8px;
+            text-align: center;
         }
-
-        .left-sidebar.expanded .left-sidebar-header {
-            justify-content: flex-start;
+        .action-btn-group button:hover {
+            width: auto; /* Expand width on hover */
+            padding-left: 16px;
+            padding-right: 16px;
         }
-
-        .sidebar-logo-text {
-            font-weight: 700;
-            font-size: 1.5rem;
+        .action-btn-group button span {
             display: none;
         }
-
-        .left-sidebar.expanded .sidebar-logo-text {
-            display: block;
-            margin-left: 0.5rem;
+        .action-btn-group button:hover span {
+            display: inline;
         }
-
-        .sidebar-nav-item {
-            display: flex;
-            align-items: center;
-            height: 48px;
-            padding: 0 1rem;
-            color: #d1d5db; /* dark:text-gray-400 */
-            border-radius: 0.5rem;
-            margin: 0.5rem 0;
-            cursor: pointer;
-            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+        .call-user-btn {
+            background-color: #22c55e;
+            color: white;
+            padding: 10px;
+            border-radius: 9999px; /* Tailwind's rounded-full */
+            font-size: 1.25rem; /* Tailwind's text-xl */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .call-user-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .call-user-btn:active {
+            transform: scale(0.95);
         }
         
-        .sidebar-nav-item:hover {
-            background-color: #374151; /* dark:bg-gray-700 */
-            color: white;
-        }
-
-        .sidebar-nav-item.active {
-            background-color: #4b5563; /* dark:bg-gray-600 */
-            color: white;
-        }
-
-        .sidebar-nav-item-icon {
-            font-size: 1.25rem;
-            min-width: 40px;
-        }
-
-        .sidebar-nav-item-text {
-            display: none;
-        }
-
-        .left-sidebar.expanded .sidebar-nav-item-text {
-            display: block;
-            margin-left: 0.5rem;
-        }
-        
-        .main-content {
-            flex-grow: 1;
-            padding: 1.5rem;
-            color: white;
-            overflow-y: auto;
-        }
-        
-        .overlay-backdrop {
-            position: fixed;
-            top: 0;
-            left: 0;
+        /* New styling for video and call UI */
+        .video-container {
+            position: relative;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 40;
-            display: none;
-        }
-
-        .overlay-backdrop.active {
-            display: block;
-        }
-
-        .message-box-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 100;
             display: flex;
             justify-content: center;
             align-items: center;
+            background-color: #000;
+        }
+        .video-large {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .video-small {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            width: 25%;
+            height: 25%;
+            border-radius: 0.75rem; /* Tailwind's rounded-xl */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            z-index: 10;
         }
 
-        .message-box-content {
+        /* Page transition animation */
+        .page-transition {
+            opacity: 0;
+            transform: translateX(-100%);
+            animation: slideIn 0.5s ease-out forwards;
+        }
+        
+        .slow-page-transition {
+            opacity: 0;
+            transform: translateX(-100%);
+            animation: slideIn 1.5s ease-out forwards; /* Slower animation for admin panel */
+        }
+        
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        /* Splash logo styling */
+        .splash-logo {
+            width: 250px;
+            height: 250px;
+            background-color: #ef4444;
+            border-radius: 9999px;
+            position: relative;
+            clip-path: circle(50% at 50% 100%); /* Cuts off the top half */
+        }
+
+        /* Store item hover effect */
+        .store-item:hover .store-item-overlay {
+            opacity: 1;
+        }
+        
+        /* Message modal styling */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.8);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
             background-color: #1f2937;
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            max-width: 400px;
-            width: 100%;
-            text-align: center;
+            margin: auto;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
         }
-        
-        .message-box-text {
-            margin-bottom: 1rem;
-            color: white;
+        .modal-close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
         }
-        
-        .message-box-button {
-            padding: 0.5rem 1rem;
-            border-radius: 0.375rem;
-            background-color: var(--accent-color);
+        .modal-close:hover,
+        .modal-close:focus {
             color: white;
-            font-weight: 500;
+            text-decoration: none;
             cursor: pointer;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 0.75rem;
-            background-color: #374151; /* dark:bg-gray-700 */
-            color: white;
-            border-radius: 0.5rem;
-            border: 1px solid #4b5563; /* dark:border-gray-600 */
         }
     </style>
 </head>
-<body class="flex flex-col md:flex-row h-screen overflow-hidden">
-
-    <!-- Mobile Header -->
-    <div class="md:hidden flex items-center justify-between p-4 bg-gray-800 text-white">
-        <div class="flex items-center">
-            <span class="text-xl font-bold text-red-500">SophosWRLD</span>
-        </div>
-        <div class="flex items-center space-x-4">
-            <button id="mobile-auth-btn" class="px-3 py-1 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition">
-                Sign In
-            </button>
-            <button id="mobile-menu-toggle" class="text-white focus:outline-none">
-                <i class="fas fa-bars"></i>
-            </button>
-        </div>
-    </div>
+<body class="flex bg-gray-900 text-gray-100 min-h-screen">
+    <!-- Overlay for mobile sidebar -->
+    <div id="overlay-backdrop" class="fixed inset-0 bg-black opacity-50 z-30 hidden md:hidden"></div>
 
     <!-- Left Sidebar -->
-    <aside id="left-sidebar" class="left-sidebar flex flex-col items-center md:items-start p-2 md:h-screen md:sticky md:top-0">
-        <div class="left-sidebar-header hidden md:flex">
-            <button id="sidebar-toggle" class="text-white focus:outline-none">
-                <i class="fas fa-bars"></i>
+    <div id="left-sidebar" class="left-sidebar md:relative md:flex flex-col py-4 px-2">
+        <!-- Logo and Toggle Button for mobile -->
+        <div class="flex items-center justify-between h-14 mb-6 md:mb-10">
+            <h1 class="text-3xl font-bold transition-opacity duration-300 md:opacity-100 hidden md:block" id="sidebar-logo">S</h1>
+            <h1 class="text-3xl font-bold transition-opacity duration-300 hidden md:hidden">SophosWRLD</h1>
+            <button id="sidebar-toggle-mobile" class="text-gray-400 p-2 rounded-full hover:bg-gray-700 md:hidden">
+                <i class="fas fa-bars text-xl"></i>
             </button>
-            <div class="flex items-center">
-                <span class="sidebar-logo-text text-red-500">SophosWRLD</span>
-            </div>
         </div>
 
-        <nav id="sidebar-nav-container" class="mt-4 w-full flex-grow overflow-y-auto">
-            <!-- Sidebar Navigation items will be rendered here dynamically -->
+        <!-- Navigation Links -->
+        <nav id="sidebar-nav" class="flex flex-col space-y-2 flex-grow">
+            <!-- Nav links will be rendered here by JavaScript -->
         </nav>
-    </aside>
-
-    <!-- Overlay Backdrop for Mobile Sidebar -->
-    <div id="overlay-backdrop" class="overlay-backdrop hidden"></div>
-
-    <!-- Main Content Area -->
-    <main id="main-content" class="main-content overflow-y-auto"></main>
-    
-    <!-- Custom Message Box HTML -->
-    <div id="message-box-overlay" class="message-box-overlay hidden">
-        <div class="message-box-content">
-            <p id="message-box-text" class="message-box-text"></p>
-            <button id="message-box-button" class="message-box-button">OK</button>
+        
+        <!-- User Info at the bottom of the sidebar -->
+        <div id="sidebar-user-info" class="mt-auto hidden md:block">
+            <!-- User info will be rendered here -->
         </div>
+        
     </div>
 
-    <script type="module">
-        // Import Firebase modules
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <!-- Main Content Area -->
+    <div id="main-content-wrapper" class="main-content-wrapper flex-grow p-6">
+        <header class="flex justify-between items-center mb-6">
+            <div class="flex-grow">
+                <h2 id="current-page-title" class="text-4xl font-extrabold text-red-500">SophosWRLD</h2>
+            </div>
+            <div class="flex items-center space-x-4">
+                <!-- Mobile User and Auth Buttons -->
+                <button id="mobile-auth-btn" class="text-gray-400 md:hidden p-2 rounded-full hover:bg-gray-700">
+                    <i class="fas fa-user-circle text-xl"></i>
+                </button>
+                <div id="desktop-user-info" class="hidden md:flex items-center space-x-2">
+                    <!-- Desktop user info will be rendered here -->
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main content will be dynamically loaded here -->
+        <main id="app-content" class="min-h-screen">
+            <!-- Content for each page will be loaded here -->
+        </main>
+    </div>
 
-        // Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
-            authDomain: "sophoswrld.firebaseapp.com",
-            databaseURL: "https://sophoswrld-default-rtdb.firebaseio.com",
-            projectId: "sophoswrld",
-            storageBucket: "sophoswrld.firebasestorage.app",
-            messagingSenderId: "26686142400",
-            appId: "1:26686142400:web:48f8d3ae0b097731317a25",
-            measurementId: "G-6XETC98C22"
+    <!-- Message Modal -->
+    <div id="message-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="document.getElementById('message-modal').style.display='none'">&times;</span>
+            <p id="modal-message-text" class="text-lg"></p>
+        </div>
+    </div>
+    
+    <!-- Firebase Libraries -->
+    <script type="module">
+        // =================================================================
+        // 1. FIREBASE IMPORTS
+        // =================================================================
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore, deleteDoc, addDoc, query, orderBy, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+
+        // =================================================================
+        // 2. CONFIGURATION & GLOBAL VARIABLES
+        // =================================================================
+        const CONFIG = {
+            websiteTitle: "SophosWRLD",
+        };
+
+        // --- PLACEHOLDER FOR YOUR FIREBASE CONFIGURATION ---
+        const FIREBASE_CONFIG_PLACEHOLDER = {
+          apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
+          authDomain: "sophoswrld.firebaseapp.com",
+          databaseURL: "https://sophoswrld-default-rtdb.firebaseio.com",
+          projectId: "sophoswrld",
+          storageBucket: "sophoswrld.firebasestorage.app",
+          messagingSenderId: "26686142400",
+          appId: "1:26686142400:web:48f8d3ae0b097731317a25",
+          measurementId: "G-6XETC98C22"
         };
         
-        // Global variables for Firebase
+        // --- DO NOT EDIT BELOW THIS LINE ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : FIREBASE_CONFIG_PLACEHOLDER;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
+
+        // --- Initialize Firebase ---
+        let app;
+        try {
+            app = initializeApp(firebaseConfig);
+        } catch (error) {
+            console.error("Firebase initialization failed:", error);
+            document.getElementById('content-area').innerHTML = `
+                <div class="text-center p-8">
+                    <h1 class="text-3xl font-bold text-red-500">Configuration Error</h1>
+                    <p class="mt-4 text-gray-400">Please provide a valid Firebase configuration in the code.</p>
+                </div>
+            `;
+            throw error;
+        }
+
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // Global state variables
+        // Global state
         let appCurrentUser = null;
         let appUserData = null;
-        let userId = null;
-        let isAdmin = false;
+        let dmUnsubscribe = null;
+        let callUnsubscribe = null;
+        let chatUserListUnsubscribe = null;
+        let activeDMUserId = null;
+        let currentStream = null;
+        let currentPeerConnection = null;
+        let isVideoCallActive = false;
+        let showAdminPanel = false;
+        let adminPanelUnsubscribe = null;
+        
+        // --- Navigation Logic ---
+        function renderSidebarNav(user, userData) {
+            const sidebarNav = document.getElementById('sidebar-nav');
+            if (!sidebarNav) return;
+            sidebarNav.innerHTML = '';
+            
+            const navLinks = [
+                { id: 'home', icon: 'fas fa-home', text: 'Home', required: true, handler: () => navigateTo('home') },
+                { id: 'users', icon: 'fas fa-users', text: 'Users', required: true, handler: () => navigateTo('users') },
+                { id: 'store', icon: 'fas fa-store', text: 'Store', required: true, handler: () => navigateTo('store') },
+            ];
 
-        // Custom Message Box function
-        function showMessageBox(message) {
-            const overlay = document.getElementById('message-box-overlay');
-            const textElement = document.getElementById('message-box-text');
-            const buttonElement = document.getElementById('message-box-button');
+            if (userData && userData.isAdmin) {
+                navLinks.push({ id: 'admin', icon: 'fas fa-tools', text: 'Admin Panel', required: true, handler: () => navigateTo('admin') });
+            }
 
-            textElement.textContent = message;
-            overlay.classList.remove('hidden');
+            navLinks.forEach(link => {
+                if (link.required) {
+                    const navItem = document.createElement('a');
+                    navItem.href = '#';
+                    navItem.className = `flex items-center p-3 rounded-lg text-gray-400 hover:bg-gray-700 transition-colors duration-200`;
+                    navItem.innerHTML = `
+                        <i class="${link.icon} w-6 text-xl"></i>
+                        <span class="ml-4 whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out">${link.text}</span>
+                    `;
+                    navItem.onclick = (e) => {
+                        e.preventDefault();
+                        link.handler();
+                        if (window.innerWidth < 768) {
+                            const leftSidebar = document.getElementById('left-sidebar');
+                            const overlayBackdrop = document.getElementById('overlay-backdrop');
+                            leftSidebar.classList.remove('expanded');
+                            overlayBackdrop.classList.add('hidden');
+                        }
+                    };
+                    sidebarNav.appendChild(navItem);
+                }
+            });
 
-            const hideMessageBox = () => {
-                overlay.classList.add('hidden');
-                buttonElement.removeEventListener('click', hideMessageBox);
-            };
-
-            buttonElement.addEventListener('click', hideMessageBox);
+            // Update user info at the bottom of the sidebar
+            renderUserInfo(user, userData);
         }
 
-        // DOM elements
-        const leftSidebar = document.getElementById('left-sidebar');
-        const overlayBackdrop = document.getElementById('overlay-backdrop');
-        const mainContent = document.getElementById('main-content');
-        const sidebarNavContainer = document.getElementById('sidebar-nav-container');
+        function renderUserInfo(user, userData) {
+            const sidebarUserInfo = document.getElementById('sidebar-user-info');
+            const desktopUserInfo = document.getElementById('desktop-user-info');
 
-        // Navigation state
-        let currentPage = 'home';
-        let currentProfileId = null;
+            if (!sidebarUserInfo || !desktopUserInfo) return;
 
-        // Sidebar content
-        const navItems = [
-            { id: 'home', icon: 'fas fa-home', text: 'Home' },
-            { id: 'dashboard', icon: 'fas fa-chart-line', text: 'Dashboard' },
-            { id: 'profile', icon: 'fas fa-user', text: 'Profile' },
-            { id: 'store', icon: 'fas fa-store', text: 'Store' },
-            { id: 'wrld-shop', icon: 'fas fa-shopping-bag', text: 'WRLD-SHOP' },
-            { id: 'settings', icon: 'fas fa-cog', text: 'Settings' },
-            { id: 'admin-dashboard', icon: 'fas fa-user-shield', text: 'Admin' },
-            { id: 'logout', icon: 'fas fa-sign-out-alt', text: 'Sign Out' },
-        ];
+            sidebarUserInfo.innerHTML = '';
+            desktopUserInfo.innerHTML = '';
 
-        const renderSidebarNav = (user) => {
-            sidebarNavContainer.innerHTML = '';
-            
-            let itemsToRender = [];
             if (user) {
-                itemsToRender = navItems.filter(item => item.id !== 'auth');
-                if (!isAdmin) {
-                    itemsToRender = itemsToRender.filter(item => item.id !== 'admin-dashboard');
-                }
-            } else {
-                itemsToRender = navItems.filter(item => item.id === 'home' || item.id === 'auth');
-            }
+                const initial = userData?.name?.charAt(0) || user.uid.charAt(0);
+                const userName = userData?.name || 'Anonymous';
+                const userBalance = userData?.balance || 0;
 
-            itemsToRender.forEach(item => {
-                const navElement = document.createElement('div');
-                navElement.id = `nav-${item.id}`;
-                navElement.className = `sidebar-nav-item group ${currentPage === item.id ? 'active' : ''}`;
-                navElement.dataset.page = item.id;
-                navElement.innerHTML = `
-                    <i class="${item.icon} sidebar-nav-item-icon"></i>
-                    <span class="sidebar-nav-item-text">${item.text}</span>
+                const userInfoHtml = `
+                    <div class="flex items-center space-x-2 p-3 rounded-lg hover:bg-gray-700 transition-colors duration-200 cursor-pointer">
+                        <div class="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center text-white font-bold text-lg">
+                            ${initial}
+                        </div>
+                        <div class="flex-grow">
+                            <span class="block text-gray-200 font-medium">${userName}</span>
+                            <span class="block text-sm text-gray-400">${CONFIG.currencyIcon} ${userBalance}</span>
+                        </div>
+                        <button id="sign-out-btn" class="text-gray-400 hover:text-red-500">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
+                    </div>
                 `;
-                navElement.addEventListener('click', () => navigateTo(item.id));
-                sidebarNavContainer.appendChild(navElement);
-            });
-        };
 
-        const navigateTo = (page, params = {}) => {
-            if (page === 'logout') {
-                signOut(auth).catch(error => {
-                    console.error("Error signing out:", error);
-                });
-                return;
-            }
+                sidebarUserInfo.innerHTML = userInfoHtml;
+                desktopUserInfo.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                         <span class="text-gray-200 font-medium">${userName}</span>
+                         <span class="text-sm text-gray-400">${CONFIG.currencyIcon} ${userBalance}</span>
+                    </div>
+                    <button id="sign-out-desktop-btn" class="p-2 text-gray-400 hover:bg-gray-700 rounded-full">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                `;
 
-            if (!appCurrentUser && page !== 'auth' && page !== 'home') {
-                showMessageBox('You must be signed in to view this page.');
-                navigateTo('auth');
-                return;
-            }
+                document.getElementById('sign-out-btn').addEventListener('click', handleSignOut);
+                document.getElementById('sign-out-desktop-btn').addEventListener('click', handleSignOut);
 
-            if (page === 'admin-dashboard' && !isAdmin) {
-                 showMessageBox('You do not have permission to view this page.');
-                 return;
-            }
-            
-            currentPage = page;
-            localStorage.setItem('currentPage', page);
-            updateActiveNav();
-
-            if (page === 'profile' && params.userId) {
-                currentProfileId = params.userId;
             } else {
-                currentProfileId = userId;
+                sidebarUserInfo.innerHTML = `
+                    <button onclick="navigateTo('auth')" class="w-full p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                        Sign In
+                    </button>
+                `;
+                desktopUserInfo.innerHTML = `
+                    <button onclick="navigateTo('auth')" class="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                        Sign In
+                    </button>
+                `;
             }
+        }
+        
+        // Function to show a message modal
+        function showMessage(message) {
+            const modal = document.getElementById('message-modal');
+            const messageText = document.getElementById('modal-message-text');
+            messageText.innerText = message;
+            modal.style.display = 'flex';
+        }
 
-            renderPage(page, { userId: currentProfileId });
-
-            if (window.innerWidth <= 768) {
-                leftSidebar.classList.remove('expanded');
-                overlayBackdrop.classList.add('hidden');
-            }
-        };
-
-        const updateActiveNav = () => {
-            document.querySelectorAll('.sidebar-nav-item').forEach(item => {
-                if (item.dataset.page === currentPage) {
-                    item.classList.add('active');
-                } else {
-                    item.classList.remove('active');
-                }
-            });
-        };
-
-        // Function to create a call
-        const callUser = async (recipientId) => {
-            if (!userId) {
-                showMessageBox("You must be logged in to make a call.");
-                return;
-            }
-            if (userId === recipientId) {
-                showMessageBox("You cannot call yourself.");
-                return;
-            }
-
+        async function handleSignOut() {
             try {
-                const callDocRef = await addDoc(collection(db, `artifacts/${appId}/public/data/calls`), {
-                    callerId: userId,
-                    recipientId: recipientId,
-                    timestamp: new Date(),
-                    status: 'ringing'
-                });
-                showMessageBox(`Calling user: ${recipientId}. Call ID: ${callDocRef.id}`);
+                await signOut(auth);
+                // Auth state change listener will handle UI update
             } catch (error) {
-                console.error("Error creating call:", error);
-                showMessageBox("Failed to initiate call. Please try again.");
+                console.error('Error signing out:', error);
+                showMessage('Error signing out. Please try again.');
             }
-        };
+        }
 
-        // Function to handle incoming calls
-        const handleIncomingCall = (callData) => {
-            const callerId = callData.callerId;
-            const callId = callData.id;
-
-            // This is a simple modal. You can replace this with a more advanced UI.
-            if (window.confirm(`Incoming call from user ${callerId}. Do you want to accept?`)) {
-                // User accepted the call. We can update the call status or navigate to a call page.
-                // For now, let's just show a message.
-                showMessageBox(`Call from ${callerId} accepted!`);
-                // Delete the call document after acceptance.
-                deleteDoc(doc(db, `artifacts/${appId}/public/data/calls`, callId));
-            } else {
-                // User declined the call.
-                showMessageBox(`Call from ${callerId} declined.`);
-                // Delete the call document.
-                deleteDoc(doc(db, `artifacts/${appId}/public/data/calls`, callId));
-            }
-        };
-
-        // Listen for incoming calls in real-time
-        onAuthStateChanged(auth, user => {
-            if (user) {
-                const callsCollectionRef = collection(db, `artifacts/${appId}/public/data/calls`);
-                onSnapshot(callsCollectionRef, (snapshot) => {
-                    snapshot.docChanges().forEach(change => {
-                        if (change.type === "added") {
-                            const callData = change.doc.data();
-                            if (callData.recipientId === user.uid) {
-                                handleIncomingCall({ ...callData, id: change.doc.id });
-                            }
-                        }
-                    });
-                });
-            }
-        });
-
-
-        const renderPage = (page, params = {}) => {
-            let pageContent = '';
-            switch (page) {
+        function navigateTo(pageId) {
+            const appContent = document.getElementById('app-content');
+            const pageTitle = document.getElementById('current-page-title');
+            
+            // Apply page transition animation
+            appContent.innerHTML = '';
+            const newContentDiv = document.createElement('div');
+            newContentDiv.className = pageId === 'admin' ? 'slow-page-transition' : 'page-transition';
+            
+            switch (pageId) {
                 case 'home':
-                    pageContent = `<h1 class="text-3xl font-bold mb-4">Welcome to SophosWRLD!</h1>
-                                  <p>Explore the features and manage your projects from the sidebar.</p>`;
+                    pageTitle.innerText = 'Home';
+                    renderHomePage(newContentDiv);
                     break;
-                case 'dashboard':
-                    pageContent = `<h1 class="text-3xl font-bold mb-4">Dashboard</h1>
-                                  <p>This is your personalized dashboard.</p>`;
+                case 'users':
+                    pageTitle.innerText = 'Users';
+                    renderUsersPage(newContentDiv);
                     break;
-                case 'profile':
-                    const profileId = params.userId || userId;
-                    pageContent = `<h1 class="text-3xl font-bold mb-4">User Profile</h1>
-                                  <p>User ID: <span id="user-id">${profileId}</span></p>
-                                  <p>This is where your profile information will be displayed.</p>
-                                  ${profileId !== userId ? `<button id="call-btn" data-user-id="${profileId}" class="mt-4 py-2 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 transition">
-                                                                <i class="fas fa-phone-alt"></i> Call User
-                                                            </button>` : ''}
-                                  `;
-                    
-                    setTimeout(() => {
-                        const callBtn = document.getElementById('call-btn');
-                        if (callBtn) {
-                            callBtn.addEventListener('click', () => {
-                                const recipientId = callBtn.dataset.userId;
-                                callUser(recipientId);
-                            });
-                        }
-                    }, 0);
+                case 'chat':
+                    pageTitle.innerText = `Chat with ${activeDMUserId}`;
+                    renderChatPanel(activeDMUserId, localStorage.getItem('activeDMUserName'));
+                    break;
+                case 'auth':
+                    pageTitle.innerText = 'Sign In';
+                    renderAuthPage(newContentDiv);
                     break;
                 case 'store':
-                    pageContent = `<h1 class="text-3xl font-bold mb-4">Store</h1>
-                                  <p>Welcome to the store! Browse and purchase items here.</p>`;
+                    pageTitle.innerText = 'Store';
+                    renderStorePage(newContentDiv);
                     break;
-                case 'wrld-shop':
-                    pageContent = `<h1 class="text-3xl font-bold mb-4">WRLD-SHOP</h1>
-                                  <p>This is the special WRLD-SHOP with unique items.</p>`;
+                case 'admin':
+                    pageTitle.innerText = 'Admin Panel';
+                    if (appUserData && appUserData.isAdmin) {
+                        renderAdminPanel(newContentDiv);
+                    } else {
+                        newContentDiv.innerHTML = '<div class="text-center p-8 text-2xl text-red-500">Access Denied.</div>';
+                    }
                     break;
-                case 'settings':
-                    pageContent = `<h1 class="text-3xl font-bold mb-4">Settings</h1>
-                                  <p>Manage your account settings here.</p>`;
-                    break;
-                case 'admin-dashboard':
-                    pageContent = `
-                        <h1 class="text-3xl font-bold mb-4">Admin Dashboard</h1>
-                        <p class="mb-6">Manage store items and currency prices from here.</p>
-                        
-                        <div class="grid md:grid-cols-2 gap-8">
-                            <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
-                                <h2 class="text-xl font-bold mb-4">Store Items</h2>
-                                <form id="add-store-item-form">
-                                    <div class="mb-4">
-                                        <label for="item-name" class="block text-sm font-medium text-gray-400">Item Name</label>
-                                        <input type="text" id="item-name" class="form-input mt-1" placeholder="e.g., Health Potion" required>
-                                    </div>
-                                    <div class="mb-4">
-                                        <label for="item-price" class="block text-sm font-medium text-gray-400">Price (in Currency)</label>
-                                        <input type="number" id="item-price" class="form-input mt-1" placeholder="e.g., 50" required>
-                                    </div>
-                                    <button type="submit" class="w-full py-2 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition">
-                                        Add/Update Item
-                                    </button>
-                                </form>
-                                <div id="store-items-list" class="mt-6 space-y-4">
-                                    <!-- Store items will be rendered here -->
-                                </div>
-                            </div>
+                default:
+                    pageTitle.innerText = 'Not Found';
+                    newContentDiv.innerHTML = '<div class="text-center p-8 text-2xl">Page not found.</div>';
+            }
+            appContent.appendChild(newContentDiv);
+            localStorage.setItem('currentPage', pageId);
+            
+            // Clean up old subscriptions when navigating away from chat/admin
+            if (pageId !== 'chat' && dmUnsubscribe) {
+                dmUnsubscribe();
+                dmUnsubscribe = null;
+            }
+            if (pageId !== 'users' && chatUserListUnsubscribe) {
+                chatUserListUnsubscribe();
+                chatUserListUnsubscribe = null;
+            }
+            if (pageId !== 'admin' && adminPanelUnsubscribe) {
+                adminPanelUnsubscribe();
+                adminPanelUnsubscribe = null;
+            }
+            
+            // If navigating away from a call, clean up
+            if (pageId !== 'chat' && isVideoCallActive) {
+                endCall();
+            }
+        }
+        
+        function renderHomePage(container) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-8">
+                    <!-- Custom Splash Logo -->
+                    <div class="splash-logo mb-8"></div>
+                    <h1 class="text-6xl font-extrabold text-white mb-4">SophosWRLD</h1>
+                    <p class="text-xl text-gray-400 text-center max-w-2xl">
+                        Explore, connect, and play. Welcome to SophosWRLD, your hub for games, community, and more.
+                    </p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+                    <!-- Placeholder Game Cards -->
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-lg transform hover:scale-105 transition-transform duration-300 cursor-pointer">
+                        <img src="https://placehold.co/400x200/4B5563/FFFFFF?text=Game+1" alt="Game 1 Placeholder" class="rounded-lg mb-4">
+                        <h3 class="text-2xl font-bold text-white">Sophos Shooter</h3>
+                        <p class="text-gray-400 mt-2">A fast-paced online shooter game with customizable characters.</p>
+                        <button class="mt-4 w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition">
+                            Play Now
+                        </button>
+                    </div>
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-lg transform hover:scale-105 transition-transform duration-300 cursor-pointer">
+                        <img src="https://placehold.co/400x200/4B5563/FFFFFF?text=Game+2" alt="Game 2 Placeholder" class="rounded-lg mb-4">
+                        <h3 class="text-2xl font-bold text-white">Sophos Racer</h3>
+                        <p class="text-gray-400 mt-2">Race against friends in this thrilling multiplayer racing experience.</p>
+                        <button class="mt-4 w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition">
+                            Play Now
+                        </button>
+                    </div>
+                    <div class="bg-gray-800 rounded-xl p-6 shadow-lg transform hover:scale-105 transition-transform duration-300 cursor-pointer">
+                        <img src="https://placehold.co/400x200/4B5563/FFFFFF?text=Game+3" alt="Game 3 Placeholder" class="rounded-lg mb-4">
+                        <h3 class="text-2xl font-bold text-white">Sophos RPG</h3>
+                        <p class="text-gray-400 mt-2">An open-world adventure game with deep lore and quests.</p>
+                        <button class="mt-4 w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition">
+                            Play Now
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderUsersPage(container) {
+            container.innerHTML = `
+                <div class="p-6">
+                    <h3 class="text-3xl font-bold text-white mb-6">Users</h3>
+                    <div id="users-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- User list will be loaded here -->
+                    </div>
+                </div>
+            `;
+            const usersListElement = document.getElementById('users-list');
+            
+            // Clean up old listener
+            if (chatUserListUnsubscribe) chatUserListUnsubscribe();
 
-                            <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
-                                <h2 class="text-xl font-bold mb-4">Currency Prices</h2>
-                                <form id="update-currency-form">
-                                    <div class="mb-4">
-                                        <label for="currency-name" class="block text-sm font-medium text-gray-400">Currency Name</label>
-                                        <input type="text" id="currency-name" class="form-input mt-1" placeholder="e.g., Gold" required>
-                                    </div>
-                                    <div class="mb-4">
-                                        <label for="currency-price" class="block text-sm font-medium text-gray-400">Price (in USD)</label>
-                                        <input type="number" id="currency-price" class="form-input mt-1" step="0.01" placeholder="e.g., 0.99" required>
-                                    </div>
-                                    <button type="submit" class="w-full py-2 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition">
-                                        Update Currency
-                                    </button>
-                                </form>
-                                <div id="currency-prices-list" class="mt-6 space-y-4">
-                                    <!-- Currency prices will be rendered here -->
+            const usersCollection = collection(db, `artifacts/${appId}/public/data/users`);
+            chatUserListUnsubscribe = onSnapshot(usersCollection, (snapshot) => {
+                usersListElement.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const user = doc.data();
+                    const initial = user.name ? user.name.charAt(0) : '?';
+                    if (doc.id !== appCurrentUser?.uid) {
+                        const userCard = document.createElement('div');
+                        userCard.className = 'bg-gray-800 rounded-xl p-6 flex items-center space-x-4 shadow-lg';
+                        userCard.innerHTML = `
+                            <div class="w-16 h-16 rounded-full flex items-center justify-center bg-blue-600 text-white text-3xl font-bold">
+                                ${initial}
+                            </div>
+                            <div class="flex-grow">
+                                <h4 class="text-xl font-semibold">${user.name || 'Anonymous'}</h4>
+                                <p class="text-sm text-gray-400">${doc.id}</p>
+                            </div>
+                            <button class="chat-btn bg-red-600 text-white p-3 rounded-full hover:bg-red-700 transition">
+                                <i class="fas fa-comment-dots"></i>
+                            </button>
+                        `;
+                        usersListElement.appendChild(userCard);
+                        userCard.querySelector('.chat-btn').addEventListener('click', () => {
+                            localStorage.setItem('activeDMUserName', user.name || 'Anonymous');
+                            navigateTo('chat');
+                        });
+                    }
+                });
+            });
+        }
+        
+        function renderAuthPage(container) {
+            container.innerHTML = `
+                <div class="flex items-center justify-center min-h-screen -mt-20">
+                    <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+                        <h3 class="text-3xl font-bold text-center mb-6">Welcome Back</h3>
+                        <p class="text-center text-gray-400 mb-8">Sign in anonymously to access all features.</p>
+                        <button id="sign-in-btn" class="w-full bg-red-600 text-white p-4 rounded-lg font-bold text-lg hover:bg-red-700 transition">
+                            Sign In Anonymously
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('sign-in-btn').addEventListener('click', async () => {
+                try {
+                    await signInAnonymously(auth);
+                } catch (error) {
+                    console.error('Error signing in anonymously:', error);
+                    showMessage('Error signing in. Please try again.');
+                }
+            });
+        }
+
+        async function renderStorePage(container) {
+            const storeItems = [
+                { id: 'item1', name: 'Legendary Armor', price: 500, description: 'Grants a significant defensive bonus.', icon: '<i class="fas fa-shield-alt text-4xl text-blue-400"></i>' },
+                { id: 'item2', name: 'Mystic Blade', price: 1000, description: 'A powerful weapon with elemental damage.', icon: '<i class="fas fa-sword text-4xl text-yellow-400"></i>' },
+                { id: 'item3', name: 'Potion of Health', price: 50, description: 'Restores a large amount of health instantly.', icon: '<i class="fas fa-flask-potion text-4xl text-green-400"></i>' },
+                { id: 'item4', name: 'Teleport Scroll', price: 250, description: 'Instantly teleports you to a safe location.', icon: '<i class="fas fa-scroll text-4xl text-purple-400"></i>' }
+            ];
+
+            container.innerHTML = `
+                <div class="p-6">
+                    <h3 class="text-3xl font-bold text-white mb-6">Store</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        ${storeItems.map(item => `
+                            <div class="bg-gray-800 rounded-xl p-6 flex flex-col items-center text-center shadow-lg transform hover:scale-105 transition-transform duration-300 store-item relative overflow-hidden">
+                                <div class="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center mb-4">
+                                    ${item.icon}
                                 </div>
+                                <h4 class="text-xl font-semibold text-white">${item.name}</h4>
+                                <p class="text-gray-400 text-sm mt-2 flex-grow">${item.description}</p>
+                                <div class="mt-4 flex items-center space-x-2">
+                                    <span class="text-white text-lg font-bold">${item.price}</span>
+                                    <span class="text-gray-400">${CONFIG.currencyIcon}</span>
+                                </div>
+                                <button class="buy-item-btn mt-4 w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition" data-item-id="${item.id}" data-item-price="${item.price}">
+                                    Buy
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            // Add event listeners for buy buttons
+            container.querySelectorAll('.buy-item-btn').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const itemId = e.target.dataset.itemId;
+                    const itemPrice = parseInt(e.target.dataset.itemPrice);
+
+                    if (!appCurrentUser || !appUserData) {
+                        showMessage('Please sign in to buy items.');
+                        return;
+                    }
+                    
+                    if (appUserData.balance < itemPrice) {
+                        showMessage('Not enough currency to buy this item.');
+                        return;
+                    }
+
+                    try {
+                        const userDocRef = doc(db, `artifacts/${appId}/public/data/users`, appCurrentUser.uid);
+                        await runTransaction(db, async (transaction) => {
+                            const userDoc = await transaction.get(userDocRef);
+                            if (!userDoc.exists()) {
+                                throw "User document does not exist!";
+                            }
+                            const newBalance = userDoc.data().balance - itemPrice;
+                            transaction.update(userDocRef, { balance: newBalance });
+                        });
+                        showMessage(`You have successfully purchased an item! Your new balance is ${appUserData.balance - itemPrice}.`);
+                    } catch (error) {
+                        console.error('Transaction failed: ', error);
+                        showMessage('Failed to process purchase. Please try again.');
+                    }
+                });
+            });
+        }
+        
+        function renderAdminPanel(container) {
+            container.innerHTML = `
+                <div class="p-6">
+                    <h3 class="text-3xl font-bold text-white mb-6">Admin Panel</h3>
+                    <div id="admin-user-list" class="space-y-4">
+                        <!-- Admin user list and edit forms will be loaded here -->
+                    </div>
+                </div>
+            `;
+            const adminUserList = document.getElementById('admin-user-list');
+            
+            // Clean up old listener
+            if (adminPanelUnsubscribe) adminPanelUnsubscribe();
+
+            const usersCollection = collection(db, `artifacts/${appId}/public/data/users`);
+            adminPanelUnsubscribe = onSnapshot(usersCollection, (snapshot) => {
+                adminUserList.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const user = doc.data();
+                    const userCard = document.createElement('div');
+                    userCard.className = 'bg-gray-800 rounded-xl p-4 shadow-lg';
+                    userCard.innerHTML = `
+                        <div class="flex items-center space-x-4 mb-4">
+                            <div class="flex-grow">
+                                <h4 class="text-xl font-semibold">${user.name || 'Anonymous'}</h4>
+                                <p class="text-sm text-gray-400 truncate">${doc.id}</p>
+                                <p class="text-sm text-gray-400 mt-1">Balance: ${user.balance || 0} ${CONFIG.currencyIcon}</p>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <input type="text" id="admin-name-${doc.id}" class="w-full bg-gray-700 text-white p-2 rounded-lg" placeholder="New Name" value="${user.name || ''}">
+                            <input type="number" id="admin-balance-${doc.id}" class="w-full bg-gray-700 text-white p-2 rounded-lg" placeholder="New Balance" value="${user.balance || 0}">
+                            <div class="flex space-x-2">
+                                <button id="admin-save-${doc.id}" class="w-1/2 bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition">Save Changes</button>
+                                <button id="admin-toggle-${doc.id}" class="w-1/2 bg-gray-600 text-white p-2 rounded-lg hover:bg-gray-700 transition">Toggle Admin</button>
                             </div>
                         </div>
                     `;
-                    break;
-                case 'auth':
-                    pageContent = `<div class="flex flex-col items-center justify-center h-full">
-                                      <h1 class="text-4xl font-extrabold text-red-500 mb-6">SophosWRLD</h1>
-                                      <div class="bg-gray-800 p-8 rounded-xl shadow-lg w-full max-w-md">
-                                          <h2 class="text-2xl font-bold text-center text-white mb-6">Sign In / Sign Up</h2>
-                                          <form id="auth-form" class="space-y-4">
-                                              <div>
-                                                  <label for="auth-email" class="sr-only">Email</label>
-                                                  <input type="email" id="auth-email" class="form-input" placeholder="Email" required>
-                                              </div>
-                                              <div>
-                                                  <label for="auth-password" class="sr-only">Password</label>
-                                                  <input type="password" id="auth-password" class="form-input" placeholder="Password" required>
-                                              </div>
-                                              <button type="submit" id="sign-in-btn" class="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition duration-300 ease-in-out transform hover:scale-105">
-                                                  Sign In
-                                              </button>
-                                          </form>
-                                          <div class="mt-6 text-center">
-                                              <button id="sign-up-toggle-btn" class="text-red-400 hover:text-red-300 text-sm">
-                                                  Don't have an account? Sign Up
-                                              </button>
-                                          </div>
-                                      </div>
-                                  </div>`;
-                    break;
-                default:
-                    pageContent = `<h1 class="text-3xl font-bold">404 - Page Not Found</h1>`;
-                    break;
-            }
-            mainContent.innerHTML = pageContent;
-            
-            if (page === 'auth') {
-                const authForm = document.getElementById('auth-form');
-                const signInBtn = document.getElementById('sign-in-btn');
-                const signUpToggleBtn = document.getElementById('sign-up-toggle-btn');
-                let isSignUp = false;
-
-                signUpToggleBtn.addEventListener('click', () => {
-                    isSignUp = !isSignUp;
-                    if (isSignUp) {
-                        signInBtn.textContent = 'Sign Up';
-                        signUpToggleBtn.textContent = 'Already have an account? Sign In';
-                    } else {
-                        signInBtn.textContent = 'Sign In';
-                        signUpToggleBtn.textContent = 'Don\'t have an account? Sign Up';
-                    }
-                });
-
-                authForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const email = document.getElementById('auth-email').value;
-                    const password = document.getElementById('auth-password').value;
-
-                    try {
-                        if (isSignUp) {
-                            await createUserWithEmailAndPassword(auth, email, password);
-                            showMessageBox("Account created successfully! You are now signed in.");
-                        } else {
-                            await signInWithEmailAndPassword(auth, email, password);
-                            showMessageBox("Signed in successfully!");
+                    adminUserList.appendChild(userCard);
+                    
+                    // Add event listeners for the new admin buttons
+                    document.getElementById(`admin-save-${doc.id}`).addEventListener('click', async () => {
+                        const newName = document.getElementById(`admin-name-${doc.id}`).value;
+                        const newBalance = parseFloat(document.getElementById(`admin-balance-${doc.id}`).value);
+                        if (isNaN(newBalance)) {
+                             showMessage("Invalid balance value. Please enter a number.");
+                             return;
                         }
-                    } catch (error) {
-                        console.error("Authentication error:", error);
-                        showMessageBox(`Authentication failed: ${error.message}`);
-                    }
-                });
-            }
-
-            if (page === 'admin-dashboard') {
-                const storeItemsList = document.getElementById('store-items-list');
-                const currencyPricesList = document.getElementById('currency-prices-list');
-                const addStoreItemForm = document.getElementById('add-store-item-form');
-                const updateCurrencyForm = document.getElementById('update-currency-form');
-
-                // Real-time listener for store items
-                onSnapshot(doc(db, `artifacts/${appId}/public/data/storeData`, 'items'), (docSnap) => {
-                    if (docSnap.exists()) {
-                        const items = docSnap.data().items || [];
-                        storeItemsList.innerHTML = items.map(item => `
-                            <div class="p-4 bg-gray-700 rounded-lg flex justify-between items-center">
-                                <div>
-                                    <p class="font-bold">${item.name}</p>
-                                    <p class="text-sm text-gray-400">Price: ${item.price}</p>
-                                </div>
-                                <button data-item-name="${item.name}" class="delete-item-btn text-red-400 hover:text-red-300">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        `).join('');
-
-                        document.querySelectorAll('.delete-item-btn').forEach(button => {
-                            button.addEventListener('click', async (e) => {
-                                const itemName = e.currentTarget.dataset.itemName;
-                                const currentItems = (docSnap.data().items || []).filter(item => item.name !== itemName);
-                                await setDoc(doc(db, `artifacts/${appId}/public/data/storeData`, 'items'), { items: currentItems });
-                                showMessageBox(`Item '${itemName}' deleted.`);
-                            });
-                        });
-                    }
-                });
-
-                // Real-time listener for currency prices
-                onSnapshot(doc(db, `artifacts/${appId}/public/data/currencyData`, 'prices'), (docSnap) => {
-                    if (docSnap.exists()) {
-                        const prices = docSnap.data() || {};
-                        currencyPricesList.innerHTML = Object.entries(prices).map(([name, price]) => `
-                            <div class="p-4 bg-gray-700 rounded-lg flex justify-between items-center">
-                                <div>
-                                    <p class="font-bold">${name}</p>
-                                    <p class="text-sm text-gray-400">1 ${name} = ${price} USD</p>
-                                </div>
-                                <button data-currency-name="${name}" class="delete-currency-btn text-red-400 hover:text-red-300">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        `).join('');
                         
-                        document.querySelectorAll('.delete-currency-btn').forEach(button => {
-                             button.addEventListener('click', async (e) => {
-                                const currencyName = e.currentTarget.dataset.currencyName;
-                                const currentPrices = docSnap.data() || {};
-                                delete currentPrices[currencyName];
-                                await setDoc(doc(db, `artifacts/${appId}/public/data/currencyData`, 'prices'), currentPrices);
-                                showMessageBox(`Currency '${currencyName}' deleted.`);
+                        try {
+                             const userDocRef = doc(db, `artifacts/${appId}/public/data/users`, doc.id);
+                             await updateDoc(userDocRef, {
+                                 name: newName,
+                                 balance: newBalance
                              });
-                        });
-                    }
+                             showMessage(`Updated user ${newName} successfully.`);
+                        } catch (error) {
+                             console.error('Error updating user:', error);
+                             showMessage('Failed to update user. Please try again.');
+                        }
+                    });
+
+                    document.getElementById(`admin-toggle-${doc.id}`).addEventListener('click', async () => {
+                        const newAdminStatus = !user.isAdmin;
+                        try {
+                            const userDocRef = doc(db, `artifacts/${appId}/public/data/users`, doc.id);
+                            await updateDoc(userDocRef, {
+                                isAdmin: newAdminStatus
+                            });
+                            showMessage(`Admin status for ${user.name} is now ${newAdminStatus}.`);
+                        } catch (error) {
+                            console.error('Error toggling admin status:', error);
+                            showMessage('Failed to toggle admin status. Please try again.');
+                        }
+                    });
                 });
-
-
-                addStoreItemForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const itemName = document.getElementById('item-name').value;
-                    const itemPrice = document.getElementById('item-price').value;
-                    const itemsDocRef = doc(db, `artifacts/${appId}/public/data/storeData`, 'items');
-
-                    try {
-                        const itemsDoc = await getDoc(itemsDocRef);
-                        const currentItems = itemsDoc.exists() ? (itemsDoc.data().items || []) : [];
-                        const newItem = { name: itemName, price: parseInt(itemPrice) };
-                        const updatedItems = [...currentItems.filter(item => item.name !== itemName), newItem];
-                        await setDoc(itemsDocRef, { items: updatedItems });
-                        showMessageBox(`Store item '${itemName}' updated.`);
-                        addStoreItemForm.reset();
-                    } catch (error) {
-                        console.error("Error updating store item:", error);
-                        showMessageBox("Failed to update store item.");
-                    }
-                });
-
-                updateCurrencyForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const currencyName = document.getElementById('currency-name').value;
-                    const currencyPrice = parseFloat(document.getElementById('currency-price').value);
-                    const pricesDocRef = doc(db, `artifacts/${appId}/public/data/currencyData`, 'prices');
-
-                    try {
-                        const pricesDoc = await getDoc(pricesDocRef);
-                        const currentPrices = pricesDoc.exists() ? pricesDoc.data() : {};
-                        await setDoc(pricesDocRef, {
-                            ...currentPrices,
-                            [currencyName]: currencyPrice
-                        });
-                        showMessageBox(`Currency '${currencyName}' updated.`);
-                        updateCurrencyForm.reset();
-                    } catch (error) {
-                        console.error("Error updating currency price:", error);
-                        showMessageBox("Failed to update currency price.");
-                    }
-                });
-            }
-        };
-
-        const initializeNavigation = () => {
-            const sidebarToggle = document.getElementById('sidebar-toggle');
-            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-
-            sidebarToggle.addEventListener('click', () => {
-                leftSidebar.classList.toggle('expanded');
             });
-
-            mobileMenuToggle.addEventListener('click', () => {
-                leftSidebar.classList.toggle('expanded');
-                overlayBackdrop.classList.toggle('hidden');
-            });
-
-            overlayBackdrop.addEventListener('click', () => {
-                leftSidebar.classList.remove('expanded');
-                overlayBackdrop.classList.add('hidden');
-            });
-        };
+        }
         
-        // This is a Firestore function to get or create user data. It's an example for future use.
-        const getUserData = async (uid) => {
-            const userDocRef = doc(db, `artifacts/${appId}/users/${uid}/userData`, 'profile');
-            const userDocSnap = await getDoc(userDocRef);
+        async function renderChatPanel(otherUserId, otherUserName) {
+            activeDMUserId = otherUserId;
+            const chatPanel = document.getElementById('app-content');
+            if (!chatPanel) return;
 
-            if (userDocSnap.exists()) {
-                return userDocSnap.data();
-            } else {
-                const newUserData = {
-                    createdAt: new Date().toISOString(),
-                    userId: uid,
-                    // Add other default user data here
+            // Clean up any old listeners
+            if (dmUnsubscribe) dmUnsubscribe();
+            if (callUnsubscribe) callUnsubscribe();
+            
+            const userInitial = otherUserName ? otherUserName.charAt(0) : '?';
+
+            chatPanel.innerHTML = `
+                <div id="chat-panel" class="flex flex-col h-full bg-gray-900 rounded-xl">
+                    <div class="flex justify-between items-center border-b border-gray-700 pb-4 mb-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-full flex items-center justify-center bg-blue-600 text-white text-xl font-bold">
+                                ${userInitial}
+                            </div>
+                            <h3 class="text-2xl font-semibold">${otherUserName}</h3>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button id="call-btn" class="call-user-btn">
+                                <i class="fas fa-video"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="messages-list" class="flex-grow overflow-y-auto space-y-4 p-4 rounded-lg bg-gray-800 mb-4">
+                        <!-- Messages will be loaded here -->
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="text" id="message-input" placeholder="Type a message..." class="flex-grow bg-gray-700 text-gray-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-red-500">
+                        <button id="send-btn" class="bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('call-btn').addEventListener('click', () => startCall(otherUserId));
+
+            // Determine chat ID (alphabetical order for consistency)
+            const chatUsers = [appCurrentUser.uid, otherUserId].sort();
+            const chatId = `${chatUsers[0]}-${chatUsers[1]}`;
+
+            const messagesCollection = collection(db, `artifacts/${appId}/private/data/chats/${chatId}/messages`);
+            const messagesQuery = query(messagesCollection, orderBy('timestamp'));
+
+            dmUnsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+                const messagesList = document.getElementById('messages-list');
+                if (!messagesList) return;
+                messagesList.innerHTML = snapshot.docs.map(doc => {
+                    const message = doc.data();
+                    const isSender = message.senderId === appCurrentUser.uid;
+                    return `
+                        <div class="flex ${isSender ? 'justify-end' : 'justify-start'}">
+                            <div class="max-w-xs md:max-w-md p-3 rounded-lg ${isSender ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-200'}">
+                                <p>${message.text}</p>
+                                <span class="text-xs ${isSender ? 'text-gray-200' : 'text-gray-400'}">${new Date(message.timestamp?.toDate()).toLocaleTimeString()}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                messagesList.scrollTop = messagesList.scrollHeight;
+            });
+            
+            document.getElementById('send-btn').addEventListener('click', () => sendMessage(chatId));
+            document.getElementById('message-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage(chatId);
+                }
+            });
+            
+            // Listen for incoming and outgoing calls
+            listenForCalls();
+        }
+
+        async function sendMessage(chatId) {
+            const messageInput = document.getElementById('message-input');
+            const messageText = messageInput.value.trim();
+
+            if (messageText) {
+                const messagesCollection = collection(db, `artifacts/${appId}/private/data/chats/${chatId}/messages`);
+                await addDoc(messagesCollection, {
+                    text: messageText,
+                    senderId: appCurrentUser.uid,
+                    timestamp: new Date()
+                });
+                messageInput.value = '';
+            }
+        }
+        
+        // --- WebRTC Logic ---
+        async function startCall(otherUserId) {
+            try {
+                // Get the user's camera and microphone
+                currentStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                const localVideo = document.getElementById('local-video');
+                if (localVideo) localVideo.srcObject = currentStream;
+
+                // Create a new PeerConnection
+                currentPeerConnection = new RTCPeerConnection();
+                currentStream.getTracks().forEach(track => currentPeerConnection.addTrack(track, currentStream));
+
+                // Handle the ICE candidates
+                currentPeerConnection.onicecandidate = async (event) => {
+                    if (event.candidate) {
+                        const callRef = doc(db, `artifacts/${appId}/private/data/calls`, otherUserId);
+                        await addDoc(collection(callRef, 'iceCandidates'), {
+                            candidate: event.candidate.toJSON(),
+                            sender: appCurrentUser.uid
+                        });
+                    }
                 };
-                await setDoc(userDocRef, newUserData);
-                return newUserData;
-            }
-        };
-        
-        // Check for admin role
-        const checkAdminStatus = async (uid) => {
-            const adminDocRef = doc(db, `artifacts/${appId}/public/data/roles`, uid);
-            const adminDocSnap = await getDoc(adminDocRef);
-            return adminDocSnap.exists() && adminDocSnap.data().isAdmin === true;
-        };
 
-        // Firebase Auth State Listener
-        onAuthStateChanged(auth, async (user) => {
-            appCurrentUser = user;
-            if (user) {
-                userId = user.uid;
-                appUserData = await getUserData(user.uid);
-                isAdmin = await checkAdminStatus(user.uid);
-                renderSidebarNav(appCurrentUser);
+                // Create and send the offer
+                const offer = await currentPeerConnection.createOffer();
+                await currentPeerConnection.setLocalDescription(offer);
+
+                const callDocRef = doc(db, `artifacts/${appId}/private/data/calls`, otherUserId);
+                await setDoc(callDocRef, {
+                    offer: {
+                        sdp: offer.sdp,
+                        type: offer.type
+                    },
+                    senderId: appCurrentUser.uid
+                });
                 
-                const currentPageFromStorage = localStorage.getItem('currentPage');
-                if (currentPageFromStorage && currentPageFromStorage !== 'auth') {
-                    navigateTo(currentPageFromStorage);
+                // Show call UI
+                renderVideoCallUI();
+                isVideoCallActive = true;
+                showMessage(`Calling ${otherUserId}...`);
+            } catch (error) {
+                console.error('Error starting call:', error);
+                showMessage('Failed to start call. Please check your camera and microphone permissions.');
+            }
+        }
+        
+        function endCall() {
+             // Stop all tracks on the local stream
+             if (currentStream) {
+                 currentStream.getTracks().forEach(track => track.stop());
+             }
+             // Close the peer connection
+             if (currentPeerConnection) {
+                 currentPeerConnection.close();
+                 currentPeerConnection = null;
+             }
+             isVideoCallActive = false;
+             // Clear the UI and show a message
+             const appContent = document.getElementById('app-content');
+             if (appContent) {
+                 appContent.innerHTML = '';
+                 showMessage('Call ended.');
+             }
+         }
+        
+        function renderVideoCallUI() {
+            const appContent = document.getElementById('app-content');
+            if (!appContent) return;
+            
+            appContent.innerHTML = `
+                <div class="video-container">
+                    <video id="local-video" class="video-small bg-gray-700" autoplay muted playsinline></video>
+                    <video id="remote-video" class="video-large bg-black" autoplay playsinline></video>
+                    <button id="end-call-btn" class="absolute bottom-6 p-4 bg-red-600 text-white rounded-full text-2xl z-20 hover:bg-red-700 transition-all duration-300">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
+                </div>
+            `;
+            document.getElementById('end-call-btn').addEventListener('click', endCall);
+        }
+
+        async function handleOffer(callDoc) {
+            try {
+                 const offer = callDoc.data().offer;
+                 const senderId = callDoc.data().senderId;
+                 
+                 // Show a custom modal instead of alert
+                 const modal = document.getElementById('message-modal');
+                 const messageText = document.getElementById('modal-message-text');
+                 messageText.innerHTML = `Incoming call from ${senderId.slice(0, 8)}...<br><br><div class="flex justify-center space-x-4"><button id="accept-call" class="bg-green-500 text-white p-3 rounded-lg">Accept</button><button id="reject-call" class="bg-red-500 text-white p-3 rounded-lg">Reject</button></div>`;
+                 modal.style.display = 'flex';
+                 
+                 const acceptButton = document.getElementById('accept-call');
+                 const rejectButton = document.getElementById('reject-call');
+
+                 acceptButton.addEventListener('click', async () => {
+                     modal.style.display = 'none';
+                     
+                     // Get user's media
+                     currentStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                     const localVideo = document.getElementById('local-video');
+                     if (localVideo) localVideo.srcObject = currentStream;
+                     
+                     // Create a new PeerConnection
+                     currentPeerConnection = new RTCPeerConnection();
+                     currentStream.getTracks().forEach(track => currentPeerConnection.addTrack(track, currentStream));
+                     
+                     // Set up remote stream
+                     currentPeerConnection.ontrack = (event) => {
+                         const remoteVideo = document.getElementById('remote-video');
+                         if (remoteVideo) remoteVideo.srcObject = event.streams[0];
+                     };
+                     
+                     // Handle ICE candidates
+                     currentPeerConnection.onicecandidate = async (event) => {
+                         if (event.candidate) {
+                             const callRef = doc(db, `artifacts/${appId}/private/data/calls`, senderId);
+                             await addDoc(collection(callRef, 'iceCandidates'), {
+                                 candidate: event.candidate.toJSON(),
+                                 sender: appCurrentUser.uid
+                             });
+                         }
+                     };
+                     
+                     // Set remote offer and create answer
+                     await currentPeerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                     const answer = await currentPeerConnection.createAnswer();
+                     await currentPeerConnection.setLocalDescription(answer);
+                     
+                     // Send the answer to the caller
+                     const answerDocRef = doc(db, `artifacts/${appId}/private/data/calls`, senderId);
+                     await setDoc(answerDocRef, {
+                         answer: {
+                             sdp: answer.sdp,
+                             type: answer.type
+                         }
+                     }, { merge: true });
+                     
+                     // Show call UI
+                     renderVideoCallUI();
+                     isVideoCallActive = true;
+                     
+                     // Listen for ICE candidates from the caller
+                     const candidatesRef = collection(db, `artifacts/${appId}/private/data/calls/${appCurrentUser.uid}/iceCandidates`);
+                     onSnapshot(candidatesRef, (snapshot) => {
+                         snapshot.docChanges().forEach(async (change) => {
+                             if (change.type === 'added' && change.doc.data().sender === senderId) {
+                                 const candidate = new RTCIceCandidate(change.doc.data().candidate);
+                                 await currentPeerConnection.addIceCandidate(candidate);
+                             }
+                         });
+                     });
+                 });
+                 
+                 rejectButton.addEventListener('click', async () => {
+                     modal.style.display = 'none';
+                     const callDocRef = doc(db, `artifacts/${appId}/private/data/calls`, appCurrentUser.uid);
+                     await deleteDoc(callDocRef);
+                 });
+            } catch (error) {
+                console.error('Error handling offer:', error);
+            }
+        }
+        
+        async function handleAnswer(callDoc) {
+             const answer = callDoc.data().answer;
+             await currentPeerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+             
+             // Listen for ICE candidates from the answerer
+             const candidatesRef = collection(db, `artifacts/${appId}/private/data/calls/${appCurrentUser.uid}/iceCandidates`);
+             onSnapshot(candidatesRef, (snapshot) => {
+                 snapshot.docChanges().forEach(async (change) => {
+                     if (change.type === 'added') {
+                         const candidate = new RTCIceCandidate(change.doc.data().candidate);
+                         await currentPeerConnection.addIceCandidate(candidate);
+                     }
+                 });
+             });
+        }
+        
+        async function listenForCalls() {
+            if (callUnsubscribe) callUnsubscribe();
+            
+            const callDocRef = doc(db, `artifacts/${appId}/private/data/calls`, appCurrentUser.uid);
+            callUnsubscribe = onSnapshot(callDocRef, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    if (data.offer) {
+                        handleOffer(doc);
+                    } else if (data.answer) {
+                        handleAnswer(doc);
+                    }
+                }
+            });
+        }
+
+        function initializeNavigation() {
+            const leftSidebar = document.getElementById('left-sidebar');
+            const sidebarToggleMobile = document.getElementById('sidebar-toggle-mobile');
+            const overlayBackdrop = document.getElementById('overlay-backdrop');
+
+            // Handle mobile sidebar toggle
+            if(sidebarToggleMobile) {
+                sidebarToggleMobile.addEventListener('click', () => {
+                    leftSidebar.classList.toggle('expanded');
+                    overlayBackdrop.classList.toggle('hidden');
+                });
+            }
+
+            // Handle overlay click to close sidebar on mobile
+            if(overlayBackdrop) {
+                overlayBackdrop.addEventListener('click', () => {
+                    leftSidebar.classList.remove('expanded');
+                    overlayBackdrop.classList.add('hidden');
+                });
+            }
+
+            // Handle desktop sidebar hover expand/collapse
+            leftSidebar.addEventListener('mouseenter', () => {
+                if (window.innerWidth >= 768) {
+                    leftSidebar.classList.add('expanded');
+                    const mainContent = document.getElementById('main-content-wrapper');
+                    mainContent.classList.add('expanded');
+                }
+            });
+
+            leftSidebar.addEventListener('mouseleave', () => {
+                if (window.innerWidth >= 768) {
+                    leftSidebar.classList.remove('expanded');
+                    const mainContent = document.getElementById('main-content-wrapper');
+                    mainContent.classList.remove('expanded');
+                }
+            });
+        }
+
+        // --- Main App Logic ---
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                appCurrentUser = user;
+                
+                const userDocRef = doc(db, `artifacts/${appId}/public/data/users`, user.uid);
+                const docSnap = await getDoc(userDocRef);
+
+                if (!docSnap.exists()) {
+                    // Create a new user document if it doesn't exist
+                    await setDoc(userDocRef, {
+                        name: `User_${user.uid.substring(0, 8)}`,
+                        isAdmin: false,
+                        balance: 1000, // Initial currency balance
+                    });
+                    appUserData = { name: `User_${user.uid.substring(0, 8)}`, isAdmin: false, balance: 1000 };
+                } else {
+                    appUserData = docSnap.data();
+                }
+                
+                // Add a listener for real-time user data updates
+                const userUnsubscribe = onSnapshot(userDocRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        appUserData = snapshot.data();
+                        renderSidebarNav(appCurrentUser, appUserData);
+                    }
+                });
+
+                renderSidebarNav(appCurrentUser, appUserData);
+                
+                const currentPage = localStorage.getItem('currentPage');
+                if (currentPage && currentPage !== 'auth') {
+                    navigateTo(currentPage);
                 } else {
                     navigateTo('home');
                 }
             } else {
                 appUserData = null;
-                userId = null;
-                isAdmin = false;
-                renderSidebarNav(appCurrentUser);
+                renderSidebarNav(appCurrentUser, appUserData);
                 navigateTo('auth');
             }
         });
@@ -783,7 +1146,7 @@
             if(mobileAuthButton) {
                 mobileAuthButton.addEventListener('click', () => {
                     navigateTo('auth');
-                    if (window.innerWidth <= 768) {
+                    if (window.innerWidth < 768) {
                         leftSidebar.classList.remove('expanded');
                         overlayBackdrop.classList.add('hidden');
                     }
@@ -794,7 +1157,7 @@
                 try {
                      await signInWithCustomToken(auth, initialAuthToken);
                 } catch (error) {
-                     console.error("Error signing in with custom token:", error);
+                     console.error('Error signing in with custom token:', error);
                      navigateTo('auth');
                 }
             }
