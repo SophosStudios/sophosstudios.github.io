@@ -239,7 +239,7 @@
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -293,6 +293,7 @@
 
         // Navigation state
         let currentPage = 'home';
+        let currentProfileId = null;
 
         // Sidebar content
         const navItems = [
@@ -333,7 +334,7 @@
             });
         };
 
-        const navigateTo = (page) => {
+        const navigateTo = (page, params = {}) => {
             if (page === 'logout') {
                 signOut(auth).catch(error => {
                     console.error("Error signing out:", error);
@@ -351,11 +352,18 @@
                  showMessageBox('You do not have permission to view this page.');
                  return;
             }
-
+            
             currentPage = page;
             localStorage.setItem('currentPage', page);
             updateActiveNav();
-            renderPage(page);
+
+            if (page === 'profile' && params.userId) {
+                currentProfileId = params.userId;
+            } else {
+                currentProfileId = userId;
+            }
+
+            renderPage(page, { userId: currentProfileId });
 
             if (window.innerWidth <= 768) {
                 leftSidebar.classList.remove('expanded');
@@ -373,7 +381,70 @@
             });
         };
 
-        const renderPage = (page) => {
+        // Function to create a call
+        const callUser = async (recipientId) => {
+            if (!userId) {
+                showMessageBox("You must be logged in to make a call.");
+                return;
+            }
+            if (userId === recipientId) {
+                showMessageBox("You cannot call yourself.");
+                return;
+            }
+
+            try {
+                const callDocRef = await addDoc(collection(db, `artifacts/${appId}/public/data/calls`), {
+                    callerId: userId,
+                    recipientId: recipientId,
+                    timestamp: new Date(),
+                    status: 'ringing'
+                });
+                showMessageBox(`Calling user: ${recipientId}. Call ID: ${callDocRef.id}`);
+            } catch (error) {
+                console.error("Error creating call:", error);
+                showMessageBox("Failed to initiate call. Please try again.");
+            }
+        };
+
+        // Function to handle incoming calls
+        const handleIncomingCall = (callData) => {
+            const callerId = callData.callerId;
+            const callId = callData.id;
+
+            // This is a simple modal. You can replace this with a more advanced UI.
+            if (window.confirm(`Incoming call from user ${callerId}. Do you want to accept?`)) {
+                // User accepted the call. We can update the call status or navigate to a call page.
+                // For now, let's just show a message.
+                showMessageBox(`Call from ${callerId} accepted!`);
+                // Delete the call document after acceptance.
+                deleteDoc(doc(db, `artifacts/${appId}/public/data/calls`, callId));
+            } else {
+                // User declined the call.
+                showMessageBox(`Call from ${callerId} declined.`);
+                // Delete the call document.
+                deleteDoc(doc(db, `artifacts/${appId}/public/data/calls`, callId));
+            }
+        };
+
+        // Listen for incoming calls in real-time
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                const callsCollectionRef = collection(db, `artifacts/${appId}/public/data/calls`);
+                onSnapshot(callsCollectionRef, (snapshot) => {
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === "added") {
+                            const callData = change.doc.data();
+                            if (callData.recipientId === user.uid) {
+                                handleIncomingCall({ ...callData, id: change.doc.id });
+                            }
+                        }
+                    });
+                });
+            }
+        });
+
+
+        const renderPage = (page, params = {}) => {
             let pageContent = '';
             switch (page) {
                 case 'home':
@@ -385,9 +456,24 @@
                                   <p>This is your personalized dashboard.</p>`;
                     break;
                 case 'profile':
+                    const profileId = params.userId || userId;
                     pageContent = `<h1 class="text-3xl font-bold mb-4">User Profile</h1>
-                                  <p>User ID: <span id="user-id">${userId}</span></p>
-                                  <p>This is where your profile information will be displayed.</p>`;
+                                  <p>User ID: <span id="user-id">${profileId}</span></p>
+                                  <p>This is where your profile information will be displayed.</p>
+                                  ${profileId !== userId ? `<button id="call-btn" data-user-id="${profileId}" class="mt-4 py-2 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 transition">
+                                                                <i class="fas fa-phone-alt"></i> Call User
+                                                            </button>` : ''}
+                                  `;
+                    
+                    setTimeout(() => {
+                        const callBtn = document.getElementById('call-btn');
+                        if (callBtn) {
+                            callBtn.addEventListener('click', () => {
+                                const recipientId = callBtn.dataset.userId;
+                                callUser(recipientId);
+                            });
+                        }
+                    }, 0);
                     break;
                 case 'store':
                     pageContent = `<h1 class="text-3xl font-bold mb-4">Store</h1>
