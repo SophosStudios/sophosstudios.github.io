@@ -115,37 +115,6 @@
         .call-user-btn:active {
             transform: scale(0.95);
         }
-        
-        /* WebRTC video container */
-        .video-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-        }
-        #local-video {
-            position: absolute;
-            bottom: 1rem;
-            right: 1rem;
-            width: 150px;
-            height: 112px;
-            border-radius: 0.5rem;
-            border: 2px solid #fff;
-            object-fit: cover;
-            transform: scaleX(-1); /* Mirror local video */
-            z-index: 10;
-        }
-        #remote-video {
-            width: 100%;
-            height: 100%;
-            border-radius: 0.5rem;
-            object-fit: cover;
-        }
-        .video-call-modal {
-            max-width: 90vw;
-            max-height: 90vh;
-            width: auto;
-            height: auto;
-        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200">
@@ -211,7 +180,7 @@
         // =================================================================
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc, deleteDoc, addDoc, query, orderBy, serverTimestamp, where, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore, deleteDoc, addDoc, query, orderBy, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 
         // =================================================================
@@ -261,13 +230,6 @@
         let appUserData = null;
         let authReady = false;
         let lastNavigatedPage = null;
-
-        // WebRTC specific globals
-        const servers = { iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
-        let localStream;
-        let peerConnection;
-        let callUnsubscribe;
-        let remoteStream;
 
         // =================================================================
         // 3. UTILITY FUNCTIONS
@@ -328,49 +290,14 @@
                 });
             }
         }
-        
+
         /**
-         * Creates and shows a custom modal with dynamic content.
-         * @param {string} title - The title of the modal.
-         * @param {string} contentHtml - The HTML content for the modal body.
-         * @param {string} buttonText - Text for the primary action button.
-         * @param {function} onAction - Callback for the primary action button.
+         * Updates the website's theme with a new accent color.
+         * @param {string} color - The new hex color for the accent.
          */
-        function showCustomModal(title, contentHtml, buttonText = 'Close', onAction = null) {
-            const modalContainer = document.getElementById('modal-container');
-            const modalId = 'custom-modal';
-            const existingModal = document.getElementById(modalId);
-            if (existingModal) existingModal.remove();
-
-            const modalHtml = `
-                <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div class="bg-gray-800 rounded-xl shadow-xl w-full max-w-lg overflow-hidden border-2 border-[var(--accent-color)]">
-                        <div class="p-6">
-                            <h2 class="text-2xl font-bold text-white mb-4">${title}</h2>
-                            <div id="modal-content-body" class="text-gray-300">
-                                ${contentHtml}
-                            </div>
-                        </div>
-                        <div class="bg-gray-700 p-4 flex justify-end space-x-2">
-                            <button id="modal-action-btn" class="bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg hover:bg-opacity-80 transition">${buttonText}</button>
-                            <button id="modal-cancel-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-500 transition">Cancel</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            modalContainer.insertAdjacentHTML('beforeend', modalHtml);
-
-            document.getElementById('modal-cancel-btn').addEventListener('click', () => document.getElementById(modalId).remove());
-            if (onAction) {
-                document.getElementById('modal-action-btn').addEventListener('click', () => {
-                    onAction();
-                    document.getElementById(modalId).remove();
-                });
-            } else {
-                document.getElementById('modal-action-btn').addEventListener('click', () => document.getElementById(modalId).remove());
-            }
+        function updateTheme(color) {
+            document.documentElement.style.setProperty('--accent-color', color);
         }
-
 
         // =================================================================
         // 4. NAVIGATION LOGIC
@@ -378,7 +305,6 @@
         const leftSidebar = document.getElementById('left-sidebar');
         const leftSidebarNav = document.getElementById('left-sidebar-nav');
         const mainContentWrapper = document.getElementById('main-content-wrapper');
-        const contentArea = document.getElementById('content-area');
         const overlayBackdrop = document.getElementById('overlay-backdrop');
         const sidebarToggleDesktop = document.getElementById('sidebar-toggle-full');
         const sidebarToggleMobile = document.getElementById('mobile-sidebar-toggle');
@@ -399,7 +325,6 @@
                 overlayBackdrop.classList.add('hidden');
             });
             
-            // Set initial state based on window size
             if (window.innerWidth >= 768) {
                 leftSidebar.classList.remove('expanded');
                 mainContentWrapper.classList.remove('expanded');
@@ -409,7 +334,7 @@
         function toggleSidebar() {
             const isExpanded = leftSidebar.classList.toggle('expanded');
             mainContentWrapper.classList.toggle('expanded');
-
+            
             const navTextElements = leftSidebar.querySelectorAll('.sidebar-nav-text');
             const websiteTitleSidebar = document.getElementById('website-title-sidebar');
             const websiteLogoCollapsed = document.getElementById('website-logo-collapsed');
@@ -453,13 +378,9 @@
             leftSidebarNav.innerHTML = '';
             
             createNavLink(leftSidebarNav, 'Home', 'home', 'fas fa-home');
-            if (currentUser) {
-                createNavLink(leftSidebarNav, 'Forums', 'forums', 'fas fa-comments');
-                createNavLink(leftSidebarNav, 'Messages', 'messages', 'fas fa-envelope');
-                createNavLink(leftSidebarNav, 'Shop', 'shop', 'fas fa-shopping-cart');
-                createNavLink(leftSidebarNav, 'Profile', 'profile', 'fas fa-user');
-                createNavLink(leftSidebarNav, 'Settings', 'settings', 'fas fa-cog');
-            }
+            createNavLink(leftSidebarNav, 'Forums', 'forums', 'fas fa-comments');
+            createNavLink(leftSidebarNav, 'Messages', 'messages', 'fas fa-envelope');
+            createNavLink(leftSidebarNav, 'Settings', 'settings', 'fas fa-cog');
 
             if (userData?.role === 'admin' || userData?.role === 'founder') {
                 const adminCategory = document.createElement('div');
@@ -467,9 +388,9 @@
                 leftSidebarNav.appendChild(adminCategory);
                 createNavLink(adminCategory, 'Admin Panel', 'admin', 'fas fa-user-shield');
             }
-
+            
             const authContainer = document.getElementById('admin-panel-button-container');
-            authContainer.innerHTML = '';
+            authContainer.innerHTML = ''; 
             
             if (currentUser) {
                 const logoutButton = document.createElement('button');
@@ -477,8 +398,7 @@
                 logoutButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
                 logoutButton.innerHTML = `
                     <i class="fas fa-sign-out-alt w-6 text-center"></i>
-                    <span class="sidebar-nav-text whitespace-nowrap hidden">Sign Out</span>
-                `;
+                    <span class="sidebar-nav-text whitespace-nowrap hidden">Sign Out</span>`;
                 logoutButton.addEventListener('click', async () => {
                     try {
                         await signOut(auth);
@@ -489,852 +409,971 @@
                     }
                 });
                 authContainer.appendChild(logoutButton);
-                if (leftSidebar.classList.contains('expanded')) {
-                    authContainer.classList.remove('hidden');
-                } else {
-                    authContainer.classList.add('hidden');
-                }
-            }
-        }
-
-        let currentPageId = 'home';
-        let unsubscribeFromCalls = null; // Variable to hold the unsubscribe function
-        let unsubscribeFromMessages = null;
-        let unsubscribeFromForums = null;
-        let activeCallUnsubscribe = null;
-
-        function navigateTo(pageId, params = {}) {
-            if (!authReady) {
-                console.log("Auth not ready, delaying navigation.");
-                setTimeout(() => navigateTo(pageId, params), 50);
-                return;
-            }
-
-            if (!appCurrentUser && pageId !== 'home' && pageId !== 'auth') {
-                showMessageModal('You must be signed in to access this page.');
-                navigateTo('auth');
-                return;
-            }
-
-            if (appCurrentUser && (appUserData?.role !== 'admin' && appUserData?.role !== 'founder') && pageId === 'admin') {
-                 showMessageModal('You do not have permission to view this page.');
-                 return;
-            }
-
-            // Clean up any active listeners and streams before navigating
-            if (callUnsubscribe) callUnsubscribe();
-            if (unsubscribeFromMessages) unsubscribeFromMessages();
-            if (unsubscribeFromForums) unsubscribeFromForums();
-            if (activeCallUnsubscribe) activeCallUnsubscribe();
-            hangUp();
-            
-            currentPageId = pageId;
-            lastNavigatedPage = { pageId, params };
-            document.querySelectorAll('#left-sidebar-nav a').forEach(link => {
-                link.classList.remove('bg-gray-700');
-            });
-            const activeLink = document.querySelector(`#left-sidebar-nav a[data-page='${pageId}']`);
-            if (activeLink) activeLink.classList.add('bg-gray-700');
-
-            renderPage(pageId, params);
-        }
-
-        // =================================================================
-        // 5. PAGE RENDERING LOGIC
-        // =================================================================
-        function renderPage(pageId, params = {}) {
-            let pageHtml = '';
-            contentArea.innerHTML = `<div class="flex flex-col items-center justify-center h-full"><div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-500"></div><p class="mt-4 text-gray-400">Loading...</p></div>`;
-
-            switch (pageId) {
-                case 'home':
-                    pageHtml = `
-                        <div class="flex flex-col items-center justify-center h-full text-center">
-                            <h1 class="text-5xl font-extrabold text-red-500 mb-4">Welcome to SophosWRLD!</h1>
-                            <p class="text-xl text-gray-400 max-w-2xl">
-                                Your digital world for connecting, building, and exploring. Navigate using the sidebar.
-                            </p>
-                            ${appCurrentUser ? `<p class="mt-4 text-sm text-gray-500">Your User ID: <span class="font-mono text-red-400">${appCurrentUser.uid}</span></p>` : ''}
-                        </div>
-                    `;
-                    contentArea.innerHTML = pageHtml;
-                    break;
-                case 'profile':
-                    showProfilePage(params.userId || appCurrentUser?.uid);
-                    break;
-                case 'forums':
-                    showForumsPage();
-                    break;
-                case 'messages':
-                    showMessagesPage();
-                    break;
-                case 'settings':
-                    showSettingsPage();
-                    break;
-                case 'shop':
-                    showShopPage();
-                    break;
-                case 'admin':
-                    showAdminPanelPage();
-                    break;
-                case 'auth':
-                    showAuthPage();
-                    break;
-                default:
-                    contentArea.innerHTML = `
-                        <div class="flex flex-col items-center justify-center h-full text-center">
-                            <h1 class="text-5xl font-extrabold text-red-500 mb-4">404</h1>
-                            <p class="text-xl text-gray-400">Page Not Found</p>
-                        </div>
-                    `;
-                    break;
-            }
-        }
-        
-        function showProfilePage(profileUid) {
-            contentArea.innerHTML = `
-                <div class="bg-gray-800 rounded-xl shadow-xl p-8 max-w-3xl mx-auto">
-                    <h1 class="text-4xl font-bold text-red-500 mb-6">User Profile</h1>
-                    <div id="profile-content" class="space-y-4">
-                        <p class="text-xl font-semibold">User ID: <span id="profile-uid" class="font-mono text-red-400 text-lg">${profileUid}</span></p>
-                        <div id="profile-details-container">
-                            <!-- User-specific data will be loaded here -->
-                        </div>
-                        ${profileUid !== appCurrentUser?.uid ? `
-                            <div class="mt-8 flex justify-center space-x-4">
-                                <button id="call-user-btn" class="call-user-btn transition duration-300" title="Start a video call">
-                                    <i class="fas fa-video"></i>
-                                </button>
-                                <button id="message-user-btn" class="call-user-btn bg-blue-500 hover:bg-blue-600 transition duration-300" title="Send a message">
-                                    <i class="fas fa-comment-dots"></i>
-                                </button>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-            
-            const callBtn = document.getElementById('call-user-btn');
-            if (callBtn) {
-                callBtn.addEventListener('click', () => callUser(profileUid));
-            }
-
-            const messageBtn = document.getElementById('message-user-btn');
-            if (messageBtn) {
-                messageBtn.addEventListener('click', () => navigateTo('messages', { recipientId: profileUid }));
-            }
-            
-            // Listen for user data changes
-            const userDocRef = doc(db, `artifacts/${appId}/users/${profileUid}/userData`, 'profile');
-            onSnapshot(userDocRef, (docSnap) => {
-                const profileDetailsContainer = document.getElementById('profile-details-container');
-                if (docSnap.exists()) {
-                    const userData = docSnap.data();
-                    const userDetailsHtml = `
-                        <p class="text-lg">Username: <span class="text-gray-300">${userData.username || 'N/A'}</span></p>
-                        <p class="text-lg">Joined: <span class="text-gray-300">${userData.createdAt ? new Date(userData.createdAt.toDate()).toLocaleDateString() : 'N/A'}</span></p>
-                        <p class="text-lg">Role: <span class="text-gray-300">${userData.role || 'user'}</span></p>
-                        <!-- Add more user data fields here -->
-                    `;
-                    document.getElementById('profile-uid').textContent = profileUid;
-                    profileDetailsContainer.innerHTML = userDetailsHtml;
-                } else {
-                    profileDetailsContainer.innerHTML = `<p>Profile data not found.</p>`;
-                }
-            });
-        }
-        
-        function showForumsPage() {
-            contentArea.innerHTML = `
-                <div class="max-w-4xl mx-auto space-y-6">
-                    <h1 class="text-4xl font-bold text-red-500 mb-6">Forums</h1>
-                    
-                    <!-- Create New Post Form -->
-                    <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
-                        <h2 class="text-2xl font-semibold text-white mb-4">Create a New Post</h2>
-                        <form id="new-post-form" class="space-y-4">
-                            <input type="text" id="post-title" class="w-full p-3 rounded-lg bg-gray-700 text-white border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Post Title" required>
-                            <textarea id="post-content" class="w-full p-3 rounded-lg bg-gray-700 text-white border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500" rows="4" placeholder="What's on your mind?" required></textarea>
-                            <button type="submit" class="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition duration-300 ease-in-out">
-                                Post
-                            </button>
-                        </form>
-                    </div>
-
-                    <!-- Forum Posts List -->
-                    <div id="forum-posts-container" class="space-y-4">
-                        <p class="text-center text-gray-500">Loading forum posts...</p>
-                    </div>
-                </div>
-            `;
-            
-            const newPostForm = document.getElementById('new-post-form');
-            const postTitleInput = document.getElementById('post-title');
-            const postContentInput = document.getElementById('post-content');
-            const forumPostsContainer = document.getElementById('forum-posts-container');
-            
-            // Listen for new posts in the public collection
-            const postsCollectionRef = collection(db, `artifacts/${appId}/public/data/forums`);
-            const q = query(postsCollectionRef, orderBy('createdAt', 'desc'));
-            
-            unsubscribeFromForums = onSnapshot(q, async (snapshot) => {
-                forumPostsContainer.innerHTML = '';
-                if (snapshot.empty) {
-                    forumPostsContainer.innerHTML = `<p class="text-center text-gray-500">No posts yet. Be the first to post!</p>`;
-                }
-                
-                // Fetch all user profiles once to avoid repeated calls
-                const usersMap = {};
-                const usersSnapshot = await getDocs(collection(db, `artifacts/${appId}/users`));
-                usersSnapshot.forEach(userDoc => {
-                    const userId = userDoc.id;
-                    const profileRef = doc(db, `artifacts/${appId}/users/${userId}/userData`, 'profile');
-                    getDoc(profileRef).then(profileSnap => {
-                         if (profileSnap.exists()) {
-                             usersMap[userId] = profileSnap.data().username;
-                         }
-                    });
-                });
-                
-                snapshot.forEach(docSnap => {
-                    const post = docSnap.data();
-                    const authorName = usersMap[post.authorId] || 'Anonymous';
-                    const postHtml = `
-                        <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
-                            <h3 class="text-xl font-bold text-red-500">${post.title}</h3>
-                            <p class="text-sm text-gray-400 mt-1">
-                                by <span class="font-semibold text-white">${authorName}</span> on ${post.createdAt ? new Date(post.createdAt.toDate()).toLocaleString() : 'N/A'}
-                            </p>
-                            <p class="text-gray-300 mt-4">${post.content}</p>
-                        </div>
-                    `;
-                    forumPostsContainer.insertAdjacentHTML('beforeend', postHtml);
-                });
-            });
-            
-            newPostForm.addEventListener('submit', async (e) => {
-                 e.preventDefault();
-                 if (!appCurrentUser) {
-                     showMessageModal('You must be signed in to post to the forums.', 'error');
-                     return;
-                 }
-                 
-                 const postTitle = postTitleInput.value;
-                 const postContent = postContentInput.value;
-                 
-                 const newPost = {
-                     title: postTitle,
-                     content: postContent,
-                     authorId: appCurrentUser.uid,
-                     createdAt: serverTimestamp(),
-                 };
-                 
-                 try {
-                     await addDoc(postsCollectionRef, newPost);
-                     postTitleInput.value = '';
-                     postContentInput.value = '';
-                     showMessageModal('Post created successfully!', 'success');
-                 } catch (error) {
-                     console.error("Error adding post:", error);
-                     showMessageModal(`Failed to create post: ${error.message}`, 'error');
-                 }
-            });
-        }
-        
-        // Messaging page rendering
-        function showMessagesPage() {
-            const recipientId = lastNavigatedPage.params.recipientId || null;
-            let currentChatId = null;
-
-            contentArea.innerHTML = `
-                <h1 class="text-4xl font-bold text-red-500 mb-6">Messages</h1>
-                <div class="flex flex-col md:flex-row bg-gray-800 rounded-xl shadow-lg h-[80vh]">
-                    <!-- Conversation List -->
-                    <div class="w-full md:w-1/3 border-b md:border-r border-gray-700 p-4 overflow-y-auto" id="conversation-list">
-                        <h2 class="text-xl font-semibold mb-4">Conversations</h2>
-                        <div id="conversations">
-                            <!-- Conversations will be loaded here -->
-                        </div>
-                    </div>
-                    <!-- Chat Window -->
-                    <div class="w-full md:w-2/3 p-4 flex flex-col" id="chat-window-container">
-                        <div class="flex-grow overflow-y-auto p-2" id="chat-messages">
-                            <p class="text-center text-gray-500">Select a conversation or start a new one.</p>
-                        </div>
-                        <form id="message-form" class="mt-4 flex space-x-2 hidden">
-                            <input type="text" id="message-input" class="flex-grow p-2 rounded-lg bg-gray-700 text-white border-none focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Type a message..." autocomplete="off">
-                            <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">Send</button>
-                        </form>
-                    </div>
-                </div>
-            `;
-            
-            const messageForm = document.getElementById('message-form');
-            const messageInput = document.getElementById('message-input');
-            const chatMessages = document.getElementById('chat-messages');
-
-            const sendMessage = async (e) => {
-                e.preventDefault();
-                const text = messageInput.value.trim();
-                if (text && currentChatId) {
-                    const messageData = {
-                        text,
-                        senderId: appCurrentUser.uid,
-                        timestamp: serverTimestamp(),
-                    };
-                    try {
-                        const messagesCollectionRef = collection(db, `artifacts/${appId}/public/data/conversations/${currentChatId}/messages`);
-                        await addDoc(messagesCollectionRef, messageData);
-                        messageInput.value = '';
-                    } catch (error) {
-                        console.error("Error sending message:", error);
-                        showMessageModal("Failed to send message.", 'error');
-                    }
-                }
-            };
-            messageForm.addEventListener('submit', sendMessage);
-
-            const loadConversation = (chatId) => {
-                currentChatId = chatId;
-                messageForm.classList.remove('hidden');
-                chatMessages.innerHTML = '';
-                
-                if (unsubscribeFromMessages) unsubscribeFromMessages();
-
-                const messagesQuery = query(collection(db, `artifacts/${appId}/public/data/conversations/${chatId}/messages`), orderBy('timestamp'));
-                unsubscribeFromMessages = onSnapshot(messagesQuery, (snapshot) => {
-                    chatMessages.innerHTML = ''; // Clear for new messages
-                    snapshot.forEach(doc => {
-                        const message = doc.data();
-                        const isSender = message.senderId === appCurrentUser.uid;
-                        const messageClass = isSender ? 'bg-red-600 ml-auto' : 'bg-gray-600';
-                        const messageHtml = `
-                            <div class="flex items-start mb-4 ${isSender ? 'justify-end' : ''}">
-                                <div class="${messageClass} text-white p-3 rounded-lg max-w-xs">
-                                    <p>${message.text}</p>
-                                </div>
-                            </div>
-                        `;
-                        chatMessages.insertAdjacentHTML('beforeend', messageHtml);
-                    });
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                });
-            };
-
-            const loadConversationsList = () => {
-                const conversationsRef = collection(db, `artifacts/${appId}/public/data/conversations`);
-                const q = query(conversationsRef, where('participants', 'array-contains', appCurrentUser.uid));
-
-                onSnapshot(q, (snapshot) => {
-                    const conversationsEl = document.getElementById('conversations');
-                    conversationsEl.innerHTML = '';
-                    snapshot.forEach(doc => {
-                        const convo = doc.data();
-                        const otherUserId = convo.participants.find(p => p !== appCurrentUser.uid);
-                        const conversationItemHtml = `
-                            <div data-chat-id="${doc.id}" class="conversation-item flex items-center p-3 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors duration-200 mb-2">
-                                <i class="fas fa-user-circle text-2xl mr-3 text-red-500"></i>
-                                <div class="flex-grow">
-                                    <p class="text-white font-semibold">User: ${otherUserId}</p>
-                                    <!-- Add last message snippet here in the future -->
-                                </div>
-                            </div>
-                        `;
-                        conversationsEl.insertAdjacentHTML('beforeend', conversationItemHtml);
-                    });
-
-                    document.querySelectorAll('.conversation-item').forEach(item => {
-                        item.addEventListener('click', () => {
-                            const chatId = item.getAttribute('data-chat-id');
-                            loadConversation(chatId);
-                        });
-                    });
-                });
-            };
-
-            if (recipientId) {
-                 // Try to find an existing conversation
-                 const conversationsRef = collection(db, `artifacts/${appId}/public/data/conversations`);
-                 const q = query(conversationsRef, where('participants', 'array-contains-any', [appCurrentUser.uid, recipientId]));
-                 getDocs(q).then(snapshot => {
-                     let existingChatId = null;
-                     snapshot.forEach(doc => {
-                        const participants = doc.data().participants;
-                        if (participants.includes(appCurrentUser.uid) && participants.includes(recipientId)) {
-                             existingChatId = doc.id;
-                        }
-                     });
-                     if (existingChatId) {
-                         loadConversation(existingChatId);
-                     } else {
-                         // Create a new conversation if it doesn't exist
-                         addDoc(conversationsRef, {
-                            participants: [appCurrentUser.uid, recipientId],
-                            createdAt: serverTimestamp(),
-                         }).then(newChatRef => {
-                            loadConversation(newChatRef.id);
-                         });
-                     }
-                 });
             } else {
-                loadConversationsList();
+                const authButton = document.createElement('button');
+                authButton.id = 'auth-btn';
+                authButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
+                authButton.innerHTML = `
+                    <i class="fas fa-sign-in-alt w-6 text-center"></i>
+                    <span class="sidebar-nav-text whitespace-nowrap hidden">Account</span>`;
+                authButton.addEventListener('click', () => navigateTo('auth'));
+                authContainer.appendChild(authButton);
+            }
+            
+            const isExpanded = leftSidebar.classList.contains('expanded');
+            const navTextElements = leftSidebar.querySelectorAll('.sidebar-nav-text');
+            const websiteTitleSidebar = document.getElementById('website-title-sidebar');
+            const websiteLogoCollapsed = document.getElementById('website-logo-collapsed');
+            const adminPanelButtonContainer = document.getElementById('admin-panel-button-container');
+            
+            if (isExpanded) {
+                navTextElements.forEach(el => el.classList.remove('hidden'));
+                websiteTitleSidebar.classList.remove('hidden');
+                websiteLogoCollapsed.classList.add('hidden');
+                if (adminPanelButtonContainer.innerHTML.trim() !== '') {
+                     adminPanelButtonContainer.classList.remove('hidden');
+                }
+            } else {
+                navTextElements.forEach(el => el.classList.add('hidden'));
+                websiteTitleSidebar.classList.add('hidden');
+                websiteLogoCollapsed.classList.remove('hidden');
+                adminPanelButtonContainer.classList.add('hidden');
             }
         }
 
-        function showSettingsPage() {
-            contentArea.innerHTML = `
-                <h1 class="text-4xl font-bold text-red-500 mb-6">Settings</h1>
-                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
-                    <p class="text-gray-400">This is a placeholder for user settings. Users can change their theme, password, etc., here.</p>
-                </div>
-            `;
-        }
-
-        function showShopPage() {
-            contentArea.innerHTML = `
-                <h1 class="text-4xl font-bold text-red-500 mb-6">Shop</h1>
-                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
-                    <p class="text-gray-400">This is a placeholder for the in-app shop.</p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-                        <!-- Example Shop Item -->
-                        <div class="bg-gray-700 rounded-lg p-4 shadow-md">
-                            <h3 class="text-xl font-bold text-red-400">Product A</h3>
-                            <p class="text-gray-300 mt-2">A cool virtual item for your profile.</p>
-                            <span class="text-lg font-semibold text-white block mt-4">$9.99</span>
-                            <button class="w-full mt-4 bg-red-600 text-white font-semibold py-2 rounded-lg hover:bg-red-700 transition">Buy Now</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
+        // =================================================================
+        // 5. PAGE RENDERERS
+        // =================================================================
+        const contentArea = document.getElementById('content-area');
         
-        function showAdminPanelPage() {
+        let activeDMUserId = null;
+        let dmUnsubscribe = null;
+        let callUnsubscribe = null;
+
+        function renderHomePage() {
             contentArea.innerHTML = `
-                <h1 class="text-4xl font-bold text-red-500 mb-6">Admin Panel</h1>
-                <div class="bg-gray-800 p-6 rounded-xl shadow-lg">
-                    <p class="text-gray-400 mb-4">Manage users and application settings.</p>
-                    <h2 class="text-2xl font-semibold mb-4">User Management</h2>
-                    <div id="user-list" class="space-y-4">
-                        <!-- User list will be loaded here -->
+                <div class="flex flex-col items-center justify-center p-8 text-center">
+                    <h1 class="text-4xl md:text-6xl font-bold text-red-500 mb-4 animate-pulse">Welcome to SophosWRLD</h1>
+                    <p class="text-xl text-gray-400">Your personalized community hub.</p>
+                    <div class="mt-8">
+                        <button id="view-forums-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
+                            <i class="fas fa-comments mr-2"></i>Go to Forums
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('view-forums-btn').addEventListener('click', () => navigateTo('forums'));
+        }
+
+        function renderAdminPage() {
+            if (!appCurrentUser || (appUserData?.role !== 'admin' && appUserData?.role !== 'founder')) {
+                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be an admin to view this page.</p></div>`;
+                return;
+            }
+
+            contentArea.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full mx-auto">
+                    <h2 class="text-3xl font-bold text-red-500 mb-6">Admin Dashboard</h2>
+                    <h3 class="text-xl font-semibold text-gray-200 mb-4">Manage Users</h3>
+                    <div id="user-list" class="overflow-x-auto">
+                        <p class="text-gray-400 text-center">Loading users...</p>
                     </div>
                 </div>
             `;
 
-            const userListContainer = document.getElementById('user-list');
-            const usersCollectionRef = collection(db, `artifacts/${appId}/users`);
-            const q = query(usersCollectionRef);
+            const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
+            onSnapshot(usersCollection, (snapshot) => {
+                const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const userListContainer = document.getElementById('user-list');
+                if (!userListContainer) return;
+                
+                // Filter out the current user from the list
+                const filteredUsers = userList.filter(user => user.id !== appCurrentUser.uid);
 
-            onSnapshot(q, (snapshot) => {
-                userListContainer.innerHTML = ''; // Clear for new list
-                snapshot.forEach(docSnap => {
-                    const userId = docSnap.id;
-                    const userDataRef = doc(db, `artifacts/${appId}/users/${userId}/userData`, 'profile');
-                    getDoc(userDataRef).then(userDoc => {
-                        const userData = userDoc.exists() ? userDoc.data() : { username: 'N/A', role: 'user' };
-                        const userCardHtml = `
-                            <div class="flex items-center justify-between bg-gray-700 p-4 rounded-lg shadow-sm">
-                                <div>
-                                    <p class="font-bold text-white">${userData.username || 'N/A'}</p>
-                                    <p class="text-sm text-gray-400">ID: ${userId}</p>
-                                    <p class="text-sm text-gray-400">Role: ${userData.role || 'user'}</p>
-                                </div>
-                                <button data-user-id="${userId}" class="edit-user-btn bg-red-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-700 transition">
-                                    Edit
-                                </button>
-                            </div>
-                        `;
-                        userListContainer.insertAdjacentHTML('beforeend', userCardHtml);
+                if (filteredUsers.length === 0) {
+                    userListContainer.innerHTML = '<p class="text-gray-400 text-center">No other users found.</p>';
+                    return;
+                }
+
+                userListContainer.innerHTML = `
+                    <table class="w-full text-left text-gray-300 min-w-[700px]">
+                        <thead class="bg-gray-700">
+                            <tr>
+                                <th class="p-3">Username</th>
+                                <th class="p-3">Email</th>
+                                <th class="p-3">Role</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filteredUsers.map(user => `
+                                <tr class="border-b border-gray-700 hover:bg-gray-700/50">
+                                    <td class="p-3">${user.username}</td>
+                                    <td class="p-3">${user.email}</td>
+                                    <td class="p-3">
+                                        <select class="role-select bg-gray-600 p-2 rounded" data-user-id="${user.id}" ${appUserData.role !== 'founder' ? 'disabled' : ''}>
+                                            <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
+                                            <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                            <option value="founder" ${user.role === 'founder' ? 'selected' : ''}>Founder</option>
+                                        </select>
+                                    </td>
+                                    <td class="p-3">
+                                        <span class="p-2 rounded-full text-xs font-semibold ${user.isBanned ? 'bg-red-500' : 'bg-green-500'}">
+                                            ${user.isBanned ? 'Banned' : 'Active'}
+                                        </span>
+                                    </td>
+                                    <td class="p-3 space-x-2 flex action-btn-group">
+                                        <button class="ban-btn bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition" data-user-id="${user.id}" data-is-banned="${user.isBanned}">
+                                            <i class="fas fa-ban"></i>
+                                            <span class="ml-2">${user.isBanned ? 'Unban' : 'Ban'}</span>
+                                        </button>
+                                        <button class="reset-password-btn bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition" data-user-id="${user.id}" data-user-email="${user.email}">
+                                            <i class="fas fa-key"></i>
+                                            <span class="ml-2">Reset Password</span>
+                                        </button>
+                                        <button class="delete-btn bg-red-600 text-white rounded-lg hover:bg-red-700 transition" data-user-id="${user.id}">
+                                            <i class="fas fa-trash"></i>
+                                            <span class="ml-2">Delete</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
+                userListContainer.querySelectorAll('.role-select').forEach(select => {
+                    select.addEventListener('change', async (event) => {
+                        const userId = event.target.dataset.userId;
+                        const newRole = event.target.value;
+                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
+                        try {
+                            await updateDocFirestore(userDocRef, { role: newRole });
+                            showMessageModal('User role updated successfully!', 'success');
+                        } catch (error) {
+                            showMessageModal('Failed to update user role.', 'error');
+                        }
                     });
                 });
-                
-                setTimeout(() => {
-                    document.querySelectorAll('.edit-user-btn').forEach(button => {
-                        button.addEventListener('click', (e) => {
-                            const userId = e.target.getAttribute('data-user-id');
-                            editUserModal(userId);
-                        });
+
+                userListContainer.querySelectorAll('.ban-btn').forEach(btn => {
+                    btn.addEventListener('click', async (event) => {
+                        const userId = event.currentTarget.dataset.userId;
+                        const isBanned = event.currentTarget.dataset.isBanned === 'true';
+                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
+                        try {
+                            await updateDocFirestore(userDocRef, { isBanned: !isBanned });
+                            showMessageModal(`User ${!isBanned ? 'banned' : 'unbanned'} successfully!`, 'success');
+                        } catch (error) {
+                            showMessageModal('Failed to update user ban status.', 'error');
+                        }
                     });
-                }, 500); // Small delay to ensure buttons are rendered
+                });
+
+                userListContainer.querySelectorAll('.reset-password-btn').forEach(btn => {
+                    btn.addEventListener('click', async (event) => {
+                        const userEmail = event.currentTarget.dataset.userEmail;
+                        try {
+                            await sendPasswordResetEmail(auth, userEmail);
+                            showMessageModal('Password reset email sent successfully!', 'success');
+                        } catch (error) {
+                            showMessageModal(`Failed to send password reset email: ${error.message}`, 'error');
+                        }
+                    });
+                });
+
+                userListContainer.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', (event) => {
+                        const userId = event.currentTarget.dataset.userId;
+                        showMessageModal(
+                            'Are you sure you want to delete this user\'s data? This will NOT delete the Firebase Authentication account, which must be done manually in the console.',
+                            'confirm',
+                            async () => {
+                                try {
+                                    const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
+                                    await deleteDoc(userDocRef);
+                                    showMessageModal('User data deleted from Firestore. Remember to delete the user from the Firebase Authentication console.', 'success');
+                                } catch (error) {
+                                    showMessageModal('Failed to delete user data.', 'error');
+                                }
+                            }
+                        );
+                    });
+                });
             });
         }
-        
-        function editUserModal(userId) {
-            const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/userData`, 'profile');
-            getDoc(userDocRef).then(docSnap => {
-                const userData = docSnap.exists() ? docSnap.data() : {};
-                const contentHtml = `
-                    <form id="edit-user-form" class="space-y-4">
-                        <div>
-                            <label for="edit-username" class="block text-sm font-medium text-gray-400">Username</label>
-                            <input type="text" id="edit-username" class="w-full p-2 mt-1 rounded-lg bg-gray-700 text-white border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500" value="${userData.username || ''}">
-                        </div>
-                        <div>
-                            <label for="edit-role" class="block text-sm font-medium text-gray-400">Role</label>
-                            <select id="edit-role" class="w-full p-2 mt-1 rounded-lg bg-gray-700 text-white border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500">
-                                <option value="user" ${userData.role === 'user' ? 'selected' : ''}>user</option>
-                                <option value="admin" ${userData.role === 'admin' ? 'selected' : ''}>admin</option>
-                                <option value="founder" ${userData.role === 'founder' ? 'selected' : ''}>founder</option>
-                            </select>
+
+        function renderAuthPage() {
+            contentArea.innerHTML = `
+                <div class="max-w-md mx-auto bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500">
+                    <h2 class="text-3xl font-bold text-center mb-6 text-red-500">Join or Sign In</h2>
+                    <form id="auth-form" class="space-y-4">
+                        <input type="email" id="auth-email" placeholder="Email" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500">
+                        <input type="password" id="auth-password" placeholder="Password" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500">
+                        <div class="flex items-center justify-between pt-2">
+                            <button type="submit" id="signin-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">Sign In</button>
+                            <button type="button" id="signup-btn" class="bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-700 transition-colors duration-300">Sign Up</button>
                         </div>
                     </form>
-                `;
-                showCustomModal('Edit User', contentHtml, 'Save Changes', async () => {
-                    const newUsername = document.getElementById('edit-username').value;
-                    const newRole = document.getElementById('edit-role').value;
-                    
-                    try {
-                        await updateDoc(userDocRef, {
-                            username: newUsername,
-                            role: newRole,
-                        });
-                        showMessageModal('User updated successfully!', 'success');
-                    } catch (error) {
-                        showMessageModal(`Failed to update user: ${error.message}`, 'error');
-                    }
-                });
-            });
-        }
-        
-        function showAuthPage() {
-            contentArea.innerHTML = `
-                <div class="flex flex-col items-center justify-center min-h-screen -mt-20">
-                    <div class="bg-gray-800 p-8 rounded-xl shadow-lg w-full max-w-md border-2 border-gray-700">
-                        <h2 class="text-3xl font-bold text-center text-white mb-6">Sign In / Sign Up</h2>
-                        <form id="auth-form" class="space-y-4">
-                            <div>
-                                <label for="auth-email" class="sr-only">Email</label>
-                                <input type="email" id="auth-email" class="w-full p-3 rounded-lg bg-gray-700 text-white border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Email" required>
-                            </div>
-                            <div>
-                                <label for="auth-password" class="sr-only">Password</label>
-                                <input type="password" id="auth-password" class="w-full p-3 rounded-lg bg-gray-700 text-white border-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Password" required>
-                            </div>
-                            <button type="submit" id="submit-btn" class="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition duration-300 ease-in-out transform hover:scale-105">
-                                Sign In
-                            </button>
-                        </form>
-                        <div class="mt-6 text-center">
-                            <button id="auth-mode-toggle-btn" class="text-red-400 hover:text-red-300 text-sm transition-colors duration-200">
-                                Don't have an account? Sign Up
-                            </button>
-                        </div>
+                    <div class="mt-6">
+                        <p class="text-center text-gray-400 mb-4">or</p>
+                        <button id="google-signin-btn" class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors duration-300 flex items-center justify-center space-x-2">
+                            <i class="fab fa-google"></i>
+                            <span>Sign in with Google</span>
+                        </button>
                     </div>
                 </div>
             `;
 
             const authForm = document.getElementById('auth-form');
-            const submitBtn = document.getElementById('submit-btn');
-            const authModeToggleBtn = document.getElementById('auth-mode-toggle-btn');
-            let isSignUp = false;
+            const emailInput = document.getElementById('auth-email');
+            const passwordInput = document.getElementById('auth-password');
+            const googleBtn = document.getElementById('google-signin-btn');
 
-            authModeToggleBtn.addEventListener('click', () => {
-                isSignUp = !isSignUp;
-                submitBtn.textContent = isSignUp ? 'Sign Up' : 'Sign In';
-                authModeToggleBtn.textContent = isSignUp ? 'Already have an account? Sign In' : 'Don\'t have an account? Sign Up';
+            document.getElementById('signin-btn').addEventListener('click', async (e) => {
+                e.preventDefault();
+                showLoadingSpinner();
+                try {
+                    await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+                } catch (error) {
+                    showMessageModal(error.message, 'error');
+                } finally {
+                    hideLoadingSpinner();
+                }
             });
 
-            authForm.addEventListener('submit', async (e) => {
+            document.getElementById('signup-btn').addEventListener('click', async (e) => {
                 e.preventDefault();
-                const email = document.getElementById('auth-email').value;
-                const password = document.getElementById('auth-password').value;
+                showLoadingSpinner();
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+                    const user = userCredential.user;
+                    
+                    const newUser = {
+                        username: user.email.split('@')[0],
+                        email: user.email,
+                        role: 'member',
+                        isBanned: false,
+                        theme: 'dark',
+                        accentColor: '#ef4444'
+                    };
+                    await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), newUser);
+                    
+                    showMessageModal('Account created successfully! You are now signed in.', 'success');
+                } catch (error) {
+                    showMessageModal(error.message, 'error');
+                } finally {
+                    hideLoadingSpinner();
+                }
+            });
+
+            if (googleBtn) {
+                googleBtn.addEventListener('click', async () => {
+                    showLoadingSpinner();
+                    const provider = new GoogleAuthProvider();
+                    try {
+                        const result = await signInWithPopup(auth, provider);
+                        const user = result.user;
+                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
+                        const userDoc = await getDoc(userDocRef);
+
+                        if (!userDoc.exists()) {
+                            const newUser = {
+                                username: user.displayName || user.email.split('@')[0],
+                                email: user.email,
+                                role: 'member',
+                                isBanned: false,
+                                theme: 'dark',
+                                accentColor: '#ef4444'
+                            };
+                            await setDoc(userDocRef, newUser);
+                        }
+                    } catch (error) {
+                        showMessageModal(`Google sign-in failed: ${error.message}`, 'error');
+                    } finally {
+                        hideLoadingSpinner();
+                    }
+                });
+            }
+        }
+        
+        function renderSettingsPage() {
+            if (!appCurrentUser || !appUserData) {
+                contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Not Logged In</h1><p class="text-center text-gray-400">Please log in to view settings.</p>`;
+                return;
+            }
+
+            contentArea.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-lg mx-auto">
+                    <h2 class="text-3xl font-bold text-red-500 mb-6">Settings</h2>
+                    <form id="settings-form" class="space-y-6">
+                        <div>
+                            <label for="username" class="block text-lg font-semibold text-gray-300 mb-2">Username</label>
+                            <input type="text" id="username" value="${appUserData.username}" class="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                        </div>
+                        <div>
+                            <label for="accent-color" class="block text-lg font-semibold text-gray-300 mb-2">Accent Color</label>
+                            <input type="color" id="accent-color" value="${appUserData.accentColor}" class="w-full h-12 p-1 bg-gray-700 rounded-lg cursor-pointer">
+                        </div>
+                        <button type="submit" id="save-settings-btn" class="w-full bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">Save Changes</button>
+                    </form>
+                </div>
+            `;
+
+            document.getElementById('settings-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                showLoadingSpinner();
+                const newUsername = document.getElementById('username').value;
+                const newAccentColor = document.getElementById('accent-color').value;
+                const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, appCurrentUser.uid);
 
                 try {
-                    showLoadingSpinner();
-                    if (isSignUp) {
-                        await createUserWithEmailAndPassword(auth, email, password);
-                        showMessageModal("Account created successfully! You are now signed in.", 'success');
-                    } else {
-                        await signInWithEmailAndPassword(auth, email, password);
-                        showMessageModal("Signed in successfully!", 'success');
-                    }
+                    await updateDocFirestore(userDocRef, {
+                        username: newUsername,
+                        accentColor: newAccentColor
+                    });
+                    updateTheme(newAccentColor);
+                    showMessageModal('Settings saved successfully!', 'success');
                 } catch (error) {
-                    console.error("Authentication error:", error);
-                    showMessageModal(`Authentication failed: ${error.message}`, 'error');
+                    showMessageModal('Error saving settings: ' + error.message, 'error');
                 } finally {
                     hideLoadingSpinner();
                 }
             });
         }
         
-        // =================================================================
-        // 6. FIRESTORE LOGIC
-        // =================================================================
-        
-        /**
-         * Gets or creates user data in Firestore and also checks for a user's role.
-         * @param {string} uid - The user's Firebase UID.
-         */
-        async function getUserData(uid) {
-            try {
-                const userDocRef = doc(db, `artifacts/${appId}/users/${uid}/userData`, 'profile');
-                const userDocSnap = await getDoc(userDocRef);
+        function renderCreatePostModal(postId = null, title = '', content = '') {
+            const modalHtml = `
+                <div id="create-post-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-lg w-full border-2 border-[var(--accent-color)]">
+                        <h3 class="text-2xl font-bold text-[var(--accent-color)] mb-4">${postId ? 'Edit Post' : 'Create New Post'}</h3>
+                        <form id="create-post-form" class="space-y-4">
+                            <input type="text" id="post-title" placeholder="Post Title" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" value="${title}" required>
+                            <textarea id="post-content" placeholder="What's on your mind?" rows="5" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required>${content}</textarea>
+                            <div class="flex justify-end space-x-2">
+                                <button type="button" id="cancel-post-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Cancel</button>
+                                <button type="submit" class="bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg hover:bg-opacity-80 transition">${postId ? 'Save Changes' : 'Post'}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-container').innerHTML = modalHtml;
+            document.getElementById('cancel-post-btn').addEventListener('click', () => document.getElementById('create-post-modal').remove());
 
-                let userData;
-                if (userDocSnap.exists()) {
-                    userData = userDocSnap.data();
-                } else {
-                    userData = {
-                        createdAt: serverTimestamp(),
-                        username: `user_${Math.random().toString(36).substring(2, 9)}`,
-                        role: 'user',
-                    };
-                    await setDoc(userDocRef, userData);
+            document.getElementById('create-post-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                showLoadingSpinner();
+                const newTitle = document.getElementById('post-title').value;
+                const newContent = document.getElementById('post-content').value;
+                const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
+
+                try {
+                    if (postId) {
+                        const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
+                        await updateDocFirestore(postDocRef, {
+                            title: newTitle,
+                            content: newContent
+                        });
+                        showMessageModal('Post updated successfully!', 'success');
+                    } else {
+                        await addDoc(postsCollection, {
+                            title: newTitle,
+                            content: newContent,
+                            authorId: appCurrentUser.uid,
+                            authorName: appUserData.username,
+                            createdAt: serverTimestamp(),
+                            reactions: {}
+                        });
+                        showMessageModal('Post created successfully!', 'success');
+                    }
+                    document.getElementById('create-post-modal').remove();
+                } catch (error) {
+                    showMessageModal('Error processing post: ' + error.message, 'error');
+                } finally {
+                    hideLoadingSpinner();
                 }
-                return userData;
-            } catch (error) {
-                console.error("Error getting or creating user data:", error);
-                return null;
-            }
+            });
         }
         
-        // =================================================================
-        // 7. WEBRTC/CALLING LOGIC
-        // =================================================================
+        function renderReactionModal(postId) {
+            const emojis = ['👍', '❤️', '😂', '🔥', '🤔', '🎉'];
+            const emojiHtml = emojis.map(emoji => `<button class="reaction-emoji text-3xl p-2 hover:bg-gray-700 rounded-lg transition" data-emoji="${emoji}">${emoji}</button>`).join('');
 
-        /**
-         * Initiates a call to a specific user using WebRTC signaling.
-         * @param {string} recipientId - The ID of the user to call.
-         */
-        async function callUser(recipientId) {
-            if (!appCurrentUser) {
-                showMessageModal("You must be logged in to make a call.");
-                return;
-            }
-            if (appCurrentUser.uid === recipientId) {
-                showMessageModal("You cannot call yourself.");
-                return;
-            }
-
-            try {
-                showLoadingSpinner();
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                const localVideo = document.getElementById('local-video');
-                if (localVideo) localVideo.srcObject = localStream;
-                hideLoadingSpinner();
-                
-                const callModalHtml = `
-                    <div class="video-container flex-grow bg-black relative">
-                        <video id="remote-video" autoplay playsinline class="w-full h-full"></video>
-                        <video id="local-video" autoplay muted playsinline class="rounded-lg shadow-lg absolute bottom-4 right-4 w-36 h-28 border-2 border-white"></video>
-                        <div class="absolute bottom-4 left-4 flex space-x-4">
-                            <button id="hang-up-btn" class="bg-red-600 text-white p-3 rounded-full hover:bg-red-700 transition">
-                                <i class="fas fa-phone-slash"></i>
-                            </button>
+            const modalHtml = `
+                <div id="reaction-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full border-2 border-[var(--accent-color)]">
+                        <h3 class="text-2xl font-bold text-[var(--accent-color)] mb-4">React to Post</h3>
+                        <div class="flex justify-around items-center space-x-2">
+                            ${emojiHtml}
+                        </div>
+                        <div class="flex justify-end mt-4">
+                            <button id="cancel-reaction-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Cancel</button>
                         </div>
                     </div>
-                `;
+                </div>
+            `;
+            document.getElementById('modal-container').innerHTML = modalHtml;
+            document.getElementById('cancel-reaction-btn').addEventListener('click', () => document.getElementById('reaction-modal').remove());
 
-                showCustomModal('Calling...', callModalHtml, 'Cancel Call', () => {
-                    hangUp();
-                });
-                
-                document.getElementById('hang-up-btn').addEventListener('click', hangUp);
-                
-                peerConnection = new RTCPeerConnection(servers);
-                localStream.getTracks().forEach(track => {
-                    peerConnection.addTrack(track, localStream);
-                });
-
-                peerConnection.ontrack = (event) => {
-                    const remoteVideo = document.getElementById('remote-video');
-                    remoteStream = event.streams[0];
-                    if (remoteVideo) remoteVideo.srcObject = remoteStream;
-                };
-
-                const callDocRef = doc(collection(db, `artifacts/${appId}/public/data/calls`), recipientId);
-                const offerCandidates = collection(callDocRef, 'offerCandidates');
-                const answerCandidates = collection(callDocRef, 'answerCandidates');
-                
-                peerConnection.onicecandidate = (event) => {
-                    event.candidate && addDoc(offerCandidates, event.candidate.toJSON());
-                };
-
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
-
-                await setDoc(callDocRef, {
-                    callerId: appCurrentUser.uid,
-                    recipientId: recipientId,
-                    offer: {
-                        type: offer.type,
-                        sdp: offer.sdp
-                    }
-                });
-
-                callUnsubscribe = onSnapshot(callDocRef, (docSnap) => {
-                    const data = docSnap.data();
-                    if (!peerConnection.currentRemoteDescription && data?.answer) {
-                        peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-                    }
-                });
-                
-                onSnapshot(answerCandidates, (snapshot) => {
-                    snapshot.docChanges().forEach(change => {
-                        if (change.type === 'added') {
-                            const candidate = new RTCIceCandidate(change.doc.data());
-                            peerConnection.addIceCandidate(candidate);
+            document.querySelectorAll('.reaction-emoji').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const emoji = e.target.dataset.emoji;
+                    const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
+                    
+                    try {
+                        const postDoc = await getDoc(postDocRef);
+                        const currentReactions = postDoc.data().reactions || {};
+                        const reactionKey = emoji.codePointAt(0).toString(16);
+                        
+                        const newReactions = { ...currentReactions };
+                        if (newReactions[reactionKey]) {
+                            newReactions[reactionKey].count += 1;
+                        } else {
+                            newReactions[reactionKey] = {
+                                emoji: emoji,
+                                count: 1
+                            };
                         }
-                    });
+                        
+                        await updateDocFirestore(postDocRef, { reactions: newReactions });
+                        document.getElementById('reaction-modal').remove();
+                    } catch (error) {
+                        showMessageModal('Failed to add reaction: ' + error.message, 'error');
+                    }
                 });
-            } catch (error) {
-                console.error("Error calling user:", error);
-                showMessageModal(`Failed to initiate call: ${error.message}`, 'error');
-                hangUp();
-            }
+            });
         }
         
-        /**
-         * Handles an incoming call notification.
-         * @param {Object} callData - The data of the incoming call.
-         */
-        async function handleIncomingCall(callData) {
-            showMessageModal(`Incoming call from user ${callData.callerId}. Do you want to accept?`, 'confirm', async () => {
-                try {
+        function deletePost(postId) {
+            showMessageModal(
+                'Are you sure you want to delete this post? This action cannot be undone.',
+                'confirm',
+                async () => {
                     showLoadingSpinner();
-                    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                    const callModalHtml = `
-                        <div class="video-container flex-grow bg-black relative">
-                            <video id="remote-video" autoplay playsinline class="w-full h-full"></video>
-                            <video id="local-video" autoplay muted playsinline class="rounded-lg shadow-lg absolute bottom-4 right-4 w-36 h-28 border-2 border-white"></video>
-                            <div class="absolute bottom-4 left-4 flex space-x-4">
-                                <button id="hang-up-btn" class="bg-red-600 text-white p-3 rounded-full hover:bg-red-700 transition">
-                                    <i class="fas fa-phone-slash"></i>
+                    const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
+                    try {
+                        await deleteDoc(postDocRef);
+                        showMessageModal('Post deleted successfully!', 'success');
+                    } catch (error) {
+                        showMessageModal('Failed to delete post: ' + error.message, 'error');
+                    } finally {
+                        hideLoadingSpinner();
+                    }
+                }
+            );
+        }
+
+        function renderForumsPage() {
+            if (!appCurrentUser) {
+                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be logged in to view the forums.</p></div>`;
+                return;
+            }
+            contentArea.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-3xl font-bold text-red-500">Forums</h2>
+                        <button id="create-post-btn" class="bg-red-600 text-white font-semibold py-2 px-5 rounded-lg hover:bg-red-700 transition-colors duration-300">
+                            <i class="fas fa-plus mr-2"></i>Create Post
+                        </button>
+                    </div>
+                    <div id="posts-list" class="space-y-4">
+                        <p class="text-gray-400 text-center">Loading posts...</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('create-post-btn').addEventListener('click', () => {
+                if (appCurrentUser) {
+                    renderCreatePostModal();
+                } else {
+                    showMessageModal('You must be signed in to create a post.', 'error');
+                }
+            });
+
+            const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
+            const q = query(postsCollection, orderBy('createdAt', 'desc'));
+            onSnapshot(q, (snapshot) => {
+                const postsList = document.getElementById('posts-list');
+                if (!postsList) return;
+                
+                if (snapshot.empty) {
+                    postsList.innerHTML = '<p class="text-gray-400 text-center">No posts yet. Be the first to create one!</p>';
+                    return;
+                }
+
+                postsList.innerHTML = snapshot.docs.map(postDoc => {
+                    const post = postDoc.data();
+                    const postId = postDoc.id;
+                    const canEditOrDelete = appUserData?.role === 'admin' || appUserData?.role === 'founder';
+
+                    const reactionsHtml = post.reactions ? Object.values(post.reactions).map(reaction => `
+                        <span class="bg-gray-700 px-2 py-1 rounded-full text-sm">${reaction.emoji} ${reaction.count}</span>
+                    `).join('') : '';
+
+                    return `
+                        <div class="bg-gray-700 p-6 rounded-lg shadow-md border border-gray-600">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="text-xl font-bold text-[var(--accent-color)]">${post.title}</h3>
+                                <div class="flex-shrink-0 text-right">
+                                    <span class="block text-sm text-gray-400">by ${post.authorName}</span>
+                                    ${canEditOrDelete ? `
+                                        <div class="mt-2 space-x-2">
+                                            <button class="edit-post-btn bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 transition" data-post-id="${postId}">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="delete-post-btn bg-red-600 text-white p-2 rounded-full hover:bg-red-700 transition" data-post-id="${postId}">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            <p class="text-gray-300 mb-4">${post.content}</p>
+                            <div class="flex items-center space-x-4">
+                                <div class="flex space-x-2">
+                                    ${reactionsHtml}
+                                </div>
+                                <button class="add-reaction-btn bg-gray-600 text-white p-2 rounded-full hover:bg-gray-500 transition" data-post-id="${postId}">
+                                    <i class="far fa-smile"></i>
                                 </button>
                             </div>
                         </div>
                     `;
+                }).join('');
 
-                    showCustomModal('Connected', callModalHtml, 'End Call', () => {
-                         hangUp();
+                document.querySelectorAll('.add-reaction-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const postId = e.currentTarget.dataset.postId;
+                        renderReactionModal(postId);
                     });
-                    document.getElementById('hang-up-btn').addEventListener('click', hangUp);
-
-                    const localVideo = document.getElementById('local-video');
-                    localVideo.srcObject = localStream;
-                    hideLoadingSpinner();
-                    
-                    peerConnection = new RTCPeerConnection(servers);
-                    localStream.getTracks().forEach(track => {
-                        peerConnection.addTrack(track, localStream);
-                    });
-
-                    peerConnection.ontrack = (event) => {
-                        remoteStream = event.streams[0];
-                        const remoteVideo = document.getElementById('remote-video');
-                        if (remoteVideo) remoteVideo.srcObject = remoteStream;
-                    };
-
-                    peerConnection.onicecandidate = (event) => {
-                        event.candidate && addDoc(collection(db, `artifacts/${appId}/public/data/calls/${appCurrentUser.uid}/answerCandidates`), event.candidate.toJSON());
-                    };
-                    
-                    const offer = callData.offer;
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-                    const answer = await peerConnection.createAnswer();
-                    await peerConnection.setLocalDescription(answer);
-
-                    const callDocRef = doc(db, `artifacts/${appId}/public/data/calls`, appCurrentUser.uid);
-                    await updateDoc(callDocRef, {
-                        answer: {
-                            type: answer.type,
-                            sdp: answer.sdp
+                });
+                
+                document.querySelectorAll('.edit-post-btn').forEach(button => {
+                    button.addEventListener('click', async (e) => {
+                        const postId = e.currentTarget.dataset.postId;
+                        showLoadingSpinner();
+                        const postDoc = await getDoc(doc(db, `/artifacts/${appId}/public/data/forums`, postId));
+                        hideLoadingSpinner();
+                        if (postDoc.exists()) {
+                            const postData = postDoc.data();
+                            renderCreatePostModal(postId, postData.title, postData.content);
+                        } else {
+                            showMessageModal('Post not found.', 'error');
                         }
                     });
-                    
-                    onSnapshot(collection(db, `artifacts/${appId}/public/data/calls/${appCurrentUser.uid}/offerCandidates`), (snapshot) => {
-                         snapshot.docChanges().forEach(change => {
-                            if (change.type === 'added') {
-                                const candidate = new RTCIceCandidate(change.doc.data());
-                                peerConnection.addIceCandidate(candidate);
-                            }
-                         });
+                });
+
+                document.querySelectorAll('.delete-post-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const postId = e.currentTarget.dataset.postId;
+                        deletePost(postId);
                     });
+                });
+            });
+        }
+        
+        function getChatId(user1Id, user2Id) {
+            return [user1Id, user2Id].sort().join('-');
+        }
+        
+        // --- Simulated Calling Logic ---
+        let currentCallId = null;
+
+        function renderCallModal(callId, status, participants, callerId) {
+            const modalContainer = document.getElementById('modal-container');
+            const modalId = 'call-modal';
+            const existingModal = document.getElementById(modalId);
+            if (existingModal) existingModal.remove();
+
+            let modalHtml = '';
+            
+            if (status === 'ringing' && appCurrentUser.uid !== callerId) {
+                // Incoming call modal for the recipient
+                modalHtml = `
+                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-[var(--accent-color)] text-center">
+                            <i class="fas fa-phone-volume text-5xl text-[var(--accent-color)] mb-4 animate-pulse"></i>
+                            <p class="text-xl text-white mb-4">${participants[0].name} is ringing you...</p>
+                            <div class="flex justify-center space-x-4 mt-4">
+                                <button id="pickup-btn" class="bg-green-500 text-white px-6 py-3 rounded-full font-bold hover:bg-green-600 transition duration-300">
+                                    <i class="fas fa-phone mr-2"></i>Pick Up
+                                </button>
+                                <button id="decline-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300">
+                                    <i class="fas fa-phone-slash mr-2"></i>Decline
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (status === 'ringing' && appCurrentUser.uid === callerId) {
+                // Outgoing call modal for the caller
+                modalHtml = `
+                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-[var(--accent-color)] text-center">
+                            <i class="fas fa-phone-alt text-5xl text-[var(--accent-color)] mb-4 animate-pulse"></i>
+                            <p class="text-xl text-white mb-4">Ringing ${participants[1].name}...</p>
+                            <button id="cancel-call-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300 mt-4">
+                                <i class="fas fa-times mr-2"></i>Cancel
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (status === 'active') {
+                // Active call modal for both participants
+                const participantsHtml = participants.map(p => `<li class="flex items-center space-x-2"><i class="fas fa-user-circle"></i><span>${p.name}</span></li>`).join('');
+                modalHtml = `
+                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-green-500 text-center">
+                            <h3 class="text-2xl font-bold text-green-500 mb-4">In a Call</h3>
+                            <ul class="text-left text-lg text-gray-200 mb-6 space-y-2">
+                                ${participantsHtml}
+                            </ul>
+                            <button id="hangup-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300">
+                                <i class="fas fa-phone-slash mr-2"></i>Hang Up
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (modalHtml) {
+                modalContainer.insertAdjacentHTML('beforeend', modalHtml);
+
+                if (status === 'ringing' && appCurrentUser.uid !== callerId) {
+                    document.getElementById('pickup-btn').addEventListener('click', () => acceptCall(callId, participants));
+                    document.getElementById('decline-btn').addEventListener('click', () => endCall(callId));
+                } else if (status === 'ringing' && appCurrentUser.uid === callerId) {
+                    document.getElementById('cancel-call-btn').addEventListener('click', () => endCall(callId));
+                } else if (status === 'active') {
+                    document.getElementById('hangup-btn').addEventListener('click', () => endCall(callId));
+                }
+            } else {
+                 const existingModal = document.getElementById(modalId);
+                 if (existingModal) existingModal.remove();
+            }
+        }
+        
+        async function startCall(recipientId, recipientUsername) {
+            showMessageModal(
+                `Are you sure you want to call ${recipientUsername}?`,
+                'confirm',
+                async () => {
+                    const callsCollection = collection(db, `/artifacts/${appId}/private/data/calls`);
+                    const newCall = {
+                        callerId: appCurrentUser.uid,
+                        recipientId: recipientId,
+                        status: 'ringing',
+                        participants: [{ id: appCurrentUser.uid, name: appUserData.username }],
+                        createdAt: serverTimestamp()
+                    };
+                    try {
+                        const callDocRef = await addDoc(callsCollection, newCall);
+                        currentCallId = callDocRef.id;
+                    } catch (error) {
+                        showMessageModal('Failed to start call: ' + error.message, 'error');
+                    }
+                }
+            );
+        }
+
+        async function acceptCall(callId, currentParticipants) {
+            const callDocRef = doc(db, `/artifacts/${appId}/private/data/calls`, callId);
+            try {
+                const updatedParticipants = [...currentParticipants, { id: appCurrentUser.uid, name: appUserData.username }];
+                await updateDocFirestore(callDocRef, {
+                    status: 'active',
+                    participants: updatedParticipants
+                });
+            } catch (error) {
+                showMessageModal('Failed to accept call: ' + error.message, 'error');
+            }
+        }
+
+        async function endCall(callId) {
+            const callDocRef = doc(db, `/artifacts/${appId}/private/data/calls`, callId);
+            try {
+                await updateDocFirestore(callDocRef, {
+                    status: 'ended'
+                });
+            } catch (error) {
+                showMessageModal('Failed to end call: ' + error.message, 'error');
+            }
+        }
+
+        // Listens for incoming and outgoing calls
+        function listenForCalls() {
+            if (!appCurrentUser) return;
+            const callsCollection = collection(db, `/artifacts/${appId}/private/data/calls`);
+            const q = query(callsCollection, where('status', 'in', ['ringing', 'active']));
+            
+            if (callUnsubscribe) callUnsubscribe(); // Unsubscribe old listener
+            
+            callUnsubscribe = onSnapshot(q, (snapshot) => {
+                let foundCall = false;
+                snapshot.forEach(callDoc => {
+                    const callData = callDoc.data();
+                    const isParticipant = callData.callerId === appCurrentUser.uid || callData.recipientId === appCurrentUser.uid;
                     
-                } catch (error) {
-                    console.error("Error accepting call:", error);
-                    showMessageModal("Failed to accept call. Please try again.", 'error');
-                    hangUp();
+                    if (isParticipant) {
+                        foundCall = true;
+                        currentCallId = callDoc.id;
+                        renderCallModal(callDoc.id, callData.status, callData.participants, callData.callerId);
+                    }
+                });
+                
+                // If no active or ringing call involves the current user, clear the modal
+                if (!foundCall) {
+                    const modal = document.getElementById('call-modal');
+                    if(modal) modal.remove();
+                    currentCallId = null;
                 }
             });
         }
-        
-        /**
-         * Cleans up the call and closes the modal.
-         */
-        function hangUp() {
-            if (peerConnection) {
-                peerConnection.close();
-                peerConnection = null;
-            }
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
-            }
-            if (remoteStream) {
-                remoteStream.getTracks().forEach(track => track.stop());
-                remoteStream = null;
-            }
-            const modal = document.getElementById('custom-modal');
-            if (modal) modal.remove();
-        }
 
-        /**
-         * Listens for incoming WebRTC call offers from other users.
-         * @param {string} uid - The user's Firebase UID.
-         */
-        function listenForCalls(uid) {
-            const callDocRef = doc(db, `artifacts/${appId}/public/data/calls`, uid);
-            if (callUnsubscribe) callUnsubscribe();
+        function renderMessagesPage() {
+            if (!appCurrentUser) {
+                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be logged in to view messages.</p></div>`;
+                return;
+            }
+
+            contentArea.innerHTML = `
+                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto flex flex-col md:flex-row h-[70vh]">
+                    <!-- User List Panel -->
+                    <div id="user-list-panel" class="w-full md:w-1/3 flex-shrink-0 border-b md:border-r border-gray-700 overflow-y-auto">
+                        <h3 class="text-xl font-bold text-[var(--accent-color)] mb-4">Users</h3>
+                        <div id="messages-user-list">
+                            <p class="text-gray-400 text-center">Loading users...</p>
+                        </div>
+                    </div>
+                    <!-- Chat Panel -->
+                    <div id="chat-panel" class="flex-grow w-full md:w-2/3 flex flex-col p-4 relative">
+                        <div class="flex items-center justify-center h-full text-gray-400">
+                            Select a user to start a conversation.
+                        </div>
+                    </div>
+                </div>
+            `;
             
-            callUnsubscribe = onSnapshot(callDocRef, (docSnap) => {
-                 if (docSnap.exists()) {
-                     const callData = docSnap.data();
-                     if (callData.offer && callData.callerId !== uid) {
-                         handleIncomingCall(callData);
-                     }
-                 }
+            listenForCalls();
+
+            const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
+            onSnapshot(usersCollection, (snapshot) => {
+                const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const userListContainer = document.getElementById('messages-user-list');
+                if (!userListContainer) return;
+
+                userListContainer.innerHTML = userList.filter(user => user.id !== appCurrentUser.uid).map(user => `
+                    <div class="user-item p-4 border-b border-gray-700 hover:bg-gray-700 cursor-pointer transition" data-user-id="${user.id}" data-username="${user.username}">
+                        <span class="font-semibold text-gray-200">${user.username}</span>
+                        <span class="block text-sm text-gray-400">${user.email}</span>
+                    </div>
+                `).join('');
+
+                document.querySelectorAll('.user-item').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        const userId = e.currentTarget.dataset.userId;
+                        const username = e.currentTarget.dataset.username;
+                        renderChatPanel(userId, username);
+                    });
+                });
             });
         }
         
-        // =================================================================
-        // 8. INITIALIZATION & EVENT LISTENERS
-        // =================================================================
-        
-        // Firebase Auth State Listener
-        onAuthStateChanged(auth, async (user) => {
-            showLoadingSpinner();
-            appCurrentUser = user;
+        function renderChatPanel(userId, username) {
+            const chatPanel = document.getElementById('chat-panel');
+            if (!chatPanel) return;
             
+            // Clear previous listener if one exists
+            if (dmUnsubscribe) {
+                dmUnsubscribe();
+                dmUnsubscribe = null;
+            }
+
+            activeDMUserId = userId;
+
+            chatPanel.innerHTML = `
+                <div class="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800 sticky top-0 z-10">
+                    <h4 class="text-xl font-bold text-[var(--accent-color)]">Chatting with ${username}</h4>
+                    <button id="call-user-btn" class="call-user-btn text-white p-3 rounded-full hover:bg-green-600 transition">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                </div>
+                <div id="messages-container" class="flex-grow overflow-y-auto p-4 space-y-4">
+                    <!-- Messages will be rendered here -->
+                    <p class="text-center text-gray-400">Say hello!</p>
+                </div>
+                <form id="dm-form" class="p-4 border-t border-gray-700 bg-gray-800 sticky bottom-0 z-10">
+                    <div class="flex space-x-2">
+                        <input type="text" id="dm-input" placeholder="Type a message..." class="flex-grow p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required>
+                        <button type="submit" class="bg-[var(--accent-color)] text-white px-4 py-3 rounded-lg hover:bg-opacity-80 transition">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </form>
+            `;
+            
+            document.getElementById('dm-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const messageInput = document.getElementById('dm-input');
+                const messageText = messageInput.value.trim();
+
+                if (messageText) {
+                    const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
+                    const messagesCollection = collection(db, `/artifacts/${appId}/private/data/chats/${chatId}/messages`);
+
+                    try {
+                        await addDoc(messagesCollection, {
+                            senderId: appCurrentUser.uid,
+                            text: messageText,
+                            createdAt: serverTimestamp()
+                        });
+                        messageInput.value = '';
+                    } catch (error) {
+                        showMessageModal('Failed to send message: ' + error.message, 'error');
+                    }
+                }
+            });
+
+            document.getElementById('call-user-btn').addEventListener('click', () => {
+                startCall(activeDMUserId, username);
+            });
+            
+            const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
+            const messagesCollection = collection(db, `/artifacts/${appId}/private/data/chats/${chatId}/messages`);
+            const q = query(messagesCollection, orderBy('createdAt', 'asc'));
+
+            dmUnsubscribe = onSnapshot(q, (snapshot) => {
+                const messagesContainer = document.getElementById('messages-container');
+                if (!messagesContainer) return;
+                
+                messagesContainer.innerHTML = snapshot.docs.map(msgDoc => {
+                    const message = msgDoc.data();
+                    const isSender = message.senderId === appCurrentUser.uid;
+                    const messageClass = isSender ? 'self-end bg-[var(--accent-color)] text-white' : 'self-start bg-gray-700 text-gray-200';
+                    return `
+                        <div class="flex ${isSender ? 'justify-end' : 'justify-start'}">
+                            <div class="p-3 rounded-lg max-w-xs ${messageClass}">
+                                ${message.text}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            });
+        }
+
+
+        // =================================================================
+        // 6. MAIN APP LOGIC
+        // =================================================================
+
+        function navigateTo(page) {
+            if (!contentArea) {
+                console.error("Content area not found.");
+                return;
+            }
+            
+            // Clean up old listeners
+            if (dmUnsubscribe) {
+                dmUnsubscribe();
+                dmUnsubscribe = null;
+            }
+            if (callUnsubscribe) {
+                callUnsubscribe();
+                callUnsubscribe = null;
+            }
+            activeDMUserId = null;
+            
+            contentArea.innerHTML = '';
+            lastNavigatedPage = page;
+            localStorage.setItem('currentPage', page);
+            
+            if (appUserData && appUserData.isBanned && page !== 'auth') {
+                showMessageModal('Your account has been banned.', 'error');
+                localStorage.removeItem('currentPage');
+                navigateTo('auth');
+                return;
+            }
+
+            switch (page) {
+                case 'home':
+                    renderHomePage();
+                    break;
+                case 'admin':
+                    renderAdminPage();
+                    break;
+                case 'auth':
+                    renderAuthPage();
+                    break;
+                case 'messages':
+                    renderMessagesPage();
+                    break;
+                case 'settings':
+                    renderSettingsPage();
+                    break;
+                case 'forums':
+                    renderForumsPage();
+                    break;
+                default:
+                    contentArea.innerHTML = `<h1 class="text-3xl text-center text-gray-500">Page Not Found</h1>`;
+                    break;
+            }
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            appCurrentUser = user;
+            authReady = true;
+
             if (user) {
-                appUserData = await getUserData(user.uid);
+                const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
+                const userDoc = await getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                    appUserData = { id: userDoc.id, ...userDoc.data() };
+                } else {
+                    appUserData = {
+                        username: user.displayName || user.email.split('@')[0] || 'Guest',
+                        email: user.email || 'N/A',
+                        role: 'member',
+                        isBanned: false,
+                        theme: 'dark',
+                        accentColor: '#ef4444'
+                    };
+                    await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), appUserData);
+                }
+                
+                if (appUserData.accentColor) {
+                    updateTheme(appUserData.accentColor);
+                }
                 
                 renderSidebarNav(appCurrentUser, appUserData);
                 
-                if (lastNavigatedPage) {
-                    navigateTo(lastNavigatedPage.pageId, lastNavigatedPage.params);
+                const currentPage = localStorage.getItem('currentPage');
+                if (currentPage && currentPage !== 'auth') {
+                    navigateTo(currentPage);
                 } else {
                     navigateTo('home');
                 }
-                
-                listenForCalls(user.uid);
             } else {
                 appUserData = null;
-                
                 renderSidebarNav(appCurrentUser, appUserData);
-                
-                if (currentPageId !== 'auth') {
-                    navigateTo('auth');
-                } else {
-                    navigateTo('auth');
-                }
+                navigateTo('auth');
             }
-            authReady = true;
-            hideLoadingSpinner();
         });
 
-        // Initial setup on page load
         document.addEventListener('DOMContentLoaded', async () => {
             initializeNavigation();
+            const mobileAuthButton = document.getElementById('mobile-auth-btn');
+            if(mobileAuthButton) {
+                mobileAuthButton.addEventListener('click', () => {
+                    navigateTo('auth');
+                    if (window.innerWidth < 768) {
+                        leftSidebar.classList.remove('expanded');
+                        overlayBackdrop.classList.add('hidden');
+                    }
+                });
+            }
             
             if (initialAuthToken) {
                 try {
@@ -1343,19 +1382,6 @@
                      console.error("Error signing in with custom token:", error);
                      navigateTo('auth');
                 }
-            } else {
-                 if (!appCurrentUser) navigateTo('auth');
-            }
-            
-            const mobileAuthBtn = document.getElementById('mobile-auth-btn');
-            if (mobileAuthBtn) {
-                mobileAuthBtn.addEventListener('click', () => {
-                    if (appCurrentUser) {
-                        navigateTo('profile');
-                    } else {
-                        navigateTo('auth');
-                    }
-                });
             }
         });
     </script>
