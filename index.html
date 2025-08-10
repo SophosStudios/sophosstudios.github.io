@@ -381,13 +381,13 @@
             createNavLink(leftSidebarNav, 'Forums', 'forums', 'fas fa-comments');
             createNavLink(leftSidebarNav, 'Messages', 'messages', 'fas fa-envelope');
             createNavLink(leftSidebarNav, 'Settings', 'settings', 'fas fa-cog');
-            createNavLink(leftSidebarNav, 'Dashboard', "dashboard", "fas fa-square-terminal")
 
             if (userData?.role === 'admin' || userData?.role === 'founder') {
                 const adminCategory = document.createElement('div');
                 adminCategory.className = 'mt-6 pt-4 border-t border-gray-700';
                 leftSidebarNav.appendChild(adminCategory);
                 createNavLink(adminCategory, 'Admin Panel', 'admin', 'fas fa-user-shield');
+                createNavLink(leftSidebarNav, 'Dashboard', "dashboard", "fas fa-terminal")
             }
             
             const authContainer = document.getElementById('admin-panel-button-container');
@@ -468,7 +468,7 @@
                 </div>
             `;
             document.getElementById('view-forums-btn').addEventListener('click', () => navigateTo('forums'));
-            document.getElementById('view-outages-btn').addEventListener('click', () => navigateTo('home'));
+            document.getElementById('view-outages-btn').addEventListener('click', () => navigateTo('dashbaord'));
         }
 
         function renderDashboardPage() {
@@ -478,12 +478,12 @@
                     <p class="text-xl text-gray-400"This dashboard allows you to view any outages or ping. This dashboard will allow you to see if there are any errors with the website.</p>
                     <div class="mt-8">
                         <button id="view-outages-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
-                            <i class="fas fa-wrench mr-2"></i>View Outages
+                            <i class="fas fa-house mr-2"></i>Home
                         </button>
                     </div>
                 </div>
             `;
-            document.getElementById('view-outages-btn').addEventListener('click', () => navigateTo('home'));
+            document.getElementById('view-home-btn').addEventListener('click', () => navigateTo('home'));
         }
 
         function renderAdminPage() {
