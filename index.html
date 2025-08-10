@@ -381,6 +381,7 @@
             createNavLink(leftSidebarNav, 'Forums', 'forums', 'fas fa-comments');
             createNavLink(leftSidebarNav, 'Messages', 'messages', 'fas fa-envelope');
             createNavLink(leftSidebarNav, 'Settings', 'settings', 'fas fa-cog');
+            createNavLink(leftSidebarNav, 'Dashboard', "dashboard", "fas fa-square-terminal")
 
             if (userData?.role === 'admin' || userData?.role === 'founder') {
                 const adminCategory = document.createElement('div');
@@ -459,10 +460,30 @@
                         <button id="view-forums-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
                             <i class="fas fa-comments mr-2"></i>Go to Forums
                         </button>
+
+                        <button id="view-outages-btn" class="bg-yellow-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
+                            <i class="fas fa-wrench mr-2"></i>View Outages
+                        </button>
                     </div>
                 </div>
             `;
             document.getElementById('view-forums-btn').addEventListener('click', () => navigateTo('forums'));
+            document.getElementById('view-outages-btn').addEventListener('click', () => navigateTo('home'));
+        }
+
+        function renderDashboardPage() {
+            contentArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-8 text-center">
+                    <h1 class="text-4xl md:text-6xl font-bold text-red-500 mb-4 animate-pulse">Welcome to SophosWRLD Dashboard</h1>
+                    <p class="text-xl text-gray-400"This dashboard allows you to view any outages or ping. This dashboard will allow you to see if there are any errors with the website.</p>
+                    <div class="mt-8">
+                        <button id="view-outages-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
+                            <i class="fas fa-wrench mr-2"></i>View Outages
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('view-outages-btn').addEventListener('click', () => navigateTo('home'));
         }
 
         function renderAdminPage() {
