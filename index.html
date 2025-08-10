@@ -386,8 +386,8 @@
                 const adminCategory = document.createElement('div');
                 adminCategory.className = 'mt-6 pt-4 border-t border-gray-700';
                 leftSidebarNav.appendChild(adminCategory);
+                createNavLink(leftSidebarNav, 'Dashboard', "dashboard", "fas fa-terminal");
                 createNavLink(adminCategory, 'Admin Panel', 'admin', 'fas fa-user-shield');
-                createNavLink(leftSidebarNav, 'Dashboard', "dashboard", "fas fa-terminal")
             }
             
             const authContainer = document.getElementById('admin-panel-button-container');
