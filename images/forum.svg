@@ -1,0 +1,10 @@
+<svg width="640" height="360" viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg">
+  <rect width="640" height="360" fill="#1e1e1e"/>
+  <rect x="40" y="40" width="560" height="280" rx="12" fill="#121212" stroke="#e53935" stroke-width="3"/>
+  <rect x="60" y="70" width="520" height="28" rx="6" fill="#2a2a2a"/>
+  <rect x="60" y="110" width="520" height="28" rx="6" fill="#2a2a2a"/>
+  <rect x="60" y="150" width="520" height="28" rx="6" fill="#2a2a2a"/>
+  <rect x="60" y="190" width="520" height="28" rx="6" fill="#2a2a2a"/>
+  <rect x="60" y="230" width="520" height="28" rx="6" fill="#2a2a2a"/>
+  <text x="40" y="330" fill="#bbb" font-size="18" font-family="Arial">Forums</text>
+</svg>

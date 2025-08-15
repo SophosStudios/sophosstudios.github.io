@@ -2,541 +2,537 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>SophosWRLD</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SophosWRLD — Developer Hub</title>
   <style>
-    :root{ --accent:#ef4444; --bg:#0b0d12; --bg-elev:#0f1117; --fg:#e5e7eb; --muted:#9ca3af }
-    .card{ background:var(--bg-elev); border:1px solid rgba(255,255,255,.06); border-radius:1rem; }
-    .btn{ padding:.6rem 1rem; border-radius:1rem; font-weight:600; border:1px solid rgba(255,255,255,.1); background:#121623; color:#fff }
-    .btn-primary{ background:var(--accent); border-color:transparent }
-    .input{ height:40px; border-radius:.6rem; background:#0f1117; border:1px solid rgba(255,255,255,.1); padding:0 .75rem; color:#e5e7eb }
-    .navtab{ padding:.5rem .75rem; border-radius:.75rem; font-weight:600; font-size:.9rem }
-    .navtab.active{ background:rgba(255,255,255,.06) }
-    .truncate-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+    :root{
+      --bg:#121212;
+      --panel:#1e1e1e;
+      --panel-2:#161616;
+      --text:#e5e5e5;
+      --muted:#a7a7a7;
+      --accent:#e53935;
+      --accent-2:#ff6b6b;
+      --border:#2a2a2a;
+      --ok:#2e7d32;
+      --warn:#f9a825;
+    }
+    *{box-sizing:border-box}
+    html, body { height:100%; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    a{ color: var(--accent-2); text-decoration:none; }
+    a:hover{ text-decoration:underline; }
+
+    /* Top Nav */
+    .topbar{
+      position:sticky; top:0; z-index:50;
+      background: linear-gradient(180deg, #151515, #111);
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; gap:10px;
+      padding:10px 16px;
+    }
+    .brand{ font-weight:700; letter-spacing:.3px; }
+    .brand .dot{ color:var(--accent); }
+    .tabs{ display:flex; gap:8px; margin-left:12px; flex-wrap:wrap; }
+    .tab{
+      border:1px solid var(--border); background:var(--panel); color:var(--text);
+      padding:8px 12px; border-radius:10px; cursor:pointer;
+      transition:.2s transform, .2s background, .2s border-color;
+    }
+    .tab:hover{ transform:translateY(-1px); border-color:#3a3a3a; }
+    .tab.active{ background: #1a1a1a; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+    .grow{ flex:1; }
+    .signout{ border:1px solid var(--border); background:#1a1a1a; color:#fff; padding:8px 12px; border-radius:10px; cursor:pointer; }
+    .google{ display:flex; align-items:center; gap:8px; border:1px solid var(--border); background:#fff; color:#111; padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600;}
+    .google img{ width:18px; height:18px; }
+
+    /* Containers */
+    .wrap{ max-width:1100px; margin: 18px auto; padding: 0 16px; }
+    .grid{ display:grid; grid-template-columns: repeat(12, 1fr); gap:16px; }
+    .card{
+      background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    .card h3{ margin:0 0 8px 0; }
+    .muted{ color:var(--muted); }
+
+    /* Auth */
+    .auth { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .auth .panel{ width:100%; max-width:860px; }
+    .auth .grid > .col{ grid-column: span 6; }
+    .field{ display:flex; flex-direction:column; gap:6px; margin:8px 0; }
+    .field input{
+      background:var(--panel-2); border:1px solid var(--border); color:#fff; padding:10px 12px; border-radius:10px;
+      outline:none;
+    }
+    .btn{ background:var(--accent); color:#fff; border:none; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; }
+    .btn.secondary{ background:transparent; border:1px solid var(--border); }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .center{ text-align:center; }
+    .hidden{ display:none !important; }
+
+    /* Sections */
+    .section{ display:none; }
+    .section.active{ display:block; }
+
+    /* Forum styles */
+    .thread{ border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:10px; background:#181818; }
+    .thread .title{ font-weight:700; }
+    .thread .meta{ color:var(--muted); font-size:12px; }
+    .post{ padding:10px; border-left:3px solid var(--accent); background:#141414; margin:8px 0; border-radius:8px; }
+    .composer textarea{
+      width:100%; min-height:90px; background:#141414; color:#fff; border:1px solid var(--border); border-radius:10px; padding:10px;
+    }
+
+    .pill{ display:inline-block; padding:4px 10px; border-radius:999px; background:#221; border:1px solid var(--border); color:#f5b3b2; font-size:12px; }
+
+    /* Hero */
+    .hero{
+      display:grid; grid-template-columns: 1.4fr .6fr; gap:16px; align-items:center;
+    }
+    .hero img{ width:100%; border-radius:16px; border:1px solid var(--border); background:#0c0c0c; }
+
+    /* Responsive */
+    @media (max-width: 900px){
+      .hero{ grid-template-columns: 1fr; }
+      .auth .grid > .col{ grid-column: span 12; }
+    }
   </style>
-  <!-- Firebase (Compat) — paste your own config below -->
-  <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js"></script>
 </head>
-<body class="bg-[#0b0d12] text-gray-100 min-h-svh">
-  <div id="app" class="min-h-svh grid md:grid-cols-[280px_1fr] gap-3 p-3">
-    <!-- Sidebar -->
-    <aside class="card p-3 md:p-4 flex flex-col gap-3">
-      <div class="flex items-center gap-3">
-        <img id="sidebarAvatar" src="assets/avatar.png" class="w-12 h-12 rounded-full object-cover ring-2 ring-red-500" alt="avatar" />
-        <div class="min-w-0">
-          <div class="font-semibold truncate" id="sidebarName">Guest</div>
-          <div class="text-sm text-gray-400 truncate" id="sidebarBio">Signed out</div>
+<body>
+
+<!-- AUTH SCREENS -->
+<div id="auth" class="auth">
+  <div class="panel card">
+    <div class="grid">
+      <div class="col">
+        <h2 style="margin-top:0">Sign in to <span class="brand">SophosWRLD<span class="dot">.</span></span></h2>
+        <p class="muted">A developer hub — collaborate, chat, and share knowledge.</p>
+        <div class="row">
+          <button class="google" onclick="googleSignIn()"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G"/> Sign in with Google</button>
         </div>
-      </div>
-
-      <div class="flex items-center justify-between text-sm">
-        <span class="text-gray-400">Currency</span>
-        <span id="sidebarCurrency" class="font-semibold">0</span>
-      </div>
-
-      <nav id="sidebarNav" class="grid gap-1">
-        <button class="navtab active" data-route="/home">Home</button>
-        <button class="navtab" data-route="/chat">Chat</button>
-        <button class="navtab" data-route="/forums">Forums</button>
-        <button class="navtab" data-route="/profile">My Profile</button>
-        <button class="navtab" data-route="/settings">Settings</button>
-        <button class="navtab hidden" id="adminNav" data-route="/admin">Admin</button>
-      </nav>
-
-      <div>
-        <label class="text-sm text-gray-400 block mb-1">Accent</label>
-        <input id="accentInput" type="color" value="#ef4444" class="w-full h-10 rounded border border-white/10 bg-[#0f1117]" />
-      </div>
-
-      <div>
-        <label class="text-sm text-gray-400 block mb-1">Redeem Code</label>
-        <div class="flex gap-2">
-          <input id="redeemCodeInput" class="flex-1 input" placeholder="ENTER-CODE"/>
-          <button id="redeemBtn" class="btn btn-primary">Redeem</button>
+        <div class="row muted">or</div>
+        <div class="field">
+          <label>Email</label>
+          <input id="signInEmail" type="email" placeholder="you@devmail.com"/>
         </div>
-        <div id="redeemMsg" class="text-xs text-gray-400 mt-1"></div>
-      </div>
-
-      <div id="adminPanelMini" class="hidden mt-3 border-t border-white/10 pt-3">
-        <div class="text-sm font-semibold mb-2">Quick Admin</div>
-        <input id="adminUid" class="w-full input mb-2" placeholder="Target UID"/>
-        <div class="flex gap-2">
-          <input id="adminAmount" type="number" class="flex-1 input" placeholder="+/- amount"/>
-          <button id="adminAdjustBtn" class="btn btn-primary">Apply</button>
+        <div class="field">
+          <label>Password</label>
+          <input id="signInPassword" type="password" placeholder="••••••••"/>
         </div>
-        <div class="text-xs text-gray-400 mt-1">Currency adjust for a user.</div>
-      </div>
-    </aside>
-
-    <!-- Main -->
-    <main class="grid grid-rows-[auto_1fr] gap-3">
-      <div class="card p-3 md:p-4 flex items-center justify-between">
-        <div class="font-semibold" id="routeTitle">Home</div>
-        <div class="text-sm text-gray-400" id="statusText">Not signed in</div>
-      </div>
-
-      <div class="grid gap-3" id="routes">
-        <!-- HOME -->
-        <section data-view="/home" class="card p-3 md:p-4">
-          <div class="grid lg:grid-cols-3 gap-3">
-            <div class="card p-4">
-              <div class="text-sm text-gray-400 mb-2">Latest Threads</div>
-              <div id="homeLatestThreads" class="flex flex-col gap-2"></div>
-            </div>
-            <div class="card p-4">
-              <div class="text-sm text-gray-400 mb-2">Online Users</div>
-              <div id="homeOnlineUsers" class="flex flex-col gap-2"></div>
-            </div>
-            <div class="card p-4">
-              <div class="text-sm text-gray-400 mb-2">Quick Post</div>
-              <div class="grid gap-2">
-                <input id="quickTitle" class="input" placeholder="Title"/>
-                <textarea id="quickBody" class="input h-24" placeholder="Say something…"></textarea>
-                <select id="quickCategory" class="input"></select>
-                <button id="quickPostBtn" class="btn btn-primary">Create Thread</button>
-                <div id="quickMsg" class="text-xs text-gray-400"></div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- CHAT -->
-        <section data-view="/chat" class="grid lg:grid-cols-[340px_1fr] gap-3 hidden">
-          <div class="card p-3 md:p-4">
-            <div class="flex items-center justify-between mb-2">
-              <div class="text-sm text-gray-400">Users</div>
-              <input id="userSearch" placeholder="Search" class="input w-40"/>
-            </div>
-            <div id="usersList" class="flex flex-col gap-2 max-h-[60svh] overflow-y-auto pr-1"></div>
-          </div>
-          <div class="card p-3 md:p-4 flex flex-col">
-            <div class="text-sm text-gray-400">Open a user to chat or call.</div>
-            <div class="mt-auto flex gap-2">
-              <input id="chatInput" class="flex-1 h-12 rounded bg-[#0f1117] border border-white/10 px-3" placeholder="Message…"/>
-              <button id="sendBtn" class="btn btn-primary">Send</button>
-            </div>
-          </div>
-        </section>
-
-        <!-- FORUMS -->
-        <section data-view="/forums" class="grid lg:grid-cols-[280px_1fr] gap-3 hidden">
-          <div class="card p-3 md:p-4">
-            <div class="flex items-center justify-between mb-2">
-              <div class="text-sm text-gray-400">Categories</div>
-              <button id="newCategoryBtn" class="btn hidden">New</button>
-            </div>
-            <div id="catList" class="flex flex-col gap-1"></div>
-          </div>
-          <div class="grid gap-3">
-            <div class="card p-3 md:p-4">
-              <div class="flex items-center justify-between">
-                <div class="text-sm text-gray-400" id="threadsHeader">Threads</div>
-                <button id="newThreadBtn" class="btn btn-primary">New Thread</button>
-              </div>
-              <div id="threadsList" class="mt-2 flex flex-col"></div>
-            </div>
-            <div class="card p-3 md:p-4 hidden" id="threadView">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="font-semibold" id="threadTitle">—</div>
-                  <div class="text-xs text-gray-400" id="threadMeta">—</div>
-                </div>
-                <div class="flex gap-2">
-                  <button id="threadEditBtn" class="btn hidden">Edit</button>
-                  <button id="threadDeleteBtn" class="btn hidden">Delete</button>
-                </div>
-              </div>
-              <div id="postsList" class="mt-3 flex flex-col gap-3"></div>
-              <div id="replyBox" class="mt-3 grid gap-2">
-                <textarea id="replyInput" class="input h-24" placeholder="Write a reply…"></textarea>
-                <button id="replySendBtn" class="btn btn-primary">Reply</button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- PROFILE -->
-        <section data-view="/profile" class="card p-3 md:p-4 hidden">
-          <div class="flex items-center gap-4">
-            <img id="profileAvatarDisplay" src="assets/avatar.png" class="w-24 h-24 rounded-full object-cover ring-2 ring-red-500" alt="avatar"/>
-            <div>
-              <div class="text-xl font-semibold" id="profileNameDisplay">Guest</div>
-              <div class="text-sm text-gray-400" id="profileBioDisplay">—</div>
-              <div class="text-xs text-gray-500">UID: <span id="profileUid">—</span></div>
-            </div>
-          </div>
-          <div class="mt-4">
-            <div class="text-sm text-gray-400 mb-1">My Recent Threads</div>
-            <div id="myThreads" class="flex flex-col"></div>
-          </div>
-          <div class="mt-4">
-            <button id="openProfileBtn" class="btn">Edit Profile</button>
-          </div>
-        </section>
-
-        <!-- SETTINGS -->
-        <section data-view="/settings" class="card p-3 md:p-4 hidden">
-          <div class="grid sm:grid-cols-2 gap-4">
-            <div class="grid gap-2">
-              <div class="font-semibold">Appearance</div>
-              <div class="flex items-center gap-3">
-                <label class="text-sm text-gray-400">Accent</label>
-                <input id="profileAccent" type="color" value="#ef4444" class="h-10 w-14 rounded border border-white/10 bg-[#0f1117]" />
-              </div>
-            </div>
-            <div class="grid gap-2">
-              <div class="font-semibold">Privacy</div>
-              <label class="text-sm flex items-center gap-2">
-                <input type="checkbox" id="hideEmail"/> Hide my email
-              </label>
-              <label class="text-sm flex items-center gap-2">
-                <input type="checkbox" id="hideOnline"/> Hide online status
-              </label>
-              <button id="saveSettingsBtn" class="btn btn-primary mt-2">Save Settings</button>
-              <div id="settingsMsg" class="text-xs text-gray-400"></div>
-            </div>
-          </div>
-        </section>
-
-        <!-- ADMIN -->
-        <section data-view="/admin" class="grid lg:grid-cols-2 gap-3 hidden">
-          <div class="card p-3 md:p-4">
-            <div class="flex items-center justify-between mb-2">
-              <div class="text-sm text-gray-400">Users</div>
-              <div class="flex gap-2">
-                <input id="adminSearch" class="input w-40" placeholder="Search users"/>
-                <button id="refreshUsersBtn" class="btn">Refresh</button>
-              </div>
-            </div>
-            <div id="adminUsers" class="flex flex-col max-h-[60svh] overflow-y-auto"></div>
-          </div>
-          <div class="card p-3 md:p-4">
-            <div class="text-sm text-gray-400 mb-2">Moderation</div>
-            <div id="moderationBox" class="text-sm text-gray-300">Select a post/thread to moderate from Forums.</div>
-          </div>
-        </section>
-      </div>
-    </main>
-  </div>
-
-  <!-- Profile Edit Sheet -->
-  <div id="profileSheet" class="fixed inset-x-0 bottom-0 z-40 hidden">
-    <div class="card rounded-t-2xl p-4 bg-[#0f1117]">
-      <div class="flex justify-between items-center mb-3">
-        <div class="font-semibold">Profile Settings</div>
-        <button id="profileClose" class="btn">Close</button>
-      </div>
-      <div class="grid sm:grid-cols-2 gap-4">
-        <div class="flex items-center gap-3">
-          <img id="profileAvatarPreview" src="assets/avatar.png" class="w-16 h-16 rounded-full object-cover ring-2 ring-red-500" alt="avatar"/>
-          <div>
-            <input id="profileAvatarFile" type="file" accept="image/*" class="block text-sm" />
-            <div class="text-xs text-gray-400">Upload a square image</div>
-          </div>
+        <div class="row">
+          <button class="btn" onclick="signIn()">Sign In</button>
+          <button class="btn secondary" onclick="toggleAuthMode(true)">Create account</button>
         </div>
-        <div class="grid gap-2">
-          <input id="profileName" class="input" placeholder="Username"/>
-          <input id="profileBio" class="input" placeholder="Bio / status message"/>
-          <button id="saveProfileBtn" class="btn btn-primary">Save</button>
-        </div>
+        <p id="authError" class="muted"></p>
+      </div>
+      <div class="col">
+        <img src="./images/forum.svg" alt="Forums"/>
       </div>
     </div>
   </div>
+</div>
 
-  <script>
-    // ====== Firebase Setup (paste your config) ======
-    const firebaseConfig = {
-      apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
-      authDomain: "sophoswrld.firebaseapp.com",
-      databaseURL: "https://sophoswrld-default-rtdb.firebaseio.com",
-      projectId: "sophoswrld",
-      storageBucket: "sophoswrld.firebasestorage.app",
-      messagingSenderId: "26686142400",
-      appId: "1:26686142400:web:48f8d3ae0b097731317a25",
-      measurementId: "G-6XETC98C22"
-    };
+<div id="signup" class="auth hidden">
+  <div class="panel card">
+    <div class="grid">
+      <div class="col">
+        <h2 style="margin-top:0">Create your account</h2>
+        <div class="field"><label>Display Name</label><input id="signUpName" type="text" maxlength="40" placeholder="Your name"/></div>
+        <div class="field"><label>Email</label><input id="signUpEmail" type="email" placeholder="you@devmail.com"/></div>
+        <div class="field"><label>Password</label><input id="signUpPassword" type="password" placeholder="Choose a strong password"/></div>
+        <div class="row">
+          <button class="btn" onclick="signUp()">Create Account</button>
+          <button class="btn secondary" onclick="toggleAuthMode(false)">Back to Sign In</button>
+        </div>
+        <p id="signupError" class="muted"></p>
+      </div>
+      <div class="col">
+        <img src="./images/chat.svg" alt="Chat"/>
+      </div>
+    </div>
+  </div>
+</div>
 
-    let app, auth, db, storage;
-    document.addEventListener("DOMContentLoaded", () => {
-      if (Object.keys(firebaseConfig).length) {
-        app = firebase.initializeApp(firebaseConfig);
-        auth = firebase.auth();
-        db = firebase.firestore();
-        storage = firebase.storage();
-        setStatus("Firebase ready");
-      } else {
-        setStatus("Demo mode");
-      }
-      initRouter();
-      seedDemo();
-    });
+<!-- APP -->
+<div id="app" class="hidden">
+  <div class="topbar">
+    <div class="brand">SophosWRLD<span class="dot">.</span></div>
+    <div class="tabs">
+      <div class="tab active" data-target="home" onclick="nav(this)">Home</div>
+      <div class="tab" data-target="chat" onclick="nav(this)">Chat</div>
+      <div class="tab" data-target="forums" onclick="nav(this)">Forums</div>
+      <div class="tab" data-target="profile" onclick="nav(this)">Profile</div>
+    </div>
+    <div class="grow"></div>
+    <button class="signout" onclick="signOut()">Sign Out</button>
+  </div>
 
-    // ====== Utils & State ======
-    const $ = (id) => document.getElementById(id);
-    function setStatus(t){ $("statusText").textContent = t; }
-    function setAccent(hex){ document.documentElement.style.setProperty("--accent", hex); }
-    function timeAgo(ts){
-      if (!ts) return "just now";
-      const d = ts instanceof Date ? ts : new Date(ts);
-      const diff = (Date.now() - d.getTime())/1000;
-      if (diff < 60) return Math.floor(diff)+"s ago";
-      if (diff < 3600) return Math.floor(diff/60)+"m ago";
-      if (diff < 86400) return Math.floor(diff/3600)+"h ago";
-      return d.toLocaleString();
-    }
-    function escapeHTML(s=''){ return s.replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;','\\'':'&#39;'}[c])); }
+  <div class="wrap">
+    <!-- HOME -->
+    <section id="home" class="section active">
+      <div class="card hero">
+        <div>
+          <h1 style="margin:0 0 6px 0">SophosWRLD — <span class="muted">Developer Communication Hub</span></h1>
+          <p class="muted">A place for developers to connect, share ideas, and collaborate on projects. Join discussions, post threads, and chat in real-time — all in one dashboard.</p>
+          <div class="row" style="margin-top:8px;">
+            <span class="pill">Realtime Chat</span>
+            <span class="pill">Forums</span>
+            <span class="pill">Profiles</span>
+            <span class="pill">Google Login</span>
+          </div>
+        </div>
+        <img src="./images/profile.svg" alt="Profile"/>
+      </div>
 
-    const state = {
-      user: { uid: "demo", name: "Guest", bio: "", avatar: "assets/avatar.png", role: "member", currency: 0, accentColor: "#ef4444" },
-      categories: [], threads: [], posts: {}, // posts[threadId] = array
-      users: []
-    };
+      <div class="grid" style="margin-top:16px;">
+        <div class="card" style="grid-column: span 4;">
+          <h3>Chat</h3>
+          <p class="muted">Discuss ideas quickly with other devs. Lightweight, real-time.</p>
+          <img src="./images/chat.svg" alt="Chat preview"/>
+        </div>
+        <div class="card" style="grid-column: span 4;">
+          <h3>Forums</h3>
+          <p class="muted">Long-form topics, announcements, and knowledge sharing.</p>
+          <img src="./images/forum.svg" alt="Forum preview"/>
+        </div>
+        <div class="card" style="grid-column: span 4;">
+          <h3>Profile</h3>
+          <p class="muted">Customize your presence with name, bio, and avatar.</p>
+          <img src="./images/profile.svg" alt="Profile preview"/>
+        </div>
+      </div>
+    </section>
 
-    // ====== Router ======
-    const routes = {
-      "/home": () => { showView("/home"); $("routeTitle").textContent = "Home"; renderHome(); },
-      "/chat": () => { showView("/chat"); $("routeTitle").textContent = "Chat"; renderUsers(state.users); },
-      "/forums": () => { showView("/forums"); $("routeTitle").textContent = "Forums"; renderCategories(); renderThreads(); },
-      "/thread": (params) => { showView("/forums"); $("routeTitle").textContent = "Forums"; openThread(params.id); },
-      "/profile": () => { showView("/profile"); $("routeTitle").textContent = "Profile"; renderProfile(); },
-      "/settings": () => { showView("/settings"); $("routeTitle").textContent = "Settings"; },
-      "/admin": () => { showView("/admin"); $("routeTitle").textContent = "Admin"; renderAdminUsers(); }
-    };
-    function parseHash(){
-      const h = location.hash.replace('#','') || '/home';
-      const [path] = h.split('?');
-      const parts = path.split('/').filter(Boolean);
-      if (parts[0] === 'thread' && parts[1]) return { route: '/thread', params: { id: parts[1] } };
-      const route = '/' + (parts[0] || 'home');
-      return { route, params: {} };
-    }
-    function navigate(path){ location.hash = path; }
-    function handleRoute(){
-      const { route, params } = parseHash();
-      document.querySelectorAll('#sidebarNav .navtab').forEach(b => b.classList.toggle('active', b.dataset.route === route));
-      (routes[route] || routes['/home'])(params);
-    }
-    function showView(view){
-      document.querySelectorAll('[data-view]').forEach(sec => sec.classList.toggle('hidden', sec.getAttribute('data-view') !== view));
-      $("threadView").classList.add("hidden");
-    }
-    function initRouter(){
-      document.querySelectorAll('#sidebarNav [data-route]').forEach(btn => btn.addEventListener('click', () => navigate(btn.dataset.route)));
-      window.addEventListener('hashchange', handleRoute);
-      handleRoute();
-    }
+    <!-- CHAT (placeholder) -->
+    <section id="chat" class="section">
+      <div class="card">
+        <h3>Chat</h3>
+        <p class="muted">This is a placeholder — wire to your existing rooms/messages collections.</p>
+      </div>
+    </section>
 
-    // ====== Demo seed (no Firebase required) ======
-    function seedDemo(){
-      state.users = [
-        { uid:"u1", name:"Alice", bio:"Builder", avatar:"assets/avatar.png" },
-        { uid:"u2", name:"Bob", bio:"Moderator", avatar:"assets/avatar.png" },
-        { uid:"u3", name:"Charlie", bio:"Hacker", avatar:"assets/avatar.png" }
-      ];
-      state.categories = [
-        { id:"c1", name:"General", description:"Talk about anything", order:1 },
-        { id:"c2", name:"Help", description:"Ask for help", order:2 },
-        { id:"c3", name:"Showcase", description:"Share your work", order:3 }
-      ];
-      state.threads = [
-        { id:"t1", categoryId:"c1", categoryName:"General", title:"Welcome to SophosWRLD", body:"Say hi!", authorId:"u1", authorName:"Alice", createdAt:new Date(Date.now()-3600_000), lastPostAt:new Date(), replyCount:2, pinned:true },
-        { id:"t2", categoryId:"c2", categoryName:"Help", title:"How do I change my accent color?", body:"Where is the setting?", authorId:"u2", authorName:"Bob", createdAt:new Date(Date.now()-86_400_000), lastPostAt:new Date(Date.now()-10_000), replyCount:1, pinned:false }
-      ];
-      state.posts["t1"] = [
-        { id:"p1", authorId:"u2", authorName:"Bob", authorAvatar:"assets/avatar.png", body:"Hello!", createdAt:new Date(Date.now()-1800_000) },
-        { id:"p2", authorId:"u3", authorName:"Charlie", authorAvatar:"assets/avatar.png", body:"Yo!", createdAt:new Date(Date.now()-1200_000) }
-      ];
-      state.posts["t2"] = [
-        { id:"p3", authorId:"u1", authorName:"Alice", authorAvatar:"assets/avatar.png", body:"Settings > Appearance", createdAt:new Date(Date.now()-9_000) }
-      ];
-      renderHome();
-      renderCategories();
-      renderThreads();
-      renderUsers(state.users);
-      renderProfile();
-    }
+    <!-- FORUMS -->
+    <section id="forums" class="section">
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">Forums</h3>
+          <button class="btn" onclick="toggleNewThread(true)">New Thread</button>
+        </div>
+        <div id="newThread" class="hidden" style="margin:10px 0;">
+          <div class="field"><label>Title</label><input id="threadTitle" type="text" placeholder="Thread title"/></div>
+          <div class="field"><label>Body</label><textarea id="threadBody" placeholder="What's on your mind?" style="min-height:120px;"></textarea></div>
+          <div class="row">
+            <button class="btn" onclick="createThread()">Post Thread</button>
+            <button class="btn secondary" onclick="toggleNewThread(false)">Cancel</button>
+          </div>
+          <p id="threadError" class="muted"></p>
+        </div>
 
-    // ====== Home ======
-    function renderHome(){
-      const latestBox = $("homeLatestThreads"); latestBox.innerHTML = "";
-      state.threads.slice(0,6).forEach(t => {
-        const row = document.createElement('button');
-        row.className = "w-full text-left p-2 rounded hover:bg-white/5";
-        row.innerHTML = `<div class="font-medium truncate">${t.pinned ? '📌 ' : ''}${escapeHTML(t.title)}</div>
-                         <div class="text-xs text-gray-400">in ${escapeHTML(t.categoryName)} • by ${escapeHTML(t.authorName)} • ${timeAgo(t.createdAt)}</div>`;
-        row.onclick = () => location.hash = `/thread/${t.id}`;
-        latestBox.appendChild(row);
-      });
-      const onlineBox = $("homeOnlineUsers"); onlineBox.innerHTML = "";
-      state.users.forEach(u => {
-        const div = document.createElement('div');
-        div.className = "flex items-center gap-3 p-2 rounded hover:bg-white/5";
-        div.innerHTML = `<img src="${u.avatar}" class="w-8 h-8 rounded-full"/>
-                         <div class="min-w-0"><div class="font-medium truncate">${escapeHTML(u.name)}</div>
-                         <div class="text-xs text-gray-400">active ${Math.floor(Math.random()*10)+1}m ago</div></div>`;
-        onlineBox.appendChild(div);
-      });
-      const sel = $("quickCategory"); sel.innerHTML = "";
-      state.categories.forEach(c => { const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
-      $("quickPostBtn").onclick = () => {
-        const title = $("quickTitle").value.trim().slice(0,120);
-        const body = $("quickBody").value.trim();
-        const catId = $("quickCategory").value;
-        if (!title || !body || !catId) { $("quickMsg").textContent = "Please fill all fields."; return; }
-        const cat = state.categories.find(c=>c.id===catId);
-        const id = "t"+(Date.now());
-        const t = { id, categoryId:catId, categoryName:cat.name, title, body, authorId:"demo", authorName:state.user.name, createdAt:new Date(), lastPostAt:new Date(), replyCount:0, pinned:false };
-        state.threads.unshift(t);
-        $("quickTitle").value=""; $("quickBody").value=""; $("quickMsg").textContent="Thread created!";
-        location.hash = `/thread/${id}`;
-      };
-    }
+        <div id="threads"></div>
+      </div>
+    </section>
 
-    // ====== Users (Chat) ======
-    function renderUsers(list){
-      const box = $("usersList"); box.innerHTML = "";
-      list.forEach(u => {
-        const li = document.createElement('div');
-        li.className = "flex items-center justify-between gap-2 p-2 rounded hover:bg-white/5";
-        li.innerHTML = `
-          <div class="flex items-center gap-3 min-w-0">
-            <img src="${u.avatar}" class="w-10 h-10 rounded-full" />
-            <div class="min-w-0">
-              <div class="font-medium truncate">${escapeHTML(u.name)}</div>
-              <div class="text-xs text-gray-400 truncate-2">${escapeHTML(u.bio||"")}</div>
+    <!-- PROFILE -->
+    <section id="profile" class="section">
+      <div class="card">
+        <h3>Profile</h3>
+        <div class="grid">
+          <div class="card" style="grid-column: span 6;">
+            <h4>My Info</h4>
+            <p><b>Name:</b> <span id="pName"></span></p>
+            <p><b>Email:</b> <span id="pEmail"></span></p>
+            <p><b>Role:</b> <span id="pRole"></span></p>
+            <p><b>UID:</b> <span id="pUid"></span></p>
+          </div>
+          <div class="card" style="grid-column: span 6;">
+            <h4>Edit Profile</h4>
+            <div class="field"><label>Display Name</label><input id="editName" type="text" maxlength="40"/></div>
+            <div class="field"><label>Bio</label><textarea id="editBio" style="min-height:100px;"></textarea></div>
+            <div class="field"><label>Avatar URL</label><input id="editAvatar" type="url"/></div>
+            <div class="field"><label>Accent Color</label><input id="editAccent" type="color" value="#e53935"/></div>
+            <div class="row">
+              <button class="btn" onclick="saveProfile()">Save</button>
             </div>
+            <p id="profileMsg" class="muted"></p>
           </div>
-          <div class="flex gap-2 shrink-0">
-            <button class="btn" title="Message">Msg</button>
-            <button class="btn btn-primary" title="Call">Call</button>
-          </div>`;
-        li.querySelectorAll("button")[0].onclick = () => { $("chatInput").value = `@${u.name} `; $("chatInput").focus(); };
-        li.querySelectorAll("button")[1].onclick = () => alert("Calling (demo) "+u.name+"…");
-        box.appendChild(li);
-      });
-      $("userSearch").oninput = (e) => {
-        const q = e.target.value.toLowerCase();
-        const filtered = state.users.filter(u => (u.name||"").toLowerCase().includes(q));
-        renderUsers(filtered);
-      };
-      $("sendBtn").onclick = () => { const v=$("chatInput").value.trim(); if(!v) return; alert("Message (demo): "+v); $("chatInput").value=""; };
-    }
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
 
-    // ====== Forums ======
-    let currentCategoryId = null;
-    function renderCategories(){
-      const box = $("catList"); box.innerHTML = "";
-      state.categories.forEach(c => {
-        const b = document.createElement('button');
-        b.className = "w-full text-left px-3 py-2 rounded hover:bg-white/5";
-        b.innerHTML = `<div class="font-medium">${escapeHTML(c.name)}</div><div class="text-xs text-gray-400">${escapeHTML(c.description||"")}</div>`;
-        b.onclick = () => { currentCategoryId=c.id; renderThreads(); };
-        box.appendChild(b);
-        if (!currentCategoryId) currentCategoryId = c.id;
-      });
-    }
-    function renderThreads(){
-      const list = $("threadsList"); list.innerHTML = "";
-      state.threads.filter(t=>t.categoryId===currentCategoryId).forEach(t => {
-        const row = document.createElement('div');
-        row.className = "flex items-center justify-between p-2 rounded hover:bg-white/5";
-        row.innerHTML = `<div class="min-w-0">
-            <div class="font-medium truncate">${t.pinned ? '📌 ' : ''}${escapeHTML(t.title)}</div>
-            <div class="text-xs text-gray-400">by ${escapeHTML(t.authorName)} • ${t.replyCount||0} replies • ${timeAgo(t.lastPostAt)}</div>
-          </div>
-          <button class="btn" title="Open">Open</button>`;
-        row.querySelector('button').onclick = () => location.hash = `/thread/${t.id}`;
-        list.appendChild(row);
-      });
-      $("newThreadBtn").onclick = () => {
-        const title = prompt("Thread title"); if (!title) return;
-        const body = prompt("Body"); if (!body) return;
-        const cat = state.categories.find(c=>c.id===currentCategoryId);
-        const id = "t"+Date.now();
-        const t = { id, categoryId:cat.id, categoryName:cat.name, title:title.trim().slice(0,120), body:body.trim(), authorId:"demo", authorName:state.user.name, createdAt:new Date(), lastPostAt:new Date(), replyCount:0, pinned:false };
-        state.threads.unshift(t);
-        location.hash = `/thread/${id}`;
-      };
-    }
-    function openThread(threadId){
-      const t = state.threads.find(x=>x.id===threadId); if(!t){ alert("Thread not found"); return; }
-      $("threadView").classList.remove("hidden");
-      $("threadTitle").textContent = t.title;
-      $("threadMeta").textContent = `${t.categoryName} • by ${t.authorName} • ${timeAgo(t.createdAt)}`;
-      const list = $("postsList"); list.innerHTML = "";
-      const first = document.createElement('div');
-      first.className = "p-3 rounded bg-white/5";
-      first.innerHTML = `<div class="font-medium">${escapeHTML(t.authorName)}</div>
-                         <div class="text-xs text-gray-400">${timeAgo(t.createdAt)}</div>
-                         <div class="mt-2 whitespace-pre-wrap">${escapeHTML(t.body)}</div>`;
-      list.appendChild(first);
-      const replies = state.posts[threadId] || [];
-      replies.forEach(p => {
-        const row = document.createElement('div');
-        row.className = "p-3 rounded bg-white/[.03] border border-white/5";
-        row.innerHTML = `<div class="font-medium">${escapeHTML(p.authorName)}</div>
-                         <div class="text-xs text-gray-400">${timeAgo(p.createdAt)}</div>
-                         <div class="mt-2 whitespace-pre-wrap">${escapeHTML(p.body||"")}</div>`;
-        list.appendChild(row);
-      });
-      $("replySendBtn").onclick = () => {
-        const body = $("replyInput").value.trim(); if(!body) return;
-        const p = { id:"p"+Date.now(), authorId:"demo", authorName:state.user.name, authorAvatar:state.user.avatar, body, createdAt:new Date() };
-        if (!state.posts[threadId]) state.posts[threadId]=[];
-        state.posts[threadId].push(p);
-        t.replyCount = (t.replyCount||0)+1;
-        t.lastPostAt = new Date();
-        $("replyInput").value = "";
-        openThread(threadId);
-      };
-    }
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+<script>
+// === CONFIG ===
+// Replace with your Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
+  authDomain: "sophoswrld.firebaseapp.com",
+  databaseURL: "https://sophoswrld-default-rtdb.firebaseio.com",
+  projectId: "sophoswrld",
+  storageBucket: "sophoswrld.firebasestorage.app",
+  messagingSenderId: "26686142400",
+  appId: "1:26686142400:web:48f8d3ae0b097731317a25",
+  measurementId: "G-6XETC98C22"
+};
+const APP_ID = "sophoswrld"; // <-- change to your appId used in Firestore paths
 
-    // ====== Profile ======
-    $("openProfileBtn").onclick = () => $("profileSheet").classList.remove("hidden");
-    $("profileClose").onclick = () => $("profileSheet").classList.add("hidden");
-    $("saveProfileBtn").onclick = () => {
-      state.user.name = $("profileName").value.trim() || state.user.name;
-      state.user.bio  = $("profileBio").value.trim() || state.user.bio;
-      $("profileSheet").classList.add("hidden");
-      renderProfile();
-    };
-    $("accentInput").oninput = (e) => { setAccent(e.target.value); };
-    $("profileAccent").oninput = (e) => { setAccent(e.target.value); };
+// === INIT ===
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
 
-    function renderProfile(){
-      $("sidebarName").textContent = state.user.name;
-      $("sidebarBio").textContent = state.user.bio || "";
-      $("profileNameDisplay").textContent = state.user.name;
-      $("profileBioDisplay").textContent = state.user.bio || "—";
-      $("profileUid").textContent = state.user.uid;
-      $("profileName").value = state.user.name;
-      $("profileBio").value = state.user.bio;
+// === UTIL ===
+function escapeHTML(s = ''){
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Safe element builder
+function el(tag, attrs={}, inner=''){
+  const e = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs)){ if (v != null) e.setAttribute(k,v); }
+  if (typeof inner === 'string') e.innerHTML = inner;
+  else if (inner instanceof Node) e.appendChild(inner);
+  else if (Array.isArray(inner)) inner.forEach(n => e.appendChild(n));
+  return e;
+}
+function fmtDate(ts){
+  if (!ts) return '';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleString();
+}
+
+// === AUTH UI TOGGLE ===
+function toggleAuthMode(signup){
+  document.getElementById('auth').classList.toggle('hidden', signup);
+  document.getElementById('signup').classList.toggle('hidden', !signup);
+}
+function showApp(show){
+  document.getElementById('auth').classList.toggle('hidden', true);
+  document.getElementById('signup').classList.toggle('hidden', true);
+  document.getElementById('app').classList.toggle('hidden', !show);
+  if (show) { setActive('home'); }
+}
+
+// === NAV ===
+function setActive(id){
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const active = document.querySelector(`.tab[data-target="${id}"]`);
+  if (active) active.classList.add('active');
+}
+function nav(btn){ setActive(btn.dataset.target); }
+
+// === AUTH ACTIONS ===
+function signIn(){
+  const email = document.getElementById('signInEmail').value.trim();
+  const pass  = document.getElementById('signInPassword').value;
+  auth.signInWithEmailAndPassword(email, pass).catch(e => {
+    document.getElementById('authError').textContent = e.message;
+  });
+}
+function signUp(){
+  const name = document.getElementById('signUpName').value.trim();
+  const email= document.getElementById('signUpEmail').value.trim();
+  const pass = document.getElementById('signUpPassword').value;
+  if (!name){ document.getElementById('signupError').textContent = 'Please enter a display name.'; return; }
+  auth.createUserWithEmailAndPassword(email, pass).then(async cred => {
+    await ensureUserDoc(cred.user.uid, {name});
+  }).catch(e => document.getElementById('signupError').textContent = e.message);
+}
+function googleSignIn(){
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).then(async result => {
+    await ensureUserDoc(result.user.uid, {name: result.user.displayName || 'User'});
+  }).catch(e => document.getElementById('authError').textContent = e.message);
+}
+function signOut(){
+  auth.signOut();
+}
+
+// Ensure user profile doc exists (aligned with your rules)
+async function ensureUserDoc(uid, {name}){
+  const ref = db.doc(`artifacts/${APP_ID}/public/data/users/${uid}`);
+  const snap = await ref.get();
+  if (!snap.exists){
+    await ref.set({
+      uid,
+      name: name || 'User',
+      bio: '',
+      avatar: '',
+      accentColor: '#e53935',
+      role: 'member',
+      currency: 0,
+      isBanned: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } else {
+    // Optionally update name on first login
+    if (name && (!snap.data().name || snap.data().name === 'User')){
+      await ref.update({ name, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
     }
+  }
+}
 
-    // ====== Admin (demo) ======
-    function renderAdminUsers(){
-      const box = $("adminUsers"); box.innerHTML = "";
-      state.users.forEach(u => {
-        const row = document.createElement('div');
-        row.className = "flex items-center justify-between p-2 rounded hover:bg-white/5";
-        row.innerHTML = `<div class="min-w-0"><div class="font-medium truncate">${escapeHTML(u.name)}</div><div class="text-xs text-gray-400 truncate">${u.uid}</div></div>
-                         <div class="flex gap-2"><select class="input w-28"><option>member</option><option>moderator</option><option>admin</option></select>
-                         <button class="btn">Ban</button></div>`;
-        box.appendChild(row);
+// Auth state
+let unsubThreads = null;
+auth.onAuthStateChanged(async user => {
+  if (user){
+    showApp(true);
+    loadProfile(user);
+    watchThreads();
+  } else {
+    if (unsubThreads) { unsubThreads(); unsubThreads = null; }
+    showApp(false);
+    document.getElementById('auth').classList.remove('hidden');
+  }
+});
+
+// === PROFILE ===
+async function loadProfile(user){
+  document.getElementById('pEmail').textContent = user.email || '';
+  document.getElementById('pUid').textContent = user.uid;
+
+  const ref = db.doc(`artifacts/${APP_ID}/public/data/users/${user.uid}`);
+  const doc = await ref.get();
+  const data = doc.data() || {};
+  document.getElementById('pName').textContent = data.name || '';
+  document.getElementById('pRole').textContent = data.role || 'member';
+
+  // Fill edit fields
+  document.getElementById('editName').value = data.name || '';
+  document.getElementById('editBio').value = data.bio || '';
+  document.getElementById('editAvatar').value = data.avatar || '';
+  document.getElementById('editAccent').value = data.accentColor || '#e53935';
+}
+async function saveProfile(){
+  const user = auth.currentUser;
+  if (!user) return;
+  const ref = db.doc(`artifacts/${APP_ID}/public/data/users/${user.uid}`);
+  const payload = {
+    name: document.getElementById('editName').value.trim(),
+    bio: document.getElementById('editBio').value,
+    avatar: document.getElementById('editAvatar').value,
+    accentColor: document.getElementById('editAccent').value,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  try{
+    await ref.update(payload);
+    document.getElementById('profileMsg').textContent = 'Profile saved.';
+    loadProfile(user);
+  }catch(e){
+    document.getElementById('profileMsg').textContent = e.message;
+  }
+}
+
+// === FORUMS ===
+function toggleNewThread(show){
+  document.getElementById('newThread').classList.toggle('hidden', !show);
+  if (show) document.getElementById('threadTitle').focus();
+}
+
+function renderThread(threadId, data){
+  const t = el('div', {class:'thread'});
+  const title = escapeHTML(data.title || '');
+  const body  = escapeHTML(data.body || '');
+  const meta  = `by ${escapeHTML(data.authorId||'unknown')} • ${fmtDate(data.createdAt)}`;
+  t.appendChild(el('div',{class:'title'}, title));
+  t.appendChild(el('div',{class:'meta'}, meta));
+  t.appendChild(el('div',{style:'margin-top:6px;'}, body));
+
+  const postsWrap = el('div', {id:`posts-${threadId}`, style:'margin-top:8px;'});
+  t.appendChild(postsWrap);
+
+  // Reply composer
+  const comp = el('div', {class:'composer', style:'margin-top:8px;'}, `
+    <textarea id="reply-${threadId}" placeholder="Write a reply..."></textarea>
+    <div class="row" style="margin-top:6px;">
+      <button class="btn" onclick="createReply('${threadId}')">Reply</button>
+    </div>
+  `);
+  t.appendChild(comp);
+
+  // load posts
+  loadPosts(threadId, postsWrap);
+  return t;
+}
+
+async function createThread(){
+  const user = auth.currentUser;
+  if (!user) return;
+  const title = document.getElementById('threadTitle').value.trim();
+  const body  = document.getElementById('threadBody').value.trim();
+  const errEl = document.getElementById('threadError');
+  errEl.textContent='';
+  if (!title || !body){ errEl.textContent='Title and body are required.'; return; }
+  try{
+    await db.collection(`artifacts/${APP_ID}/public/data/forumThreads`).add({
+      authorId: user.uid,
+      title, body,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('threadTitle').value='';
+    document.getElementById('threadBody').value='';
+    toggleNewThread(false);
+  }catch(e){
+    errEl.textContent = e.message;
+  }
+}
+
+function loadPosts(threadId, wrap){
+  db.collection(`artifacts/${APP_ID}/public/data/forumThreads/${threadId}/posts`)
+    .orderBy('createdAt','asc')
+    .onSnapshot(snap => {
+      wrap.innerHTML = '';
+      snap.forEach(doc => {
+        const d = doc.data();
+        const p = el('div', {class:'post'},
+          `<div class="muted" style="font-size:12px;">${escapeHTML(d.authorId||'')} • ${fmtDate(d.createdAt)}</div>
+           <div>${escapeHTML(d.body||'')}</div>`);
+        wrap.appendChild(p);
       });
-      $("refreshUsersBtn").onclick = renderAdminUsers;
-      $("adminSearch").oninput = (e) => {
-        const q = e.target.value.toLowerCase();
-        Array.from(box.children).forEach(div => {
-          const text = div.textContent.toLowerCase();
-          div.style.display = text.includes(q) ? "" : "none";
-        });
-      };
-    }
-  </script>
+    });
+}
+
+async function createReply(threadId){
+  const user = auth.currentUser;
+  if (!user) return;
+  const ta = document.getElementById(`reply-${threadId}`);
+  const text = ta.value.trim();
+  if (!text) return;
+  try{
+    await db.collection(`artifacts/${APP_ID}/public/data/forumThreads/${threadId}/posts`).add({
+      authorId: user.uid,
+      body: text,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    ta.value='';
+  }catch(e){
+    alert(e.message);
+  }
+}
+
+function watchThreads(){
+  const list = document.getElementById('threads');
+  if (window._unsubThreads) { window._unsubThreads(); }
+  window._unsubThreads = db.collection(`artifacts/${APP_ID}/public/data/forumThreads`)
+    .orderBy('createdAt','desc')
+    .onSnapshot(snap => {
+      list.innerHTML = '';
+      if (snap.empty){
+        list.appendChild(el('div', {class:'muted'}, 'No threads yet. Start the first one!'));
+      }
+      snap.forEach(doc => {
+        list.appendChild(renderThread(doc.id, doc.data()));
+      });
+    });
+}
+</script>
 </body>
 </html>
