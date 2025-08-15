@@ -1080,7 +1080,7 @@
                 `Are you sure you want to call ${recipientUsername}?`,
                 'confirm',
                 async () => {
-                    const callsCollection = collection(db, `/artifacts/${appId}/private/data/calls`);
+                    const callsCollection = collection(db, `/artifacts/${appId}/public/data/calls`);
                     const newCall = {
                         callerId: appCurrentUser.uid,
                         recipientId: recipientId,
@@ -1099,7 +1099,7 @@
         }
 
         async function acceptCall(callId, currentParticipants) {
-            const callDocRef = doc(db, `/artifacts/${appId}/private/data/calls`, callId);
+            const callDocRef = doc(db, `/artifacts/${appId}/public/data/calls`, callId);
             try {
                 const updatedParticipants = [...currentParticipants, { id: appCurrentUser.uid, name: appUserData.username }];
                 await updateDocFirestore(callDocRef, {
@@ -1112,7 +1112,7 @@
         }
 
         async function endCall(callId) {
-            const callDocRef = doc(db, `/artifacts/${appId}/private/data/calls`, callId);
+            const callDocRef = doc(db, `/artifacts/${appId}/public/data/calls`, callId);
             try {
                 await updateDocFirestore(callDocRef, {
                     status: 'ended'
@@ -1125,7 +1125,7 @@
         // Listens for incoming and outgoing calls
         function listenForCalls() {
             if (!appCurrentUser) return;
-            const callsCollection = collection(db, `/artifacts/${appId}/private/data/calls`);
+            const callsCollection = collection(db, `/artifacts/${appId}/public/data/calls`);
             const q = query(callsCollection, where('status', 'in', ['ringing', 'active']));
             
             if (callUnsubscribe) callUnsubscribe(); // Unsubscribe old listener
@@ -1241,7 +1241,7 @@
 
                 if (messageText) {
                     const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
-                    const messagesCollection = collection(db, `/artifacts/${appId}/private/data/chats/${chatId}/messages`);
+                    const messagesCollection = collection(db, `/artifacts/${appId}/public/data/chat/${chatId}/messages`);
 
                     try {
                         await addDoc(messagesCollection, {
@@ -1261,7 +1261,7 @@
             });
             
             const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
-            const messagesCollection = collection(db, `/artifacts/${appId}/private/data/chats/${chatId}/messages`);
+            const messagesCollection = collection(db, `/artifacts/${appId}/public/data/chat/${chatId}/messages`);
             const q = query(messagesCollection, orderBy('createdAt', 'asc'));
 
             dmUnsubscribe = onSnapshot(q, (snapshot) => {
@@ -1412,3 +1412,4 @@
 </body>
 
 </html>
+
