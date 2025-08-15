@@ -1,15 +1,33 @@
-# SophosWRLD — SPA Dashboard (Dark + Red Accent)
+# SophosWRLD — Dashboard with Admin Panel
 
-- Single-file app with Firebase Auth (Email/Password + Google) and Firestore forums.
-- Replace `firebaseConfig` and `APP_ID` at the bottom of `index.html`.
-- Forums use paths like: `artifacts/{APP_ID}/public/data/forumThreads/{threadId}` and `posts` subcollection.
+Dark dashboard with red accents. Includes:
+- Google + Email/Password Auth
+- Suspension flow (shows suspended screen + appeal creation)
+- Forums (threads + posts) showing usernames and "~ Sincerely, {username}"
+- Public Chat room (roomsPublic/general) showing usernames
+- Tickets (user + admin views)
+- Admin Panel: suspend/unsuspend, send password reset emails, and *delete accounts* via Cloud Function
+- Polished inputs (no white textareas), icons (Font Awesome), and subtle animations
 
-## Quick start
-1. Open `index.html` in a static host (or directly in a modern browser).
-2. Insert your Firebase config + APP_ID.
-3. Sign in with Google or create an account.
-4. Create a thread and reply.
+## Setup
+1. Replace Firebase config and `APP_ID` in `index.html`.
+2. **Firestore Rules**: deploy `firestore.rules`.
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+3. **Functions** (for account deletion from Admin Panel):
+   ```bash
+   cd functions
+   npm install
+   firebase deploy --only functions
+   ```
 
-## Notes
-- Profile editor only updates self-writable fields to match your security rules.
-- `escapeHTML` included for safe rendering.
+> Note: Password reset sends the standard Firebase reset email. Deleting another user's auth account requires the provided Admin SDK Cloud Function (`deleteUserByUid`).
+
+## Collections used
+- `artifacts/{APP_ID}/public/data/users/{uid}`
+- `artifacts/{APP_ID}/public/data/roomsPublic/general/messages/{messageId}`
+- `artifacts/{APP_ID}/public/data/forumThreads/{threadId}`
+- `artifacts/{APP_ID}/public/data/forumThreads/{threadId}/posts/{postId}`
+- `artifacts/{APP_ID}/public/data/tickets/{ticketId}`
+
