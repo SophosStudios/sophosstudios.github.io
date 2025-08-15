@@ -413,13 +413,17 @@ async function ensureUserDoc(uid, {name}){
 // Auth state
 let unsubThreads = null, unsubChat = null, unsubTickets = null, unsubAdminTickets = null;
 auth.onAuthStateChanged(async user => {
-  if (user){
-    const uref = db.doc(`artifacts/${APP_ID}/public/data/users/${user.uid}`);
-    const usnap = await uref.get();
-    if (usnap.exists && usnap.data().isBanned){
-      showSuspended();
-      return;
-    }
+firebase.auth().createUserWithEmailAndPassword(email, pass)
+  .then(cred => {
+    return db.collection(`artifacts/${APP_ID}/public/data/users`)
+      .doc(cred.user.uid)
+      .set({
+        uid: cred.user.uid,
+        name: displayName,
+        ...
+      });
+  });
+
     showApp(true);
     loadProfile(user);
     watchThreads();
