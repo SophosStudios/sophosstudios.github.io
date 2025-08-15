@@ -1,1415 +1,540 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SophosWRLD</title>
-    <!-- Tailwind CSS for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-    <!-- Inter Font -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
-    <style>
-        :root {
-            --accent-color: #ef4444; /* Default red accent */
-        }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #111827; /* dark:bg-gray-900 */
-        }
-        
-        /* Custom scrollbar styling */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #1f2937; /* dark:bg-gray-800 */
-        }
-        ::-webkit-scrollbar-thumb {
-            background: var(--accent-color);
-            border-radius: 4px;
-        }
-        
-        /* Left Sidebar: Collapsed by default on desktop, hidden on mobile */
-        .left-sidebar {
-            width: 72px;
-            transition: width 0.3s ease, transform 0.3s ease;
-            position: fixed;
-            z-index: 40;
-            height: 100vh;
-            background-color: #1f2937; /* dark:bg-gray-800 */
-            flex-shrink: 0;
-        }
-
-        /* Sidebar Expanded State */
-        .left-sidebar.expanded {
-            width: 256px;
-        }
-        
-        /* Main Content Wrapper: Adjusts margin based on sidebar state */
-        .main-content-wrapper {
-            margin-left: 72px;
-            transition: margin-left 0.3s ease;
-        }
-        .main-content-wrapper.expanded {
-            margin-left: 256px;
-        }
-
-        /* Mobile specific styles (<= 767px) */
-        @media (max-width: 767px) {
-            .left-sidebar {
-                transform: translateX(-100%);
-            }
-            .left-sidebar.expanded {
-                transform: translateX(0);
-            }
-            .main-content-wrapper {
-                margin-left: 0;
-            }
-        }
-        
-        /* Dynamic theme classes based on accent color */
-        .accent-red { background-color: var(--accent-color); }
-        .accent-red:hover { background-color: var(--accent-color); opacity: 0.8; }
-        nav.border-red-500, .border-red-500 { border-color: var(--accent-color); }
-        .text-red-500 { color: var(--accent-color); }
-        .focus\:ring-red-500:focus { --tw-ring-color: var(--accent-color); }
-        .bg-red-600 { background-color: var(--accent-color); }
-        .hover\:bg-red-700:hover { background-color: var(--accent-color); opacity: 0.8; }
-        .text-red-400 { color: var(--accent-color); opacity: 0.8; }
-        
-        /* New styling for hover-to-expand buttons */
-        .action-btn-group button {
-            transition: width 0.3s ease, padding 0.3s ease, background-color 0.3s ease;
-            white-space: nowrap;
-            overflow: hidden;
-            width: 40px; /* Initial width for just the icon */
-            padding: 8px;
-            text-align: center;
-        }
-        .action-btn-group button:hover {
-            width: auto; /* Expand width on hover */
-            padding-left: 16px;
-            padding-right: 16px;
-        }
-        .action-btn-group button span {
-            display: none;
-        }
-        .action-btn-group button:hover span {
-            display: inline;
-        }
-        .call-user-btn {
-            background-color: #22c55e;
-            color: white;
-            padding: 10px;
-            border-radius: 9999px; /* Tailwind's rounded-full */
-            font-size: 1.25rem; /* Tailwind's text-xl */
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .call-user-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-        .call-user-btn:active {
-            transform: scale(0.95);
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>SophosWRLD — All‑in‑One SPA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{ --accent:#ef4444; --bg:#0b0d12; --bg-elev:#0f1117; --fg:#e5e7eb; --muted:#9ca3af }
+    .card{ background:var(--bg-elev); border:1px solid rgba(255,255,255,.06); border-radius:1rem; }
+    .btn{ padding:.6rem 1rem; border-radius:1rem; font-weight:600; border:1px solid rgba(255,255,255,.1); background:#121623; color:#fff }
+    .btn-primary{ background:var(--accent); border-color:transparent }
+    .input{ height:40px; border-radius:.6rem; background:#0f1117; border:1px solid rgba(255,255,255,.1); padding:0 .75rem; color:#e5e7eb }
+    .navtab{ padding:.5rem .75rem; border-radius:.75rem; font-weight:600; font-size:.9rem }
+    .navtab.active{ background:rgba(255,255,255,.06) }
+    .truncate-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+  </style>
+  <!-- Firebase (Compat) — paste your own config below -->
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js"></script>
 </head>
-<body class="bg-gray-900 text-gray-200">
-    <div id="modal-container"></div>
-    <div id="loading-spinner" class="hidden fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50">
-        <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-500"></div>
-    </div>
-    
-    <!-- Overlay for mobile sidebar -->
-    <div id="overlay-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden md:hidden"></div>
+<body class="bg-[#0b0d12] text-gray-100 min-h-svh">
+  <div id="app" class="min-h-svh grid md:grid-cols-[280px_1fr] gap-3 p-3">
+    <!-- Sidebar -->
+    <aside class="card p-3 md:p-4 flex flex-col gap-3">
+      <div class="flex items-center gap-3">
+        <img id="sidebarAvatar" src="assets/avatar.png" class="w-12 h-12 rounded-full object-cover ring-2 ring-red-500" alt="avatar" />
+        <div class="min-w-0">
+          <div class="font-semibold truncate" id="sidebarName">Guest</div>
+          <div class="text-sm text-gray-400 truncate" id="sidebarBio">Signed out</div>
+        </div>
+      </div>
 
-    <!-- Left Sidebar -->
-    <aside id="left-sidebar" class="left-sidebar bg-gray-800 text-gray-300 flex flex-col p-4 shadow-xl">
-        <div class="flex items-center justify-between h-16 mb-6">
-            <!-- Sidebar toggle button -->
-            <button id="sidebar-toggle-full" class="hidden md:block text-gray-400 hover:text-white transition-colors duration-200">
-                <i class="fas fa-bars"></i>
-            </button>
-            <!-- Logo in expanded state -->
-            <h1 id="website-title-sidebar" class="text-2xl font-bold text-red-500 whitespace-nowrap hidden">SophosWRLD</h1>
-            <!-- Logo in collapsed state -->
-            <h1 id="website-logo-collapsed" class="text-2xl font-bold text-red-500 whitespace-nowrap md:hidden">SW</h1>
-            <!-- Close button for mobile -->
-            <button id="sidebar-toggle-close" class="md:hidden text-gray-400 hover:text-white transition-colors duration-200">
-                <i class="fas fa-times"></i>
-            </button>
+      <div class="flex items-center justify-between text-sm">
+        <span class="text-gray-400">Currency</span>
+        <span id="sidebarCurrency" class="font-semibold">0</span>
+      </div>
+
+      <nav id="sidebarNav" class="grid gap-1">
+        <button class="navtab active" data-route="/home">Home</button>
+        <button class="navtab" data-route="/chat">Chat</button>
+        <button class="navtab" data-route="/forums">Forums</button>
+        <button class="navtab" data-route="/profile">My Profile</button>
+        <button class="navtab" data-route="/settings">Settings</button>
+        <button class="navtab hidden" id="adminNav" data-route="/admin">Admin</button>
+      </nav>
+
+      <div>
+        <label class="text-sm text-gray-400 block mb-1">Accent</label>
+        <input id="accentInput" type="color" value="#ef4444" class="w-full h-10 rounded border border-white/10 bg-[#0f1117]" />
+      </div>
+
+      <div>
+        <label class="text-sm text-gray-400 block mb-1">Redeem Code</label>
+        <div class="flex gap-2">
+          <input id="redeemCodeInput" class="flex-1 input" placeholder="ENTER-CODE"/>
+          <button id="redeemBtn" class="btn btn-primary">Redeem</button>
         </div>
-        
-        <nav id="left-sidebar-nav" class="space-y-2 flex-grow overflow-y-auto">
-            <!-- Nav links will be rendered here -->
-        </nav>
-        
-        <div id="admin-panel-button-container" class="mt-auto pt-4 border-t border-gray-700">
-            <!-- Auth/Admin button will be rendered here -->
+        <div id="redeemMsg" class="text-xs text-gray-400 mt-1"></div>
+      </div>
+
+      <div id="adminPanelMini" class="hidden mt-3 border-t border-white/10 pt-3">
+        <div class="text-sm font-semibold mb-2">Quick Admin</div>
+        <input id="adminUid" class="w-full input mb-2" placeholder="Target UID"/>
+        <div class="flex gap-2">
+          <input id="adminAmount" type="number" class="flex-1 input" placeholder="+/- amount"/>
+          <button id="adminAdjustBtn" class="btn btn-primary">Apply</button>
         </div>
+        <div class="text-xs text-gray-400 mt-1">Currency adjust for a user.</div>
+      </div>
     </aside>
 
-    <!-- Main Content Wrapper -->
-    <div id="main-content-wrapper" class="main-content-wrapper min-h-screen">
-        <!-- Top Nav for Mobile -->
-        <nav class="md:hidden bg-gray-800 text-white p-4 flex items-center justify-between shadow-md">
-            <button id="mobile-sidebar-toggle" class="text-gray-400 hover:text-white transition-colors duration-200">
-                <i class="fas fa-bars"></i>
-            </button>
-            <h1 class="text-2xl font-bold text-red-500">SophosWRLD</h1>
-            <button id="mobile-auth-btn" class="bg-red-600 text-white font-semibold py-1 px-4 rounded-lg hover:bg-red-700 transition duration-300">Account</button>
-        </nav>
+    <!-- Main -->
+    <main class="grid grid-rows-[auto_1fr] gap-3">
+      <div class="card p-3 md:p-4 flex items-center justify-between">
+        <div class="font-semibold" id="routeTitle">Home</div>
+        <div class="text-sm text-gray-400" id="statusText">Not signed in</div>
+      </div>
 
-        <!-- Main Content Area -->
-        <main id="content-area" class="p-4 md:p-8 min-h-screen">
-            <!-- Page content will be rendered here -->
-            <div class="flex flex-col items-center justify-center h-full">
-                <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-red-500"></div>
-                <p class="mt-4 text-gray-400">Loading...</p>
+      <div class="grid gap-3" id="routes">
+        <!-- HOME -->
+        <section data-view="/home" class="card p-3 md:p-4">
+          <div class="grid lg:grid-cols-3 gap-3">
+            <div class="card p-4">
+              <div class="text-sm text-gray-400 mb-2">Latest Threads</div>
+              <div id="homeLatestThreads" class="flex flex-col gap-2"></div>
             </div>
-        </main>
+            <div class="card p-4">
+              <div class="text-sm text-gray-400 mb-2">Online Users</div>
+              <div id="homeOnlineUsers" class="flex flex-col gap-2"></div>
+            </div>
+            <div class="card p-4">
+              <div class="text-sm text-gray-400 mb-2">Quick Post</div>
+              <div class="grid gap-2">
+                <input id="quickTitle" class="input" placeholder="Title"/>
+                <textarea id="quickBody" class="input h-24" placeholder="Say something…"></textarea>
+                <select id="quickCategory" class="input"></select>
+                <button id="quickPostBtn" class="btn btn-primary">Create Thread</button>
+                <div id="quickMsg" class="text-xs text-gray-400"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CHAT -->
+        <section data-view="/chat" class="grid lg:grid-cols-[340px_1fr] gap-3 hidden">
+          <div class="card p-3 md:p-4">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-sm text-gray-400">Users</div>
+              <input id="userSearch" placeholder="Search" class="input w-40"/>
+            </div>
+            <div id="usersList" class="flex flex-col gap-2 max-h-[60svh] overflow-y-auto pr-1"></div>
+          </div>
+          <div class="card p-3 md:p-4 flex flex-col">
+            <div class="text-sm text-gray-400">Open a user to chat or call.</div>
+            <div class="mt-auto flex gap-2">
+              <input id="chatInput" class="flex-1 h-12 rounded bg-[#0f1117] border border-white/10 px-3" placeholder="Message…"/>
+              <button id="sendBtn" class="btn btn-primary">Send</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- FORUMS -->
+        <section data-view="/forums" class="grid lg:grid-cols-[280px_1fr] gap-3 hidden">
+          <div class="card p-3 md:p-4">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-sm text-gray-400">Categories</div>
+              <button id="newCategoryBtn" class="btn hidden">New</button>
+            </div>
+            <div id="catList" class="flex flex-col gap-1"></div>
+          </div>
+          <div class="grid gap-3">
+            <div class="card p-3 md:p-4">
+              <div class="flex items-center justify-between">
+                <div class="text-sm text-gray-400" id="threadsHeader">Threads</div>
+                <button id="newThreadBtn" class="btn btn-primary">New Thread</button>
+              </div>
+              <div id="threadsList" class="mt-2 flex flex-col"></div>
+            </div>
+            <div class="card p-3 md:p-4 hidden" id="threadView">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="font-semibold" id="threadTitle">—</div>
+                  <div class="text-xs text-gray-400" id="threadMeta">—</div>
+                </div>
+                <div class="flex gap-2">
+                  <button id="threadEditBtn" class="btn hidden">Edit</button>
+                  <button id="threadDeleteBtn" class="btn hidden">Delete</button>
+                </div>
+              </div>
+              <div id="postsList" class="mt-3 flex flex-col gap-3"></div>
+              <div id="replyBox" class="mt-3 grid gap-2">
+                <textarea id="replyInput" class="input h-24" placeholder="Write a reply…"></textarea>
+                <button id="replySendBtn" class="btn btn-primary">Reply</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PROFILE -->
+        <section data-view="/profile" class="card p-3 md:p-4 hidden">
+          <div class="flex items-center gap-4">
+            <img id="profileAvatarDisplay" src="assets/avatar.png" class="w-24 h-24 rounded-full object-cover ring-2 ring-red-500" alt="avatar"/>
+            <div>
+              <div class="text-xl font-semibold" id="profileNameDisplay">Guest</div>
+              <div class="text-sm text-gray-400" id="profileBioDisplay">—</div>
+              <div class="text-xs text-gray-500">UID: <span id="profileUid">—</span></div>
+            </div>
+          </div>
+          <div class="mt-4">
+            <div class="text-sm text-gray-400 mb-1">My Recent Threads</div>
+            <div id="myThreads" class="flex flex-col"></div>
+          </div>
+          <div class="mt-4">
+            <button id="openProfileBtn" class="btn">Edit Profile</button>
+          </div>
+        </section>
+
+        <!-- SETTINGS -->
+        <section data-view="/settings" class="card p-3 md:p-4 hidden">
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="grid gap-2">
+              <div class="font-semibold">Appearance</div>
+              <div class="flex items-center gap-3">
+                <label class="text-sm text-gray-400">Accent</label>
+                <input id="profileAccent" type="color" value="#ef4444" class="h-10 w-14 rounded border border-white/10 bg-[#0f1117]" />
+              </div>
+            </div>
+            <div class="grid gap-2">
+              <div class="font-semibold">Privacy</div>
+              <label class="text-sm flex items-center gap-2">
+                <input type="checkbox" id="hideEmail"/> Hide my email
+              </label>
+              <label class="text-sm flex items-center gap-2">
+                <input type="checkbox" id="hideOnline"/> Hide online status
+              </label>
+              <button id="saveSettingsBtn" class="btn btn-primary mt-2">Save Settings</button>
+              <div id="settingsMsg" class="text-xs text-gray-400"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ADMIN -->
+        <section data-view="/admin" class="grid lg:grid-cols-2 gap-3 hidden">
+          <div class="card p-3 md:p-4">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-sm text-gray-400">Users</div>
+              <div class="flex gap-2">
+                <input id="adminSearch" class="input w-40" placeholder="Search users"/>
+                <button id="refreshUsersBtn" class="btn">Refresh</button>
+              </div>
+            </div>
+            <div id="adminUsers" class="flex flex-col max-h-[60svh] overflow-y-auto"></div>
+          </div>
+          <div class="card p-3 md:p-4">
+            <div class="text-sm text-gray-400 mb-2">Moderation</div>
+            <div id="moderationBox" class="text-sm text-gray-300">Select a post/thread to moderate from Forums.</div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Profile Edit Sheet -->
+  <div id="profileSheet" class="fixed inset-x-0 bottom-0 z-40 hidden">
+    <div class="card rounded-t-2xl p-4 bg-[#0f1117]">
+      <div class="flex justify-between items-center mb-3">
+        <div class="font-semibold">Profile Settings</div>
+        <button id="profileClose" class="btn">Close</button>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div class="flex items-center gap-3">
+          <img id="profileAvatarPreview" src="assets/avatar.png" class="w-16 h-16 rounded-full object-cover ring-2 ring-red-500" alt="avatar"/>
+          <div>
+            <input id="profileAvatarFile" type="file" accept="image/*" class="block text-sm" />
+            <div class="text-xs text-gray-400">Upload a square image</div>
+          </div>
+        </div>
+        <div class="grid gap-2">
+          <input id="profileName" class="input" placeholder="Username"/>
+          <input id="profileBio" class="input" placeholder="Bio / status message"/>
+          <button id="saveProfileBtn" class="btn btn-primary">Save</button>
+        </div>
+      </div>
     </div>
-
-    <!-- The combined JavaScript logic -->
-    <script type="module">
-        // =================================================================
-        // 1. FIREBASE IMPORTS
-        // =================================================================
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc as updateDocFirestore, deleteDoc, addDoc, query, orderBy, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-
-        // =================================================================
-        // 2. CONFIGURATION & GLOBAL VARIABLES
-        // =================================================================
-        const CONFIG = {
-            websiteTitle: "SophosWRLD",
-        };
-
-        // --- PLACEHOLDER FOR YOUR FIREBASE CONFIGURATION ---
-        const FIREBASE_CONFIG_PLACEHOLDER = {
-          apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
-          authDomain: "sophoswrld.firebaseapp.com",
-          databaseURL: "https://sophoswrld-default-rtdb.firebaseio.com",
-          projectId: "sophoswrld",
-          storageBucket: "sophoswrld.firebasestorage.app",
-          messagingSenderId: "26686142400",
-          appId: "1:26686142400:web:48f8d3ae0b097731317a25",
-          measurementId: "G-6XETC98C22"
-        };
-        
-        // --- DO NOT EDIT BELOW THIS LINE ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'sophoswrld';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : FIREBASE_CONFIG_PLACEHOLDER;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // --- Initialize Firebase ---
-        let app;
-        try {
-            app = initializeApp(firebaseConfig);
-        } catch (error) {
-            console.error("Firebase initialization failed:", error);
-            document.getElementById('content-area').innerHTML = `
-                <div class="text-center p-8">
-                    <h1 class="text-3xl font-bold text-red-500">Configuration Error</h1>
-                    <p class="mt-4 text-gray-400">Please provide a valid Firebase configuration in the code.</p>
-                </div>
-            `;
-            throw error;
-        }
-
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // --- Global state ---
-        let appCurrentUser = null;
-        let appUserData = null;
-        let authReady = false;
-        let lastNavigatedPage = null;
-
-        // =================================================================
-        // 3. UTILITY FUNCTIONS
-        // =================================================================
-
-        /**
-         * Shows a loading spinner.
-         */
-        function showLoadingSpinner() {
-            let spinner = document.getElementById('loading-spinner');
-            if (spinner) {
-                spinner.classList.remove('hidden');
-            }
-        }
-
-        /**
-         * Hides the loading spinner.
-         */
-        function hideLoadingSpinner() {
-            const spinner = document.getElementById('loading-spinner');
-            if (spinner) {
-                spinner.classList.add('hidden');
-            }
-        }
-
-        /**
-         * Displays a message modal.
-         * @param {string} message - The message to display.
-         * @param {string} type - 'info', 'error', 'success', or 'confirm'.
-         * @param {function} onConfirm - Callback for 'confirm' type.
-         */
-        function showMessageModal(message, type = 'info', onConfirm = null) {
-            const modalContainer = document.getElementById('modal-container');
-            const modalId = 'message-modal';
-            const existingModal = document.getElementById(modalId);
-            if (existingModal) existingModal.remove();
-
-            const modalHtml = `
-                <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-sm w-full border-2 border-[var(--accent-color)]">
-                        <p class="text-lg text-gray-200 mb-4">${message}</p>
-                        <div class="flex justify-end space-x-2">
-                            ${type === 'confirm' ? `
-                                <button id="modal-confirm-btn" class="bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg hover:bg-opacity-80 transition">Yes</button>
-                            ` : ''}
-                            <button id="modal-close-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">${type === 'confirm' ? 'Cancel' : 'Close'}</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            modalContainer.insertAdjacentHTML('beforeend', modalHtml);
-
-            document.getElementById('modal-close-btn').addEventListener('click', () => document.getElementById(modalId).remove());
-            if (type === 'confirm' && onConfirm) {
-                document.getElementById('modal-confirm-btn').addEventListener('click', () => {
-                    onConfirm();
-                    document.getElementById(modalId).remove();
-                });
-            }
-        }
-
-        /**
-         * Updates the website's theme with a new accent color.
-         * @param {string} color - The new hex color for the accent.
-         */
-        function updateTheme(color) {
-            document.documentElement.style.setProperty('--accent-color', color);
-        }
-
-        // =================================================================
-        // 4. NAVIGATION LOGIC
-        // =================================================================
-        const leftSidebar = document.getElementById('left-sidebar');
-        const leftSidebarNav = document.getElementById('left-sidebar-nav');
-        const mainContentWrapper = document.getElementById('main-content-wrapper');
-        const overlayBackdrop = document.getElementById('overlay-backdrop');
-        const sidebarToggleDesktop = document.getElementById('sidebar-toggle-full');
-        const sidebarToggleMobile = document.getElementById('mobile-sidebar-toggle');
-        const sidebarToggleClose = document.getElementById('sidebar-toggle-close');
-
-        function initializeNavigation() {
-            if (sidebarToggleDesktop) sidebarToggleDesktop.addEventListener('click', toggleSidebar);
-            if (sidebarToggleMobile) sidebarToggleMobile.addEventListener('click', () => {
-                leftSidebar.classList.add('expanded');
-                overlayBackdrop.classList.remove('hidden');
-            });
-            if (sidebarToggleClose) sidebarToggleClose.addEventListener('click', () => {
-                leftSidebar.classList.remove('expanded');
-                overlayBackdrop.classList.add('hidden');
-            });
-            if (overlayBackdrop) overlayBackdrop.addEventListener('click', () => {
-                leftSidebar.classList.remove('expanded');
-                overlayBackdrop.classList.add('hidden');
-            });
-            
-            if (window.innerWidth >= 768) {
-                leftSidebar.classList.remove('expanded');
-                mainContentWrapper.classList.remove('expanded');
-            }
-        }
-
-        function toggleSidebar() {
-            const isExpanded = leftSidebar.classList.toggle('expanded');
-            mainContentWrapper.classList.toggle('expanded');
-            
-            const navTextElements = leftSidebar.querySelectorAll('.sidebar-nav-text');
-            const websiteTitleSidebar = document.getElementById('website-title-sidebar');
-            const websiteLogoCollapsed = document.getElementById('website-logo-collapsed');
-            const adminButtonContainer = document.getElementById('admin-panel-button-container');
-
-            if (isExpanded) {
-                websiteTitleSidebar.classList.remove('hidden');
-                websiteLogoCollapsed.classList.add('hidden');
-                navTextElements.forEach(el => el.classList.remove('hidden'));
-                if (adminButtonContainer.innerHTML.trim() !== '') {
-                    adminButtonContainer.classList.remove('hidden');
-                }
-            } else {
-                websiteTitleSidebar.classList.add('hidden');
-                websiteLogoCollapsed.classList.remove('hidden');
-                navTextElements.forEach(el => el.classList.add('hidden'));
-                adminButtonContainer.classList.add('hidden');
-            }
-        }
-
-        function createNavLink(parentElement, text, page, iconClass) {
-            const link = document.createElement('a');
-            link.href = '#';
-            link.className = `flex items-center space-x-4 py-3 px-4 rounded-xl text-lg font-semibold text-gray-300 hover:bg-gray-700 transition-colors duration-200`;
-            link.innerHTML = `
-                <i class="${iconClass} text-red-500 w-6 text-center"></i>
-                <span class="sidebar-nav-text whitespace-nowrap hidden">${text}</span>
-            `;
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                navigateTo(page);
-                if (window.innerWidth < 768) {
-                    leftSidebar.classList.remove('expanded');
-                    overlayBackdrop.classList.add('hidden');
-                }
-            });
-            parentElement.appendChild(link);
-        }
-
-        function renderSidebarNav(currentUser, userData) {
-            leftSidebarNav.innerHTML = '';
-            
-            createNavLink(leftSidebarNav, 'Home', 'home', 'fas fa-home');
-            createNavLink(leftSidebarNav, 'Forums', 'forums', 'fas fa-comments');
-            createNavLink(leftSidebarNav, 'Messages', 'messages', 'fas fa-envelope');
-            createNavLink(leftSidebarNav, 'Settings', 'settings', 'fas fa-cog');
-
-            if (userData?.role === 'admin' || userData?.role === 'founder') {
-                const adminCategory = document.createElement('div');
-                adminCategory.className = 'mt-6 pt-4 border-t border-gray-700';
-                leftSidebarNav.appendChild(adminCategory);
-                createNavLink(leftSidebarNav, 'Dashboard', "dashboard", "fas fa-terminal");
-                createNavLink(adminCategory, 'Admin Panel', 'admin', 'fas fa-user-shield');
-            }
-            
-            const authContainer = document.getElementById('admin-panel-button-container');
-            authContainer.innerHTML = ''; 
-            
-            if (currentUser) {
-                const logoutButton = document.createElement('button');
-                logoutButton.id = 'logout-btn';
-                logoutButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
-                logoutButton.innerHTML = `
-                    <i class="fas fa-sign-out-alt w-6 text-center"></i>
-                    <span class="sidebar-nav-text whitespace-nowrap hidden">Sign Out</span>`;
-                logoutButton.addEventListener('click', async () => {
-                    try {
-                        await signOut(auth);
-                        navigateTo('auth');
-                        showMessageModal('You have been signed out.', 'success');
-                    } catch (error) {
-                        showMessageModal(`Sign out failed: ${error.message}`, 'error');
-                    }
-                });
-                authContainer.appendChild(logoutButton);
-            } else {
-                const authButton = document.createElement('button');
-                authButton.id = 'auth-btn';
-                authButton.className = 'w-full py-3 px-4 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 transition duration-300 text-left flex items-center space-x-4';
-                authButton.innerHTML = `
-                    <i class="fas fa-sign-in-alt w-6 text-center"></i>
-                    <span class="sidebar-nav-text whitespace-nowrap hidden">Account</span>`;
-                authButton.addEventListener('click', () => navigateTo('auth'));
-                authContainer.appendChild(authButton);
-            }
-            
-            const isExpanded = leftSidebar.classList.contains('expanded');
-            const navTextElements = leftSidebar.querySelectorAll('.sidebar-nav-text');
-            const websiteTitleSidebar = document.getElementById('website-title-sidebar');
-            const websiteLogoCollapsed = document.getElementById('website-logo-collapsed');
-            const adminPanelButtonContainer = document.getElementById('admin-panel-button-container');
-            
-            if (isExpanded) {
-                navTextElements.forEach(el => el.classList.remove('hidden'));
-                websiteTitleSidebar.classList.remove('hidden');
-                websiteLogoCollapsed.classList.add('hidden');
-                if (adminPanelButtonContainer.innerHTML.trim() !== '') {
-                     adminPanelButtonContainer.classList.remove('hidden');
-                }
-            } else {
-                navTextElements.forEach(el => el.classList.add('hidden'));
-                websiteTitleSidebar.classList.add('hidden');
-                websiteLogoCollapsed.classList.remove('hidden');
-                adminPanelButtonContainer.classList.add('hidden');
-            }
-        }
-
-        // =================================================================
-        // 5. PAGE RENDERERS
-        // =================================================================
-        const contentArea = document.getElementById('content-area');
-        
-        let activeDMUserId = null;
-        let dmUnsubscribe = null;
-        let callUnsubscribe = null;
-
-        function renderHomePage() {
-            contentArea.innerHTML = `
-                <div class="flex flex-col items-center justify-center p-8 text-center">
-                    <h1 class="text-4xl md:text-6xl font-bold text-red-500 mb-4 animate-pulse">Welcome to SophosWRLD</h1>
-                    <p class="text-xl text-gray-400">Your personalized community hub.</p>
-                    <div class="mt-8">
-                        <button id="view-forums-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
-                            <i class="fas fa-comments mr-2"></i>Go to Forums
-                        </button>
-
-                        <button id="view-outages-btn" class="bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-orange-700 transition-colors duration-300 shadow-lg">
-                            <i class="fas fa-wrench mr-2"></i>View Outages
-                        </button>
-                    </div>
-                </div>
-            `;
-            document.getElementById('view-forums-btn').addEventListener('click', () => navigateTo('forums'));
-            document.getElementById('view-outages-btn').addEventListener('click', () => navigateTo('dashboard'));
-        }
-
-        function renderDashboardPage() {
-            contentArea.innerHTML = `
-                <div class="flex flex-col items-center justify-center p-8 text-center">
-                    <h1 class="text-4xl md:text-6xl font-bold text-red-500 mb-4 animate-pulse">Welcome to SophosWRLD Dashboard</h1>
-                    <p class="text-xl text-gray-400"This dashboard allows you to view any outages or ping. This dashboard will allow you to see if there are any errors with the website.</p>
-                    <div class="mt-8">
-                        <button id="view-home-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300 shadow-lg">
-                            <i class="fas fa-home mr-2"></i>Home
-                        </button>
-                    </div>
-                </div>
-            `;
-            document.getElementById('view-home-btn').addEventListener('click', () => navigateTo('home'));
-        }
-
-        function renderAdminPage() {
-            if (!appCurrentUser || (appUserData?.role !== 'admin' && appUserData?.role !== 'founder')) {
-                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be an admin to view this page.</p></div>`;
-                return;
-            }
-
-            contentArea.innerHTML = `
-                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full mx-auto">
-                    <h2 class="text-3xl font-bold text-red-500 mb-6">Admin Dashboard</h2>
-                    <h3 class="text-xl font-semibold text-gray-200 mb-4">Manage Users</h3>
-                    <div id="user-list" class="overflow-x-auto">
-                        <p class="text-gray-400 text-center">Loading users...</p>
-                    </div>
-                </div>
-            `;
-
-            const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
-            onSnapshot(usersCollection, (snapshot) => {
-                const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                const userListContainer = document.getElementById('user-list');
-                if (!userListContainer) return;
-                
-                // Filter out the current user from the list
-                const filteredUsers = userList.filter(user => user.id !== appCurrentUser.uid);
-
-                if (filteredUsers.length === 0) {
-                    userListContainer.innerHTML = '<p class="text-gray-400 text-center">No other users found.</p>';
-                    return;
-                }
-
-                userListContainer.innerHTML = `
-                    <table class="w-full text-left text-gray-300 min-w-[700px]">
-                        <thead class="bg-gray-700">
-                            <tr>
-                                <th class="p-3">Username</th>
-                                <th class="p-3">Email</th>
-                                <th class="p-3">Role</th>
-                                <th class="p-3">Status</th>
-                                <th class="p-3">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${filteredUsers.map(user => `
-                                <tr class="border-b border-gray-700 hover:bg-gray-700/50">
-                                    <td class="p-3">${user.username}</td>
-                                    <td class="p-3">${user.email}</td>
-                                    <td class="p-3">
-                                        <select class="role-select bg-gray-600 p-2 rounded" data-user-id="${user.id}" ${appUserData.role !== 'founder' ? 'disabled' : ''}>
-                                            <option value="member" ${user.role === 'member' ? 'selected' : ''}>Member</option>
-                                            <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                                            <option value="founder" ${user.role === 'founder' ? 'selected' : ''}>Founder</option>
-                                        </select>
-                                    </td>
-                                    <td class="p-3">
-                                        <span class="p-2 rounded-full text-xs font-semibold ${user.isBanned ? 'bg-red-500' : 'bg-green-500'}">
-                                            ${user.isBanned ? 'Banned' : 'Active'}
-                                        </span>
-                                    </td>
-                                    <td class="p-3 space-x-2 flex action-btn-group">
-                                        <button class="ban-btn bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition" data-user-id="${user.id}" data-is-banned="${user.isBanned}">
-                                            <i class="fas fa-ban"></i>
-                                            <span class="ml-2">${user.isBanned ? 'Unban' : 'Ban'}</span>
-                                        </button>
-                                        <button class="reset-password-btn bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition" data-user-id="${user.id}" data-user-email="${user.email}">
-                                            <i class="fas fa-key"></i>
-                                            <span class="ml-2">Reset Password</span>
-                                        </button>
-                                        <button class="delete-btn bg-red-600 text-white rounded-lg hover:bg-red-700 transition" data-user-id="${user.id}">
-                                            <i class="fas fa-trash"></i>
-                                            <span class="ml-2">Delete</span>
-                                        </button>
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                `;
-                
-                userListContainer.querySelectorAll('.role-select').forEach(select => {
-                    select.addEventListener('change', async (event) => {
-                        const userId = event.target.dataset.userId;
-                        const newRole = event.target.value;
-                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
-                        try {
-                            await updateDocFirestore(userDocRef, { role: newRole });
-                            showMessageModal('User role updated successfully!', 'success');
-                        } catch (error) {
-                            showMessageModal('Failed to update user role.', 'error');
-                        }
-                    });
-                });
-
-                userListContainer.querySelectorAll('.ban-btn').forEach(btn => {
-                    btn.addEventListener('click', async (event) => {
-                        const userId = event.currentTarget.dataset.userId;
-                        const isBanned = event.currentTarget.dataset.isBanned === 'true';
-                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
-                        try {
-                            await updateDocFirestore(userDocRef, { isBanned: !isBanned });
-                            showMessageModal(`User ${!isBanned ? 'banned' : 'unbanned'} successfully!`, 'success');
-                        } catch (error) {
-                            showMessageModal('Failed to update user ban status.', 'error');
-                        }
-                    });
-                });
-
-                userListContainer.querySelectorAll('.reset-password-btn').forEach(btn => {
-                    btn.addEventListener('click', async (event) => {
-                        const userEmail = event.currentTarget.dataset.userEmail;
-                        try {
-                            await sendPasswordResetEmail(auth, userEmail);
-                            showMessageModal('Password reset email sent successfully!', 'success');
-                        } catch (error) {
-                            showMessageModal(`Failed to send password reset email: ${error.message}`, 'error');
-                        }
-                    });
-                });
-
-                userListContainer.querySelectorAll('.delete-btn').forEach(btn => {
-                    btn.addEventListener('click', (event) => {
-                        const userId = event.currentTarget.dataset.userId;
-                        showMessageModal(
-                            'Are you sure you want to delete this user\'s data? This will NOT delete the Firebase Authentication account, which must be done manually in the console.',
-                            'confirm',
-                            async () => {
-                                try {
-                                    const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, userId);
-                                    await deleteDoc(userDocRef);
-                                    showMessageModal('User data deleted from Firestore. Remember to delete the user from the Firebase Authentication console.', 'success');
-                                } catch (error) {
-                                    showMessageModal('Failed to delete user data.', 'error');
-                                }
-                            }
-                        );
-                    });
-                });
-            });
-        }
-
-        function renderAuthPage() {
-            contentArea.innerHTML = `
-                <div class="max-w-md mx-auto bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500">
-                    <h2 class="text-3xl font-bold text-center mb-6 text-red-500">Join or Sign In</h2>
-                    <form id="auth-form" class="space-y-4">
-                        <input type="email" id="auth-email" placeholder="Email" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500">
-                        <input type="password" id="auth-password" placeholder="Password" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500">
-                        <div class="flex items-center justify-between pt-2">
-                            <button type="submit" id="signin-btn" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">Sign In</button>
-                            <button type="button" id="signup-btn" class="bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-700 transition-colors duration-300">Sign Up</button>
-                        </div>
-                    </form>
-                    <div class="mt-6">
-                        <p class="text-center text-gray-400 mb-4">or</p>
-                        <button id="google-signin-btn" class="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors duration-300 flex items-center justify-center space-x-2">
-                            <i class="fab fa-google"></i>
-                            <span>Sign in with Google</span>
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            const authForm = document.getElementById('auth-form');
-            const emailInput = document.getElementById('auth-email');
-            const passwordInput = document.getElementById('auth-password');
-            const googleBtn = document.getElementById('google-signin-btn');
-
-            document.getElementById('signin-btn').addEventListener('click', async (e) => {
-                e.preventDefault();
-                showLoadingSpinner();
-                try {
-                    await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
-                } catch (error) {
-                    showMessageModal(error.message, 'error');
-                } finally {
-                    hideLoadingSpinner();
-                }
-            });
-
-            document.getElementById('signup-btn').addEventListener('click', async (e) => {
-                e.preventDefault();
-                showLoadingSpinner();
-                try {
-                    const userCredential = await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
-                    const user = userCredential.user;
-                    
-                    const newUser = {
-                        username: user.email.split('@')[0],
-                        email: user.email,
-                        role: 'member',
-                        isBanned: false,
-                        theme: 'dark',
-                        accentColor: '#ef4444'
-                    };
-                    await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), newUser);
-                    
-                    showMessageModal('Account created successfully! You are now signed in.', 'success');
-                } catch (error) {
-                    showMessageModal(error.message, 'error');
-                } finally {
-                    hideLoadingSpinner();
-                }
-            });
-
-            if (googleBtn) {
-                googleBtn.addEventListener('click', async () => {
-                    showLoadingSpinner();
-                    const provider = new GoogleAuthProvider();
-                    try {
-                        const result = await signInWithPopup(auth, provider);
-                        const user = result.user;
-                        const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
-                        const userDoc = await getDoc(userDocRef);
-
-                        if (!userDoc.exists()) {
-                            const newUser = {
-                                username: user.displayName || user.email.split('@')[0],
-                                email: user.email,
-                                role: 'member',
-                                isBanned: false,
-                                theme: 'dark',
-                                accentColor: '#ef4444'
-                            };
-                            await setDoc(userDocRef, newUser);
-                        }
-                    } catch (error) {
-                        showMessageModal(`Google sign-in failed: ${error.message}`, 'error');
-                    } finally {
-                        hideLoadingSpinner();
-                    }
-                });
-            }
-        }
-        
-        function renderSettingsPage() {
-            if (!appCurrentUser || !appUserData) {
-                contentArea.innerHTML = `<h1 class="text-3xl text-center text-red-500">Not Logged In</h1><p class="text-center text-gray-400">Please log in to view settings.</p>`;
-                return;
-            }
-
-            contentArea.innerHTML = `
-                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-lg mx-auto">
-                    <h2 class="text-3xl font-bold text-red-500 mb-6">Settings</h2>
-                    <form id="settings-form" class="space-y-6">
-                        <div>
-                            <label for="username" class="block text-lg font-semibold text-gray-300 mb-2">Username</label>
-                            <input type="text" id="username" value="${appUserData.username}" class="w-full p-3 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-red-500">
-                        </div>
-                        <div>
-                            <label for="accent-color" class="block text-lg font-semibold text-gray-300 mb-2">Accent Color</label>
-                            <input type="color" id="accent-color" value="${appUserData.accentColor}" class="w-full h-12 p-1 bg-gray-700 rounded-lg cursor-pointer">
-                        </div>
-                        <button type="submit" id="save-settings-btn" class="w-full bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-300">Save Changes</button>
-                    </form>
-                </div>
-            `;
-
-            document.getElementById('settings-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                showLoadingSpinner();
-                const newUsername = document.getElementById('username').value;
-                const newAccentColor = document.getElementById('accent-color').value;
-                const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, appCurrentUser.uid);
-
-                try {
-                    await updateDocFirestore(userDocRef, {
-                        username: newUsername,
-                        accentColor: newAccentColor
-                    });
-                    updateTheme(newAccentColor);
-                    showMessageModal('Settings saved successfully!', 'success');
-                } catch (error) {
-                    showMessageModal('Error saving settings: ' + error.message, 'error');
-                } finally {
-                    hideLoadingSpinner();
-                }
-            });
-        }
-        
-        function renderCreatePostModal(postId = null, title = '', content = '') {
-            const modalHtml = `
-                <div id="create-post-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-lg w-full border-2 border-[var(--accent-color)]">
-                        <h3 class="text-2xl font-bold text-[var(--accent-color)] mb-4">${postId ? 'Edit Post' : 'Create New Post'}</h3>
-                        <form id="create-post-form" class="space-y-4">
-                            <input type="text" id="post-title" placeholder="Post Title" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" value="${title}" required>
-                            <textarea id="post-content" placeholder="What's on your mind?" rows="5" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required>${content}</textarea>
-                            <div class="flex justify-end space-x-2">
-                                <button type="button" id="cancel-post-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Cancel</button>
-                                <button type="submit" class="bg-[var(--accent-color)] text-white px-4 py-2 rounded-lg hover:bg-opacity-80 transition">${postId ? 'Save Changes' : 'Post'}</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            `;
-            document.getElementById('modal-container').innerHTML = modalHtml;
-            document.getElementById('cancel-post-btn').addEventListener('click', () => document.getElementById('create-post-modal').remove());
-
-            document.getElementById('create-post-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                showLoadingSpinner();
-                const newTitle = document.getElementById('post-title').value;
-                const newContent = document.getElementById('post-content').value;
-                const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
-
-                try {
-                    if (postId) {
-                        const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
-                        await updateDocFirestore(postDocRef, {
-                            title: newTitle,
-                            content: newContent
-                        });
-                        showMessageModal('Post updated successfully!', 'success');
-                    } else {
-                        await addDoc(postsCollection, {
-                            title: newTitle,
-                            content: newContent,
-                            authorId: appCurrentUser.uid,
-                            authorName: appUserData.username,
-                            createdAt: serverTimestamp(),
-                            reactions: {}
-                        });
-                        showMessageModal('Post created successfully!', 'success');
-                    }
-                    document.getElementById('create-post-modal').remove();
-                } catch (error) {
-                    showMessageModal('Error processing post: ' + error.message, 'error');
-                } finally {
-                    hideLoadingSpinner();
-                }
-            });
-        }
-        
-        function renderReactionModal(postId) {
-            const emojis = ['👍', '❤️', '😂', '🔥', '🤔', '🎉'];
-            const emojiHtml = emojis.map(emoji => `<button class="reaction-emoji text-3xl p-2 hover:bg-gray-700 rounded-lg transition" data-emoji="${emoji}">${emoji}</button>`).join('');
-
-            const modalHtml = `
-                <div id="reaction-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div class="bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full border-2 border-[var(--accent-color)]">
-                        <h3 class="text-2xl font-bold text-[var(--accent-color)] mb-4">React to Post</h3>
-                        <div class="flex justify-around items-center space-x-2">
-                            ${emojiHtml}
-                        </div>
-                        <div class="flex justify-end mt-4">
-                            <button id="cancel-reaction-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">Cancel</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.getElementById('modal-container').innerHTML = modalHtml;
-            document.getElementById('cancel-reaction-btn').addEventListener('click', () => document.getElementById('reaction-modal').remove());
-
-            document.querySelectorAll('.reaction-emoji').forEach(button => {
-                button.addEventListener('click', async (e) => {
-                    const emoji = e.target.dataset.emoji;
-                    const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
-                    
-                    try {
-                        const postDoc = await getDoc(postDocRef);
-                        const currentReactions = postDoc.data().reactions || {};
-                        const reactionKey = emoji.codePointAt(0).toString(16);
-                        
-                        const newReactions = { ...currentReactions };
-                        if (newReactions[reactionKey]) {
-                            newReactions[reactionKey].count += 1;
-                        } else {
-                            newReactions[reactionKey] = {
-                                emoji: emoji,
-                                count: 1
-                            };
-                        }
-                        
-                        await updateDocFirestore(postDocRef, { reactions: newReactions });
-                        document.getElementById('reaction-modal').remove();
-                    } catch (error) {
-                        showMessageModal('Failed to add reaction: ' + error.message, 'error');
-                    }
-                });
-            });
-        }
-        
-        function deletePost(postId) {
-            showMessageModal(
-                'Are you sure you want to delete this post? This action cannot be undone.',
-                'confirm',
-                async () => {
-                    showLoadingSpinner();
-                    const postDocRef = doc(db, `/artifacts/${appId}/public/data/forums`, postId);
-                    try {
-                        await deleteDoc(postDocRef);
-                        showMessageModal('Post deleted successfully!', 'success');
-                    } catch (error) {
-                        showMessageModal('Failed to delete post: ' + error.message, 'error');
-                    } finally {
-                        hideLoadingSpinner();
-                    }
-                }
-            );
-        }
-
-        function renderForumsPage() {
-            if (!appCurrentUser) {
-                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be logged in to view the forums.</p></div>`;
-                return;
-            }
-            contentArea.innerHTML = `
-                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-3xl font-bold text-red-500">Forums</h2>
-                        <button id="create-post-btn" class="bg-red-600 text-white font-semibold py-2 px-5 rounded-lg hover:bg-red-700 transition-colors duration-300">
-                            <i class="fas fa-plus mr-2"></i>Create Post
-                        </button>
-                    </div>
-                    <div id="posts-list" class="space-y-4">
-                        <p class="text-gray-400 text-center">Loading posts...</p>
-                    </div>
-                </div>
-            `;
-            document.getElementById('create-post-btn').addEventListener('click', () => {
-                if (appCurrentUser) {
-                    renderCreatePostModal();
-                } else {
-                    showMessageModal('You must be signed in to create a post.', 'error');
-                }
-            });
-
-            const postsCollection = collection(db, `/artifacts/${appId}/public/data/forums`);
-            const q = query(postsCollection, orderBy('createdAt', 'desc'));
-            onSnapshot(q, (snapshot) => {
-                const postsList = document.getElementById('posts-list');
-                if (!postsList) return;
-                
-                if (snapshot.empty) {
-                    postsList.innerHTML = '<p class="text-gray-400 text-center">No posts yet. Be the first to create one!</p>';
-                    return;
-                }
-
-                postsList.innerHTML = snapshot.docs.map(postDoc => {
-                    const post = postDoc.data();
-                    const postId = postDoc.id;
-                    const canEditOrDelete = appUserData?.role === 'admin' || appUserData?.role === 'founder';
-
-                    const reactionsHtml = post.reactions ? Object.values(post.reactions).map(reaction => `
-                        <span class="bg-gray-700 px-2 py-1 rounded-full text-sm">${reaction.emoji} ${reaction.count}</span>
-                    `).join('') : '';
-
-                    return `
-                        <div class="bg-gray-700 p-6 rounded-lg shadow-md border border-gray-600">
-                            <div class="flex justify-between items-start mb-2">
-                                <h3 class="text-xl font-bold text-[var(--accent-color)]">${post.title}</h3>
-                                <div class="flex-shrink-0 text-right">
-                                    <span class="block text-sm text-gray-400">by ${post.authorName}</span>
-                                    ${canEditOrDelete ? `
-                                        <div class="mt-2 space-x-2">
-                                            <button class="edit-post-btn bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 transition" data-post-id="${postId}">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button class="delete-post-btn bg-red-600 text-white p-2 rounded-full hover:bg-red-700 transition" data-post-id="${postId}">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            </div>
-                            <p class="text-gray-300 mb-4">${post.content}</p>
-                            <div class="flex items-center space-x-4">
-                                <div class="flex space-x-2">
-                                    ${reactionsHtml}
-                                </div>
-                                <button class="add-reaction-btn bg-gray-600 text-white p-2 rounded-full hover:bg-gray-500 transition" data-post-id="${postId}">
-                                    <i class="far fa-smile"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-
-                document.querySelectorAll('.add-reaction-btn').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        const postId = e.currentTarget.dataset.postId;
-                        renderReactionModal(postId);
-                    });
-                });
-                
-                document.querySelectorAll('.edit-post-btn').forEach(button => {
-                    button.addEventListener('click', async (e) => {
-                        const postId = e.currentTarget.dataset.postId;
-                        showLoadingSpinner();
-                        const postDoc = await getDoc(doc(db, `/artifacts/${appId}/public/data/forums`, postId));
-                        hideLoadingSpinner();
-                        if (postDoc.exists()) {
-                            const postData = postDoc.data();
-                            renderCreatePostModal(postId, postData.title, postData.content);
-                        } else {
-                            showMessageModal('Post not found.', 'error');
-                        }
-                    });
-                });
-
-                document.querySelectorAll('.delete-post-btn').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        const postId = e.currentTarget.dataset.postId;
-                        deletePost(postId);
-                    });
-                });
-            });
-        }
-        
-        function getChatId(user1Id, user2Id) {
-            return [user1Id, user2Id].sort().join('-');
-        }
-        
-        // --- Simulated Calling Logic ---
-        let currentCallId = null;
-
-        function renderCallModal(callId, status, participants, callerId) {
-            const modalContainer = document.getElementById('modal-container');
-            const modalId = 'call-modal';
-            const existingModal = document.getElementById(modalId);
-            if (existingModal) existingModal.remove();
-
-            let modalHtml = '';
-            
-            if (status === 'ringing' && appCurrentUser.uid !== callerId) {
-                // Incoming call modal for the recipient
-                modalHtml = `
-                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-[var(--accent-color)] text-center">
-                            <i class="fas fa-phone-volume text-5xl text-[var(--accent-color)] mb-4 animate-pulse"></i>
-                            <p class="text-xl text-white mb-4">${participants[0].name} is ringing you...</p>
-                            <div class="flex justify-center space-x-4 mt-4">
-                                <button id="pickup-btn" class="bg-green-500 text-white px-6 py-3 rounded-full font-bold hover:bg-green-600 transition duration-300">
-                                    <i class="fas fa-phone mr-2"></i>Pick Up
-                                </button>
-                                <button id="decline-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300">
-                                    <i class="fas fa-phone-slash mr-2"></i>Decline
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            } else if (status === 'ringing' && appCurrentUser.uid === callerId) {
-                // Outgoing call modal for the caller
-                modalHtml = `
-                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-[var(--accent-color)] text-center">
-                            <i class="fas fa-phone-alt text-5xl text-[var(--accent-color)] mb-4 animate-pulse"></i>
-                            <p class="text-xl text-white mb-4">Ringing ${participants[1].name}...</p>
-                            <button id="cancel-call-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300 mt-4">
-                                <i class="fas fa-times mr-2"></i>Cancel
-                            </button>
-                        </div>
-                    </div>
-                `;
-            } else if (status === 'active') {
-                // Active call modal for both participants
-                const participantsHtml = participants.map(p => `<li class="flex items-center space-x-2"><i class="fas fa-user-circle"></i><span>${p.name}</span></li>`).join('');
-                modalHtml = `
-                    <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full border-2 border-green-500 text-center">
-                            <h3 class="text-2xl font-bold text-green-500 mb-4">In a Call</h3>
-                            <ul class="text-left text-lg text-gray-200 mb-6 space-y-2">
-                                ${participantsHtml}
-                            </ul>
-                            <button id="hangup-btn" class="bg-red-600 text-white px-6 py-3 rounded-full font-bold hover:bg-red-700 transition duration-300">
-                                <i class="fas fa-phone-slash mr-2"></i>Hang Up
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }
-
-            if (modalHtml) {
-                modalContainer.insertAdjacentHTML('beforeend', modalHtml);
-
-                if (status === 'ringing' && appCurrentUser.uid !== callerId) {
-                    document.getElementById('pickup-btn').addEventListener('click', () => acceptCall(callId, participants));
-                    document.getElementById('decline-btn').addEventListener('click', () => endCall(callId));
-                } else if (status === 'ringing' && appCurrentUser.uid === callerId) {
-                    document.getElementById('cancel-call-btn').addEventListener('click', () => endCall(callId));
-                } else if (status === 'active') {
-                    document.getElementById('hangup-btn').addEventListener('click', () => endCall(callId));
-                }
-            } else {
-                 const existingModal = document.getElementById(modalId);
-                 if (existingModal) existingModal.remove();
-            }
-        }
-        
-        async function startCall(recipientId, recipientUsername) {
-            showMessageModal(
-                `Are you sure you want to call ${recipientUsername}?`,
-                'confirm',
-                async () => {
-                    const callsCollection = collection(db, `/artifacts/${appId}/public/data/calls`);
-                    const newCall = {
-                        callerId: appCurrentUser.uid,
-                        recipientId: recipientId,
-                        status: 'ringing',
-                        participants: [{ id: appCurrentUser.uid, name: appUserData.username }],
-                        createdAt: serverTimestamp()
-                    };
-                    try {
-                        const callDocRef = await addDoc(callsCollection, newCall);
-                        currentCallId = callDocRef.id;
-                    } catch (error) {
-                        showMessageModal('Failed to start call: ' + error.message, 'error');
-                    }
-                }
-            );
-        }
-
-        async function acceptCall(callId, currentParticipants) {
-            const callDocRef = doc(db, `/artifacts/${appId}/public/data/calls`, callId);
-            try {
-                const updatedParticipants = [...currentParticipants, { id: appCurrentUser.uid, name: appUserData.username }];
-                await updateDocFirestore(callDocRef, {
-                    status: 'active',
-                    participants: updatedParticipants
-                });
-            } catch (error) {
-                showMessageModal('Failed to accept call: ' + error.message, 'error');
-            }
-        }
-
-        async function endCall(callId) {
-            const callDocRef = doc(db, `/artifacts/${appId}/public/data/calls`, callId);
-            try {
-                await updateDocFirestore(callDocRef, {
-                    status: 'ended'
-                });
-            } catch (error) {
-                showMessageModal('Failed to end call: ' + error.message, 'error');
-            }
-        }
-
-        // Listens for incoming and outgoing calls
-        function listenForCalls() {
-            if (!appCurrentUser) return;
-            const callsCollection = collection(db, `/artifacts/${appId}/public/data/calls`);
-            const q = query(callsCollection, where('status', 'in', ['ringing', 'active']));
-            
-            if (callUnsubscribe) callUnsubscribe(); // Unsubscribe old listener
-            
-            callUnsubscribe = onSnapshot(q, (snapshot) => {
-                let foundCall = false;
-                snapshot.forEach(callDoc => {
-                    const callData = callDoc.data();
-                    const isParticipant = callData.callerId === appCurrentUser.uid || callData.recipientId === appCurrentUser.uid;
-                    
-                    if (isParticipant) {
-                        foundCall = true;
-                        currentCallId = callDoc.id;
-                        renderCallModal(callDoc.id, callData.status, callData.participants, callData.callerId);
-                    }
-                });
-                
-                // If no active or ringing call involves the current user, clear the modal
-                if (!foundCall) {
-                    const modal = document.getElementById('call-modal');
-                    if(modal) modal.remove();
-                    currentCallId = null;
-                }
-            });
-        }
-
-        function renderMessagesPage() {
-            if (!appCurrentUser) {
-                contentArea.innerHTML = `<div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-4xl mx-auto"><h1 class="text-3xl text-center text-red-500">Access Denied</h1><p class="text-center text-gray-400">You must be logged in to view messages.</p></div>`;
-                return;
-            }
-
-            contentArea.innerHTML = `
-                <div class="bg-gray-800 p-8 rounded-lg shadow-xl border-t-4 border-red-500 w-full max-w-6xl mx-auto flex flex-col md:flex-row h-[70vh]">
-                    <!-- User List Panel -->
-                    <div id="user-list-panel" class="w-full md:w-1/3 flex-shrink-0 border-b md:border-r border-gray-700 overflow-y-auto">
-                        <h3 class="text-xl font-bold text-[var(--accent-color)] mb-4">Users</h3>
-                        <div id="messages-user-list">
-                            <p class="text-gray-400 text-center">Loading users...</p>
-                        </div>
-                    </div>
-                    <!-- Chat Panel -->
-                    <div id="chat-panel" class="flex-grow w-full md:w-2/3 flex flex-col p-4 relative">
-                        <div class="flex items-center justify-center h-full text-gray-400">
-                            Select a user to start a conversation.
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            listenForCalls();
-
-            const usersCollection = collection(db, `/artifacts/${appId}/public/data/users`);
-            onSnapshot(usersCollection, (snapshot) => {
-                const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                const userListContainer = document.getElementById('messages-user-list');
-                if (!userListContainer) return;
-
-                userListContainer.innerHTML = userList.filter(user => user.id !== appCurrentUser.uid).map(user => `
-                    <div class="user-item p-4 border-b border-gray-700 hover:bg-gray-700 cursor-pointer transition" data-user-id="${user.id}" data-username="${user.username}">
-                        <span class="font-semibold text-gray-200">${user.username}</span>
-                        <span class="block text-sm text-gray-400">${user.email}</span>
-                    </div>
-                `).join('');
-
-                document.querySelectorAll('.user-item').forEach(item => {
-                    item.addEventListener('click', (e) => {
-                        const userId = e.currentTarget.dataset.userId;
-                        const username = e.currentTarget.dataset.username;
-                        renderChatPanel(userId, username);
-                    });
-                });
-            });
-        }
-        
-        function renderChatPanel(userId, username) {
-            const chatPanel = document.getElementById('chat-panel');
-            if (!chatPanel) return;
-            
-            // Clear previous listener if one exists
-            if (dmUnsubscribe) {
-                dmUnsubscribe();
-                dmUnsubscribe = null;
-            }
-
-            activeDMUserId = userId;
-
-            chatPanel.innerHTML = `
-                <div class="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800 sticky top-0 z-10">
-                    <h4 class="text-xl font-bold text-[var(--accent-color)]">Chatting with ${username}</h4>
-                    <button id="call-user-btn" class="call-user-btn text-white p-3 rounded-full hover:bg-green-600 transition">
-                        <i class="fas fa-phone"></i>
-                    </button>
-                </div>
-                <div id="messages-container" class="flex-grow overflow-y-auto p-4 space-y-4">
-                    <!-- Messages will be rendered here -->
-                    <p class="text-center text-gray-400">Say hello!</p>
-                </div>
-                <form id="dm-form" class="p-4 border-t border-gray-700 bg-gray-800 sticky bottom-0 z-10">
-                    <div class="flex space-x-2">
-                        <input type="text" id="dm-input" placeholder="Type a message..." class="flex-grow p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]" required>
-                        <button type="submit" class="bg-[var(--accent-color)] text-white px-4 py-3 rounded-lg hover:bg-opacity-80 transition">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </form>
-            `;
-            
-            document.getElementById('dm-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const messageInput = document.getElementById('dm-input');
-                const messageText = messageInput.value.trim();
-
-                if (messageText) {
-                    const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
-                    const messagesCollection = collection(db, `/artifacts/${appId}/public/data/chat/${chatId}/messages`);
-
-                    try {
-                        await addDoc(messagesCollection, {
-                            senderId: appCurrentUser.uid,
-                            text: messageText,
-                            createdAt: serverTimestamp()
-                        });
-                        messageInput.value = '';
-                    } catch (error) {
-                        showMessageModal('Failed to send message: ' + error.message, 'error');
-                    }
-                }
-            });
-
-            document.getElementById('call-user-btn').addEventListener('click', () => {
-                startCall(activeDMUserId, username);
-            });
-            
-            const chatId = getChatId(appCurrentUser.uid, activeDMUserId);
-            const messagesCollection = collection(db, `/artifacts/${appId}/public/data/chat/${chatId}/messages`);
-            const q = query(messagesCollection, orderBy('createdAt', 'asc'));
-
-            dmUnsubscribe = onSnapshot(q, (snapshot) => {
-                const messagesContainer = document.getElementById('messages-container');
-                if (!messagesContainer) return;
-                
-                messagesContainer.innerHTML = snapshot.docs.map(msgDoc => {
-                    const message = msgDoc.data();
-                    const isSender = message.senderId === appCurrentUser.uid;
-                    const messageClass = isSender ? 'self-end bg-[var(--accent-color)] text-white' : 'self-start bg-gray-700 text-gray-200';
-                    return `
-                        <div class="flex ${isSender ? 'justify-end' : 'justify-start'}">
-                            <div class="p-3 rounded-lg max-w-xs ${messageClass}">
-                                ${message.text}
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            });
-        }
-
-
-        // =================================================================
-        // 6. MAIN APP LOGIC
-        // =================================================================
-
-        function navigateTo(page) {
-            if (!contentArea) {
-                console.error("Content area not found.");
-                return;
-            }
-            
-            // Clean up old listeners
-            if (dmUnsubscribe) {
-                dmUnsubscribe();
-                dmUnsubscribe = null;
-            }
-            if (callUnsubscribe) {
-                callUnsubscribe();
-                callUnsubscribe = null;
-            }
-            activeDMUserId = null;
-            
-            contentArea.innerHTML = '';
-            lastNavigatedPage = page;
-            localStorage.setItem('currentPage', page);
-            
-            if (appUserData && appUserData.isBanned && page !== 'auth') {
-                showMessageModal('Your account has been banned.', 'error');
-                localStorage.removeItem('currentPage');
-                navigateTo('auth');
-                return;
-            }
-
-            switch (page) {
-                case 'home':
-                    renderHomePage();
-                    break;
-                case 'admin':
-                    renderAdminPage();
-                    break;
-                case 'auth':
-                    renderAuthPage();
-                    break;
-                case 'messages':
-                    renderMessagesPage();
-                    break;
-                case 'settings':
-                    renderSettingsPage();
-                    break;
-                case 'forums':
-                    renderForumsPage();
-                    break;
-                case 'dashboard':
-                    renderDashboardPage();
-                    break;
-                default:
-                    contentArea.innerHTML = `<h1 class="text-3xl text-center text-gray-500">404: Page Not Found</h1>`;
-                    break;
-            }
-        }
-
-        onAuthStateChanged(auth, async (user) => {
-            appCurrentUser = user;
-            authReady = true;
-
-            if (user) {
-                const userDocRef = doc(db, `/artifacts/${appId}/public/data/users`, user.uid);
-                const userDoc = await getDoc(userDocRef);
-                
-                if (userDoc.exists()) {
-                    appUserData = { id: userDoc.id, ...userDoc.data() };
-                } else {
-                    appUserData = {
-                        username: user.displayName || user.email.split('@')[0] || 'Guest',
-                        email: user.email || 'N/A',
-                        role: 'member',
-                        isBanned: false,
-                        theme: 'dark',
-                        accentColor: '#ef4444'
-                    };
-                    await setDoc(doc(db, `/artifacts/${appId}/public/data/users`, user.uid), appUserData);
-                }
-                
-                if (appUserData.accentColor) {
-                    updateTheme(appUserData.accentColor);
-                }
-                
-                renderSidebarNav(appCurrentUser, appUserData);
-                
-                const currentPage = localStorage.getItem('currentPage');
-                if (currentPage && currentPage !== 'auth') {
-                    navigateTo(currentPage);
-                } else {
-                    navigateTo('home');
-                }
-            } else {
-                appUserData = null;
-                renderSidebarNav(appCurrentUser, appUserData);
-                navigateTo('auth');
-            }
+  </div>
+
+  <script>
+    // ====== Firebase Setup (paste your config) ======
+    const firebaseConfig = {
+      // apiKey: "YOUR_API_KEY",
+      // authDomain: "YOUR_PROJECT.firebaseapp.com",
+      // projectId: "YOUR_PROJECT_ID",
+      // storageBucket: "YOUR_PROJECT.appspot.com",
+      // messagingSenderId: "YOUR_SENDER_ID",
+      // appId: "YOUR_APP_ID"
+    };
+
+    let app, auth, db, storage;
+    document.addEventListener("DOMContentLoaded", () => {
+      if (Object.keys(firebaseConfig).length) {
+        app = firebase.initializeApp(firebaseConfig);
+        auth = firebase.auth();
+        db = firebase.firestore();
+        storage = firebase.storage();
+        setStatus("Firebase ready");
+      } else {
+        setStatus("Demo mode");
+      }
+      initRouter();
+      seedDemo();
+    });
+
+    // ====== Utils & State ======
+    const $ = (id) => document.getElementById(id);
+    function setStatus(t){ $("statusText").textContent = t; }
+    function setAccent(hex){ document.documentElement.style.setProperty("--accent", hex); }
+    function timeAgo(ts){
+      if (!ts) return "just now";
+      const d = ts instanceof Date ? ts : new Date(ts);
+      const diff = (Date.now() - d.getTime())/1000;
+      if (diff < 60) return Math.floor(diff)+"s ago";
+      if (diff < 3600) return Math.floor(diff/60)+"m ago";
+      if (diff < 86400) return Math.floor(diff/3600)+"h ago";
+      return d.toLocaleString();
+    }
+    function escapeHTML(s=''){ return s.replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;','\\'':'&#39;'}[c])); }
+
+    const state = {
+      user: { uid: "demo", name: "Guest", bio: "", avatar: "assets/avatar.png", role: "member", currency: 0, accentColor: "#ef4444" },
+      categories: [], threads: [], posts: {}, // posts[threadId] = array
+      users: []
+    };
+
+    // ====== Router ======
+    const routes = {
+      "/home": () => { showView("/home"); $("routeTitle").textContent = "Home"; renderHome(); },
+      "/chat": () => { showView("/chat"); $("routeTitle").textContent = "Chat"; renderUsers(state.users); },
+      "/forums": () => { showView("/forums"); $("routeTitle").textContent = "Forums"; renderCategories(); renderThreads(); },
+      "/thread": (params) => { showView("/forums"); $("routeTitle").textContent = "Forums"; openThread(params.id); },
+      "/profile": () => { showView("/profile"); $("routeTitle").textContent = "Profile"; renderProfile(); },
+      "/settings": () => { showView("/settings"); $("routeTitle").textContent = "Settings"; },
+      "/admin": () => { showView("/admin"); $("routeTitle").textContent = "Admin"; renderAdminUsers(); }
+    };
+    function parseHash(){
+      const h = location.hash.replace('#','') || '/home';
+      const [path] = h.split('?');
+      const parts = path.split('/').filter(Boolean);
+      if (parts[0] === 'thread' && parts[1]) return { route: '/thread', params: { id: parts[1] } };
+      const route = '/' + (parts[0] || 'home');
+      return { route, params: {} };
+    }
+    function navigate(path){ location.hash = path; }
+    function handleRoute(){
+      const { route, params } = parseHash();
+      document.querySelectorAll('#sidebarNav .navtab').forEach(b => b.classList.toggle('active', b.dataset.route === route));
+      (routes[route] || routes['/home'])(params);
+    }
+    function showView(view){
+      document.querySelectorAll('[data-view]').forEach(sec => sec.classList.toggle('hidden', sec.getAttribute('data-view') !== view));
+      $("threadView").classList.add("hidden");
+    }
+    function initRouter(){
+      document.querySelectorAll('#sidebarNav [data-route]').forEach(btn => btn.addEventListener('click', () => navigate(btn.dataset.route)));
+      window.addEventListener('hashchange', handleRoute);
+      handleRoute();
+    }
+
+    // ====== Demo seed (no Firebase required) ======
+    function seedDemo(){
+      state.users = [
+        { uid:"u1", name:"Alice", bio:"Builder", avatar:"assets/avatar.png" },
+        { uid:"u2", name:"Bob", bio:"Moderator", avatar:"assets/avatar.png" },
+        { uid:"u3", name:"Charlie", bio:"Hacker", avatar:"assets/avatar.png" }
+      ];
+      state.categories = [
+        { id:"c1", name:"General", description:"Talk about anything", order:1 },
+        { id:"c2", name:"Help", description:"Ask for help", order:2 },
+        { id:"c3", name:"Showcase", description:"Share your work", order:3 }
+      ];
+      state.threads = [
+        { id:"t1", categoryId:"c1", categoryName:"General", title:"Welcome to SophosWRLD", body:"Say hi!", authorId:"u1", authorName:"Alice", createdAt:new Date(Date.now()-3600_000), lastPostAt:new Date(), replyCount:2, pinned:true },
+        { id:"t2", categoryId:"c2", categoryName:"Help", title:"How do I change my accent color?", body:"Where is the setting?", authorId:"u2", authorName:"Bob", createdAt:new Date(Date.now()-86_400_000), lastPostAt:new Date(Date.now()-10_000), replyCount:1, pinned:false }
+      ];
+      state.posts["t1"] = [
+        { id:"p1", authorId:"u2", authorName:"Bob", authorAvatar:"assets/avatar.png", body:"Hello!", createdAt:new Date(Date.now()-1800_000) },
+        { id:"p2", authorId:"u3", authorName:"Charlie", authorAvatar:"assets/avatar.png", body:"Yo!", createdAt:new Date(Date.now()-1200_000) }
+      ];
+      state.posts["t2"] = [
+        { id:"p3", authorId:"u1", authorName:"Alice", authorAvatar:"assets/avatar.png", body:"Settings > Appearance", createdAt:new Date(Date.now()-9_000) }
+      ];
+      renderHome();
+      renderCategories();
+      renderThreads();
+      renderUsers(state.users);
+      renderProfile();
+    }
+
+    // ====== Home ======
+    function renderHome(){
+      const latestBox = $("homeLatestThreads"); latestBox.innerHTML = "";
+      state.threads.slice(0,6).forEach(t => {
+        const row = document.createElement('button');
+        row.className = "w-full text-left p-2 rounded hover:bg-white/5";
+        row.innerHTML = `<div class="font-medium truncate">${t.pinned ? '📌 ' : ''}${escapeHTML(t.title)}</div>
+                         <div class="text-xs text-gray-400">in ${escapeHTML(t.categoryName)} • by ${escapeHTML(t.authorName)} • ${timeAgo(t.createdAt)}</div>`;
+        row.onclick = () => location.hash = `/thread/${t.id}`;
+        latestBox.appendChild(row);
+      });
+      const onlineBox = $("homeOnlineUsers"); onlineBox.innerHTML = "";
+      state.users.forEach(u => {
+        const div = document.createElement('div');
+        div.className = "flex items-center gap-3 p-2 rounded hover:bg-white/5";
+        div.innerHTML = `<img src="${u.avatar}" class="w-8 h-8 rounded-full"/>
+                         <div class="min-w-0"><div class="font-medium truncate">${escapeHTML(u.name)}</div>
+                         <div class="text-xs text-gray-400">active ${Math.floor(Math.random()*10)+1}m ago</div></div>`;
+        onlineBox.appendChild(div);
+      });
+      const sel = $("quickCategory"); sel.innerHTML = "";
+      state.categories.forEach(c => { const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
+      $("quickPostBtn").onclick = () => {
+        const title = $("quickTitle").value.trim().slice(0,120);
+        const body = $("quickBody").value.trim();
+        const catId = $("quickCategory").value;
+        if (!title || !body || !catId) { $("quickMsg").textContent = "Please fill all fields."; return; }
+        const cat = state.categories.find(c=>c.id===catId);
+        const id = "t"+(Date.now());
+        const t = { id, categoryId:catId, categoryName:cat.name, title, body, authorId:"demo", authorName:state.user.name, createdAt:new Date(), lastPostAt:new Date(), replyCount:0, pinned:false };
+        state.threads.unshift(t);
+        $("quickTitle").value=""; $("quickBody").value=""; $("quickMsg").textContent="Thread created!";
+        location.hash = `/thread/${id}`;
+      };
+    }
+
+    // ====== Users (Chat) ======
+    function renderUsers(list){
+      const box = $("usersList"); box.innerHTML = "";
+      list.forEach(u => {
+        const li = document.createElement('div');
+        li.className = "flex items-center justify-between gap-2 p-2 rounded hover:bg-white/5";
+        li.innerHTML = `
+          <div class="flex items-center gap-3 min-w-0">
+            <img src="${u.avatar}" class="w-10 h-10 rounded-full" />
+            <div class="min-w-0">
+              <div class="font-medium truncate">${escapeHTML(u.name)}</div>
+              <div class="text-xs text-gray-400 truncate-2">${escapeHTML(u.bio||"")}</div>
+            </div>
+          </div>
+          <div class="flex gap-2 shrink-0">
+            <button class="btn" title="Message">Msg</button>
+            <button class="btn btn-primary" title="Call">Call</button>
+          </div>`;
+        li.querySelectorAll("button")[0].onclick = () => { $("chatInput").value = `@${u.name} `; $("chatInput").focus(); };
+        li.querySelectorAll("button")[1].onclick = () => alert("Calling (demo) "+u.name+"…");
+        box.appendChild(li);
+      });
+      $("userSearch").oninput = (e) => {
+        const q = e.target.value.toLowerCase();
+        const filtered = state.users.filter(u => (u.name||"").toLowerCase().includes(q));
+        renderUsers(filtered);
+      };
+      $("sendBtn").onclick = () => { const v=$("chatInput").value.trim(); if(!v) return; alert("Message (demo): "+v); $("chatInput").value=""; };
+    }
+
+    // ====== Forums ======
+    let currentCategoryId = null;
+    function renderCategories(){
+      const box = $("catList"); box.innerHTML = "";
+      state.categories.forEach(c => {
+        const b = document.createElement('button');
+        b.className = "w-full text-left px-3 py-2 rounded hover:bg-white/5";
+        b.innerHTML = `<div class="font-medium">${escapeHTML(c.name)}</div><div class="text-xs text-gray-400">${escapeHTML(c.description||"")}</div>`;
+        b.onclick = () => { currentCategoryId=c.id; renderThreads(); };
+        box.appendChild(b);
+        if (!currentCategoryId) currentCategoryId = c.id;
+      });
+    }
+    function renderThreads(){
+      const list = $("threadsList"); list.innerHTML = "";
+      state.threads.filter(t=>t.categoryId===currentCategoryId).forEach(t => {
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between p-2 rounded hover:bg-white/5";
+        row.innerHTML = `<div class="min-w-0">
+            <div class="font-medium truncate">${t.pinned ? '📌 ' : ''}${escapeHTML(t.title)}</div>
+            <div class="text-xs text-gray-400">by ${escapeHTML(t.authorName)} • ${t.replyCount||0} replies • ${timeAgo(t.lastPostAt)}</div>
+          </div>
+          <button class="btn" title="Open">Open</button>`;
+        row.querySelector('button').onclick = () => location.hash = `/thread/${t.id}`;
+        list.appendChild(row);
+      });
+      $("newThreadBtn").onclick = () => {
+        const title = prompt("Thread title"); if (!title) return;
+        const body = prompt("Body"); if (!body) return;
+        const cat = state.categories.find(c=>c.id===currentCategoryId);
+        const id = "t"+Date.now();
+        const t = { id, categoryId:cat.id, categoryName:cat.name, title:title.trim().slice(0,120), body:body.trim(), authorId:"demo", authorName:state.user.name, createdAt:new Date(), lastPostAt:new Date(), replyCount:0, pinned:false };
+        state.threads.unshift(t);
+        location.hash = `/thread/${id}`;
+      };
+    }
+    function openThread(threadId){
+      const t = state.threads.find(x=>x.id===threadId); if(!t){ alert("Thread not found"); return; }
+      $("threadView").classList.remove("hidden");
+      $("threadTitle").textContent = t.title;
+      $("threadMeta").textContent = `${t.categoryName} • by ${t.authorName} • ${timeAgo(t.createdAt)}`;
+      const list = $("postsList"); list.innerHTML = "";
+      const first = document.createElement('div');
+      first.className = "p-3 rounded bg-white/5";
+      first.innerHTML = `<div class="font-medium">${escapeHTML(t.authorName)}</div>
+                         <div class="text-xs text-gray-400">${timeAgo(t.createdAt)}</div>
+                         <div class="mt-2 whitespace-pre-wrap">${escapeHTML(t.body)}</div>`;
+      list.appendChild(first);
+      const replies = state.posts[threadId] || [];
+      replies.forEach(p => {
+        const row = document.createElement('div');
+        row.className = "p-3 rounded bg-white/[.03] border border-white/5";
+        row.innerHTML = `<div class="font-medium">${escapeHTML(p.authorName)}</div>
+                         <div class="text-xs text-gray-400">${timeAgo(p.createdAt)}</div>
+                         <div class="mt-2 whitespace-pre-wrap">${escapeHTML(p.body||"")}</div>`;
+        list.appendChild(row);
+      });
+      $("replySendBtn").onclick = () => {
+        const body = $("replyInput").value.trim(); if(!body) return;
+        const p = { id:"p"+Date.now(), authorId:"demo", authorName:state.user.name, authorAvatar:state.user.avatar, body, createdAt:new Date() };
+        if (!state.posts[threadId]) state.posts[threadId]=[];
+        state.posts[threadId].push(p);
+        t.replyCount = (t.replyCount||0)+1;
+        t.lastPostAt = new Date();
+        $("replyInput").value = "";
+        openThread(threadId);
+      };
+    }
+
+    // ====== Profile ======
+    $("openProfileBtn").onclick = () => $("profileSheet").classList.remove("hidden");
+    $("profileClose").onclick = () => $("profileSheet").classList.add("hidden");
+    $("saveProfileBtn").onclick = () => {
+      state.user.name = $("profileName").value.trim() || state.user.name;
+      state.user.bio  = $("profileBio").value.trim() || state.user.bio;
+      $("profileSheet").classList.add("hidden");
+      renderProfile();
+    };
+    $("accentInput").oninput = (e) => { setAccent(e.target.value); };
+    $("profileAccent").oninput = (e) => { setAccent(e.target.value); };
+
+    function renderProfile(){
+      $("sidebarName").textContent = state.user.name;
+      $("sidebarBio").textContent = state.user.bio || "";
+      $("profileNameDisplay").textContent = state.user.name;
+      $("profileBioDisplay").textContent = state.user.bio || "—";
+      $("profileUid").textContent = state.user.uid;
+      $("profileName").value = state.user.name;
+      $("profileBio").value = state.user.bio;
+    }
+
+    // ====== Admin (demo) ======
+    function renderAdminUsers(){
+      const box = $("adminUsers"); box.innerHTML = "";
+      state.users.forEach(u => {
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between p-2 rounded hover:bg-white/5";
+        row.innerHTML = `<div class="min-w-0"><div class="font-medium truncate">${escapeHTML(u.name)}</div><div class="text-xs text-gray-400 truncate">${u.uid}</div></div>
+                         <div class="flex gap-2"><select class="input w-28"><option>member</option><option>moderator</option><option>admin</option></select>
+                         <button class="btn">Ban</button></div>`;
+        box.appendChild(row);
+      });
+      $("refreshUsersBtn").onclick = renderAdminUsers;
+      $("adminSearch").oninput = (e) => {
+        const q = e.target.value.toLowerCase();
+        Array.from(box.children).forEach(div => {
+          const text = div.textContent.toLowerCase();
+          div.style.display = text.includes(q) ? "" : "none";
         });
-
-        document.addEventListener('DOMContentLoaded', async () => {
-            initializeNavigation();
-            const mobileAuthButton = document.getElementById('mobile-auth-btn');
-            if(mobileAuthButton) {
-                mobileAuthButton.addEventListener('click', () => {
-                    navigateTo('auth');
-                    if (window.innerWidth < 768) {
-                        leftSidebar.classList.remove('expanded');
-                        overlayBackdrop.classList.add('hidden');
-                    }
-                });
-            }
-            
-            if (initialAuthToken) {
-                try {
-                     await signInWithCustomToken(auth, initialAuthToken);
-                } catch (error) {
-                     console.error("Error signing in with custom token:", error);
-                     navigateTo('auth');
-                }
-            }
-        });
-    </script>
+      };
+    }
+  </script>
 </body>
-
 </html>
-
