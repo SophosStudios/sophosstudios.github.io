@@ -493,7 +493,12 @@ async function loadProfile(user){
   document.getElementById('editAccent').value = data.accentColor || '#e53935';
 }
 async function saveProfile(){
-  const user = auth.currentUser; if (!user) return;
+  const user = auth.currentUser;
+  // This check is the fix. If user is null, the function stops.
+  if (!user) {
+    notify('profileMsg', 'You must be logged in to save your profile.');
+    return;
+  }
   const ref = db.doc(`artifacts/${APP_ID}/public/data/users/${user.uid}`);
   const payload = {
     name: document.getElementById('editName').value.trim(),
