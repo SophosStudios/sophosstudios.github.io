@@ -380,14 +380,25 @@ function sendResetFromLogin(){
   if (!email) return notify('authError','Enter your email then click Forgot password.');
   auth.sendPasswordResetEmail(email).then(()=> notify('authError','Password reset email sent.')).catch(e=>notify('authError',e.message));
 }
-function signUp(){
-  const name = document.getElementById('signUpName').value.trim();
-  const email= document.getElementById('signUpEmail').value.trim();
-  const pass = document.getElementById('signUpPassword').value;
-  if (!name){ return notify('signupError','Please enter a display name.'); }
-  auth.createUserWithEmailAndPassword(email, pass).then(async cred => {
-    await ensureUserDoc(cred.user.uid, {name});
-  }).catch(e => notify('signupError', e.message));
+function signUp(email, pass, displayName) {
+  firebase.auth().createUserWithEmailAndPassword(email, pass)
+    .then(cred => {
+      // create Firestore profile document for this user
+      return db.collection(`artifacts/${APP_ID}/public/data/users`)
+        .doc(cred.user.uid)
+        .set({
+          uid: cred.user.uid,
+          name: displayName,
+          bio: "",
+          avatar: "",
+          role: "member",
+          isBanned: false,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    })
+    .catch(err => {
+      alert("Sign up failed: " + err.message);
+    });
 }
 function googleSignIn(){
   const provider = new firebase.auth.GoogleAuthProvider();
@@ -413,16 +424,28 @@ async function ensureUserDoc(uid, {name}){
 // Auth state
 let unsubThreads = null, unsubChat = null, unsubTickets = null, unsubAdminTickets = null;
 auth.onAuthStateChanged(async user => {
-firebase.auth().createUserWithEmailAndPassword(email, pass)
-  .then(cred => {
-    return db.collection(`artifacts/${APP_ID}/public/data/users`)
-      .doc(cred.user.uid)
-      .set({
-        uid: cred.user.uid,
-        name: displayName,
-        ...
+  if (user) {
+    console.log("User logged in:", user.uid);
+
+    // Load their profile data
+    const doc = await db.collection(`artifacts/${APP_ID}/public/data/users`).doc(user.uid).get();
+    if (!doc.exists) {
+      // If profile doesn’t exist (e.g. Google login), create a default one
+      await db.collection(`artifacts/${APP_ID}/public/data/users`).doc(user.uid).set({
+        uid: user.uid,
+        name: user.displayName || "Anonymous",
+        bio: "",
+        avatar: user.photoURL || "",
+        role: "member",
+        isBanned: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-  });
+    }
+  } else {
+    console.log("User logged out");
+  }
+});
+
 
     showApp(true);
     loadProfile(user);
