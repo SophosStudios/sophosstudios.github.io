@@ -380,7 +380,10 @@ function sendResetFromLogin(){
   if (!email) return notify('authError','Enter your email then click Forgot password.');
   auth.sendPasswordResetEmail(email).then(()=> notify('authError','Password reset email sent.')).catch(e=>notify('authError',e.message));
 }
-function signUp(email, pass, displayName) {
+async function signUp() { // Removed parameters
+  const email = document.getElementById('signUpEmail').value.trim();
+  const pass  = document.getElementById('signUpPassword').value;
+  const displayName = document.getElementById('signUpName').value.trim();
   firebase.auth().createUserWithEmailAndPassword(email, pass)
     .then(cred => {
       // create Firestore profile document for this user
@@ -441,19 +444,18 @@ auth.onAuthStateChanged(async user => {
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     }
-  } else {
-    console.log("User logged out");
-  }
-});
 
-
+    // This is the code that was misplaced.
+    const usnap = await db.doc(`artifacts/${APP_ID}/public/data/users/${user.uid}`).get();
     showApp(true);
     loadProfile(user);
     watchThreads();
     watchChat();
     watchTickets();
     checkAdmin(usnap.data());
+
   } else {
+    console.log("User logged out");
     if (unsubThreads){ unsubThreads(); unsubThreads=null; }
     if (unsubChat){ unsubChat(); unsubChat=null; }
     if (unsubTickets){ unsubTickets(); unsubTickets=null; }
@@ -461,7 +463,7 @@ auth.onAuthStateChanged(async user => {
     document.getElementById('app').classList.add('hidden');
     document.getElementById('suspended').classList.add('hidden');
     document.getElementById('auth').classList.remove('hidden');
-  };
+  }
 });
 
 // Suspended - submit appeal
