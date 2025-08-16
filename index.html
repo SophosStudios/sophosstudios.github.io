@@ -429,7 +429,6 @@ let unsubThreads = null, unsubChat = null, unsubTickets = null, unsubAdminTicket
 auth.onAuthStateChanged(async user => {
   if (user) {
     console.log("User logged in:", user.uid);
-
     // Load their profile data
     const doc = await db.collection(`artifacts/${APP_ID}/public/data/users`).doc(user.uid).get();
     if (!doc.exists) {
@@ -445,14 +444,18 @@ auth.onAuthStateChanged(async user => {
       });
     }
 
-    // This is the code that was misplaced.
-    const usnap = await db.doc(`artifacts/${APP_ID}/public/data/users/${user.uid}`).get();
+    // This is the corrected code.
+    const userData = doc.data() || {};
+    if (userData.isBanned) {
+      showSuspended();
+      return;
+    }
     showApp(true);
     loadProfile(user);
     watchThreads();
     watchChat();
     watchTickets();
-    checkAdmin(usnap.data());
+    checkAdmin(userData);
 
   } else {
     console.log("User logged out");
