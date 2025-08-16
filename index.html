@@ -663,14 +663,17 @@ function checkAdmin(userData){
 }
 async function loadUsers(){
   const q = document.getElementById('userSearch').value.toLowerCase();
-  const wrap = document.getElementById('userList'); wrap.innerHTML='';
+  const wrap = document.getElementById('userList');
+  wrap.innerHTML='';
   const snap = await db.collection(`artifacts/${APP_ID}/public/data/users`).limit(200).get();
   snap.forEach(doc => {
-    const u = doc.data(); const hay = (u.name||'') + ' ' + (u.uid||'') + ' ' + (u.email||'');
+    const u = doc.data();
+    const hay = (u.name||'') + ' ' + (u.uid||'') + ' ' + (u.email||'');
     if (q && !hay.toLowerCase().includes(q)) return;
     const row = el('div',{class:'row', style:'justify-content:space-between; border:1px solid var(--border); padding:10px; border-radius:10px; margin:6px 0;'},
-      `<div><b>${escapeHTML(u.name||'User')}</b> <span class="muted">(${escapeHTML(u.email||'no email')})</span><br/>
-        <span class="pill">${escapeHTML(u.role||'member')}</span> ${u.isBanned ? '<span class="pill" style="background:#331;">Suspended</span>':''}
+      `<div><b>${escapeHTML(u.name||'User')}</b><br/>
+       <span class="muted">${escapeHTML(u.email||'no email')}</span><br/>
+       <span class="pill">${escapeHTML(u.role||'member')}</span> ${u.isBanned ? '<span class="pill" style="background:#331;">Suspended</span>':''}
       </div>`);
     const btns = el('div',{class:'row'});
     const suspendBtn = el('button',{class:`btn ${u.isBanned?'ok':'warn'}`}, `<i class="fas fa-user-slash"></i> ${u.isBanned?'Unsuspend':'Suspend'}`);
