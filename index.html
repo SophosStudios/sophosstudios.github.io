@@ -664,7 +664,7 @@ async function loadUsers(){
     const u = doc.data(); const hay = (u.name||'') + ' ' + (u.uid||'') + ' ' + (u.email||'');
     if (q && !hay.toLowerCase().includes(q)) return;
     const row = el('div',{class:'row', style:'justify-content:space-between; border:1px solid var(--border); padding:10px; border-radius:10px; margin:6px 0;'},
-      `<div><b>${escapeHTML(u.name||'User')}</b> <span class="muted">(${escapeHTML(u.uid)})</span><br/>
+      `<div><b>${escapeHTML(u.name||'User')}</b> <span class="muted">(${escapeHTML(u.email||'no email')})</span><br/>
         <span class="pill">${escapeHTML(u.role||'member')}</span> ${u.isBanned ? '<span class="pill" style="background:#331;">Suspended</span>':''}
       </div>`);
     const btns = el('div',{class:'row'});
