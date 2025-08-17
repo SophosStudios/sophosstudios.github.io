@@ -236,6 +236,7 @@
             <select id="ticketType">
               <option value="support">Support</option>
               <option value="appeal">Appeal</option>
+              <option value="suggestion">Suggestion</option>
             </select>
           </div>
           <div class="field"><label>Message</label><textarea id="ticketMessage" placeholder="Describe your request..."></textarea></div>
@@ -475,10 +476,21 @@ async function submitAppeal(){
   const message = document.getElementById('appealText').value.trim();
   if (!message) return notify('appealMsg','Please write a message.');
   await db.collection(`artifacts/${APP_ID}/public/data/tickets`).add({
-    createdBy: user.uid, type: 'appeal', status: 'open', message,
+    createdBy: user.uid, type: 'appeal', status: 'pending', message,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
   notify('appealMsg','Appeal submitted. We will review it soon.');
+}
+
+async function submitSuggestion() {
+  const user = auth.currentUser; if (!user) return;
+  const message = document.getElementById('suggestionText').value.trim();
+  if (!message) return notify('suggestionMsg', 'Please write your suggestion.');
+  await db.collection(`artifacts/${APP_ID}/public/data/ticket`).add({
+    createdBy: user.uid, type: 'suggestion', status: 'pending', message,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  notify('appealMsg', 'Suggestion submitted. Staff will reveal it shortly')
 }
 
 // === PROFILE ===
@@ -651,7 +663,7 @@ async function createTicket(){
   const msg  = document.getElementById('ticketMessage').value.trim();
   if (!msg) return notify('ticketError','Please write a message.');
   await db.collection(`artifacts/${APP_ID}/public/data/tickets`).add({
-    createdBy: user.uid, type, status: 'open', message: msg,
+    createdBy: user.uid, type, status: 'pending', message: msg,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
   document.getElementById('ticketMessage').value='';
