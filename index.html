@@ -8,10 +8,10 @@
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <style>
-        /* Reset and base styles for the entire page */
-        body {
-            font-family: 'Inter', sans-serif;
+        <style>
+        /* Base styles */
+        body { 
+            font-family: 'Inter', sans-serif; 
             background: #f8fafc; /* Subtle light gray background for a clean look */
             transition: background-color 0.3s ease-in-out;
         }
@@ -21,16 +21,16 @@
             background: #111827; /* Dark gray for the body in dark mode */
         }
 
-        /* Styles for the main content area */
+        /* Main content area */
         #content-area {
             min-height: calc(100vh - 64px); /* Correctly handles navbar height */
-            padding: 2rem 1rem; /* Generous padding on all sides */
+            padding: 2rem 1rem;
             display: flex;
             flex-direction: column;
             align-items: center; /* Center content horizontally */
         }
 
-        /* Styles for the side drawer menu */
+        /* Side drawer menu */
         #side-drawer-menu {
             position: fixed;
             top: 0;
@@ -47,7 +47,7 @@
             display: flex;
             flex-direction: column;
         }
-
+        
         #side-drawer-menu.open {
             transform: translateX(0);
         }
@@ -59,7 +59,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.6); /* Slightly darker overlay */
+            background-color: rgba(0, 0, 0, 0.6);
             z-index: 40;
             opacity: 0;
             visibility: hidden;
@@ -71,12 +71,13 @@
             visibility: visible;
         }
 
-        /* Additional class for a more visually appealing card */
+        /* Reusable card style for main content */
         .content-card {
             transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
             transform: translateY(0);
             backdrop-filter: blur(8px);
         }
+
         .content-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
@@ -105,6 +106,7 @@
             bottom: 0;
             background-color: #ccc;
             transition: .4s;
+            border-radius: 28px; /* Correct for rounded corners */
         }
 
         .slider:before {
@@ -116,6 +118,7 @@
             bottom: 4px;
             background-color: white;
             transition: .4s;
+            border-radius: 50%; /* Correct for a circular handle */
         }
 
         input:checked + .slider {
@@ -124,15 +127,6 @@
 
         input:checked + .slider:before {
             transform: translateX(22px);
-        }
-
-        /* Rounded sliders */
-        .slider.round {
-            border-radius: 28px;
-        }
-
-        .slider.round:before {
-            border-radius: 50%;
         }
     </style>
 </head>
