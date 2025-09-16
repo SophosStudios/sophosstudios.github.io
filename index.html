@@ -1,750 +1,137 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SophosWRLD — Developer Hub</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
-  <style>
-    :root{
-      --bg:#121212; --panel:#1e1e1e; --panel-2:#161616;
-      --text:#e5e5e5; --muted:#a7a7a7; --accent:#e53935;
-      --accent-2:#ff6b6b; --border:#2a2a2a; --ok:#2e7d32; --warn:#f9a825;
-    }
-    *{box-sizing:border-box} html, body { height:100%; }
-    body { margin:0; background:var(--bg); color:var(--text);
-      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    a{ color: var(--accent-2); text-decoration:none; } a:hover{text-decoration:underline;}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SophosWRLD</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="./style.css">
+    <style>
+        /* Custom CSS for Inter font and general body styles */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Basic transition for sidebar and content area */
+        #left-sidebar, #main-content-wrapper {
+            transition: width 0.3s ease, margin-left 0.3s ease;
+        }
+        /* Overlay backdrop for mobile */
+        #overlay-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 40; /* Below sidebar, above content */
+            display: none;
+        }
+        #overlay-backdrop.visible {
+            display: block;
+        }
 
-    /* Top Nav */
-    .topbar{ position:sticky; top:0; z-index:50; background:linear-gradient(180deg,#151515,#111);
-      border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; padding:10px 16px; }
-    .brand{ font-weight:700; letter-spacing:.3px; display:flex; align-items:center; gap:8px; }
-    .brand .dot{ color:var(--accent); }
-    .tabs{ display:flex; gap:8px; margin-left:12px; flex-wrap:wrap; }
-    .tab{ border:1px solid var(--border); background:var(--panel); color:var(--text);
-      padding:8px 12px; border-radius:10px; cursor:pointer; display:flex; align-items:center; gap:8px;
-      transition:.2s transform,.2s background,.2s border-color; }
-    .tab:hover{ transform:translateY(-1px); border-color:#3a3a3a; }
-    .tab.active{ background:#1a1a1a; border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
-    .grow{ flex:1; }
-    .signout{ border:1px solid var(--border); background:#1a1a1a; color:#fff; padding:8px 12px; border-radius:10px; cursor:pointer; display:flex; align-items:center; gap:8px;}
-    .google{ display:flex; align-items:center; gap:8px; border:1px solid var(--border); background:#fff; color:#111; padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600;}
-    .google img{ width:18px; height:18px; }
-
-    /* Containers */
-    .wrap{ max-width:1180px; margin:18px auto; padding:0 16px; }
-    .grid{ display:grid; grid-template-columns:repeat(12,1fr); gap:16px; }
-    .card{ background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px;
-      box-shadow:0 10px 30px rgba(0,0,0,.25); }
-    .card h3{ margin:0 0 8px 0; }
-    .muted{ color:var(--muted); }
-    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    .center{ text-align:center; }
-    .hidden{ display:none !important; }
-    .btn{ background:var(--accent); color:#fff; border:none; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; }
-    .btn.secondary{ background:transparent; border:1px solid var(--border); color:#fff; }
-    .btn.warn{ background:var(--warn); color:#111; }
-    .btn.ok{ background:var(--ok); }
-    .pill{ display:inline-block; padding:4px 10px; border-radius:999px; background:#221; border:1px solid var(--border); color:#f5b3b2; font-size:12px; }
-
-    /* Inputs */
-    .field{ display:flex; flex-direction:column; gap:6px; margin:8px 0; }
-    input, textarea, select {
-      background:var(--panel-2); border:1px solid var(--border); color:#fff; padding:10px 12px; border-radius:10px; outline:none;
-    }
-    textarea{ min-height:120px; resize:vertical; }
-    input:focus, textarea:focus, select:focus{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
-
-    /* Sections */
-    .section{ display:none; animation: fadeIn .25s ease; }
-    .section.active{ display:block; }
-    @keyframes fadeIn{ from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none} }
-
-    /* Forum */
-    .thread{ border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:10px; background:#181818; }
-    .thread .title{ font-weight:700; }
-    .thread .meta{ color:var(--muted); font-size:12px; }
-    .post{ padding:10px; border-left:3px solid var(--accent); background:#141414; margin:8px 0; border-radius:8px; animation: fadeIn .2s ease; }
-
-    /* Chat */
-    .msg{ padding:8px 10px; margin:6px 0; border:1px solid var(--border); border-radius:10px; background:#161616; animation: fadeIn .2s ease; }
-    .msg .who{ font-weight:600; }
-    .chatbox{ max-height:420px; overflow:auto; padding-right:6px; }
-
-    /* Suspended */
-    .suspend{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
-  </style>
+        /* Custom switch for dark mode (from previous code) */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            -webkit-transition: .4s;
+            transition: .4s;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            -webkit-transition: .4s;
+            transition: .4s;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:focus + .slider {
+            box-shadow: 0 0 1px #2196F3;
+        }
+        input:checked + .slider:before {
+            -webkit-transform: translateX(26px);
+            -ms-transform: translateX(26px);
+            transform: translateX(26px);
+        }
+        .slider.round {
+            border-radius: 34px;
+        }
+        .slider.round:before {
+            border-radius: 50%;
+        }
+        .dark-theme .slider {
+            background-color: #555;
+        }
+        .dark-theme input:checked + .slider {
+            background-color: #667EEA;
+        }
+    </style>
 </head>
-<body>
-
-<!-- AUTH & SUSPENDED SCREENS -->
-<div id="auth" class="auth">
-  <div class="panel card">
-    <div class="grid">
-      <div class="col" style="grid-column: span 7;">
-        <h2 style="margin-top:0"><i class="fas fa-code"></i> Sign in to <span class="brand">SophosWRLD<span class="dot">.</span></span></h2>
-        <p class="muted">A developer hub — collaborate, chat, and share knowledge.</p>
-        <div class="row">
-          <button class="google" onclick="googleSignIn()"><i class="fab fa-google"></i> Sign in with Google</button>
-        </div>
-        <div class="row muted">or</div>
-        <div class="field"><label>Email</label><input id="signInEmail" type="email" placeholder="you@devmail.com"/></div>
-        <div class="field"><label>Password</label><input id="signInPassword" type="password" placeholder="••••••••"/></div>
-        <div class="row">
-          <button class="btn" onclick="signIn()"><i class="fas fa-right-to-bracket"></i> Sign In</button>
-          <button class="btn secondary" onclick="toggleAuthMode(true)"><i class="fas fa-user-plus"></i> Create account</button>
-          <button class="btn secondary" onclick="sendResetFromLogin()"><i class="fas fa-key"></i> Forgot password</button>
-        </div>
-        <p id="authError" class="muted"></p>
-      </div>
-      <div class="col" style="grid-column: span 5;">
-        <img src="./images/forum.svg" alt="Forums" style="width:100%"/>
-      </div>
+<body class="min-h-screen font-inter bg-gradient-to-r from-blue-400 to-purple-600">
+    <div id="loading-spinner" class="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-50 hidden">
+        <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-white"></div>
     </div>
-  </div>
-</div>
 
-<div id="signup" class="auth hidden">
-  <div class="panel card">
-    <div class="grid">
-      <div class="col" style="grid-column: span 7;">
-        <h2 style="margin-top:0"><i class="fas fa-user-plus"></i> Create your account</h2>
-        <div class="field"><label>Display Name</label><input id="signUpName" type="text" maxlength="40" placeholder="Your name"/></div>
-        <div class="field"><label>Email</label><input id="signUpEmail" type="email" placeholder="you@devmail.com"/></div>
-        <div class="field"><label>Password</label><input id="signUpPassword" type="password" placeholder="Choose a strong password"/></div>
-        <div class="row">
-          <button class="btn" onclick="signUp()"><i class="fas fa-user-check"></i> Create Account</button>
-          <button class="btn secondary" onclick="toggleAuthMode(false)">Back to Sign In</button>
+    <!-- Left Sidebar -->
+    <aside id="left-sidebar" class="fixed top-0 left-0 h-full bg-gray-900 text-white z-50 flex flex-col shadow-lg
+                                   w-16 md:w-64 transform -translate-x-full md:translate-x-0
+                                   md:transition-all duration-300 ease-in-out">
+        <div class="p-4 flex items-center justify-center md:justify-start border-b border-gray-700">
+            <button id="sidebar-toggle" class="text-white text-2xl focus:outline-none">
+                <i id="sidebar-icon-open" class="fas fa-bars md:hidden"></i>
+                <i id="sidebar-icon-close" class="fas fa-times hidden md:hidden"></i>
+                <span class="hidden md:inline text-xl font-bold ml-2" id="website-title-sidebar"></span>
+            </button>
         </div>
-        <p id="signupError" class="muted"></p>
-      </div>
-      <div class="col" style="grid-column: span 5;">
-        <img src="./images/chat.svg" alt="Chat" style="width:100%"/>
-      </div>
+        <nav id="left-sidebar-nav" class="flex-grow overflow-y-auto py-4 space-y-2">
+            <!-- Navigation links will be rendered here by JavaScript -->
+        </nav>
+        <!-- Admin Panel Button (fixed at the bottom of the sidebar) -->
+        <div id="admin-panel-button-container" class="p-4 border-t border-gray-700">
+            <!-- Button will be rendered by navigation.js -->
+        </div>
+    </aside>
+
+    <!-- Overlay Backdrop for mobile sidebar -->
+    <div id="overlay-backdrop"></div>
+
+    <!-- Main Content Area -->
+    <div id="main-content-wrapper" class="flex-grow min-h-screen ml-0 md:ml-64">
+        <main id="content-area" class="flex flex-col items-center justify-center p-4 min-h-screen">
+            <!-- Page content will be rendered here by JavaScript -->
+        </main>
     </div>
-  </div>
-</div>
 
-<div id="suspended" class="suspend hidden">
-  <div class="panel card" style="max-width:720px;">
-    <h2 style="margin-top:0; color:var(--accent)"><i class="fas fa-triangle-exclamation"></i> Your account is suspended</h2>
-    <p class="muted">You cannot access the app at this time. If you believe this is a mistake, you may submit an appeal.</p>
-    <div class="field"><label>Appeal message</label><textarea id="appealText" placeholder="Explain why your suspension should be reviewed..."></textarea></div>
-    <div class="row">
-      <button class="btn" onclick="submitAppeal()"><i class="fas fa-envelope-open-text"></i> Submit Appeal</button>
-      <button class="btn secondary" onclick="auth.signOut()">Sign Out</button>
-    </div>
-    <p id="appealMsg" class="muted"></p>
-  </div>
-</div>
-
-<!-- APP -->
-<div id="app" class="hidden">
-  <div class="topbar">
-    <div class="brand"><i class="fas fa-terminal"></i> SophosWRLD<span class="dot">.</span></div>
-    <div class="tabs">
-      <div class="tab active" data-target="home" onclick="nav(this)"><i class="fas fa-house"></i> Home</div>
-      <div class="tab" data-target="chat" onclick="nav(this)"><i class="fas fa-comments"></i> Chat</div>
-      <div class="tab" data-target="forums" onclick="nav(this)"><i class="fas fa-layer-group"></i> Forums</div>
-      <div class="tab" data-target="tickets" onclick="nav(this)"><i class="fas fa-ticket"></i> Tickets</div>
-      <div class="tab" data-target="admin" id="adminTab" class="hidden" onclick="nav(this)"><i class="fas fa-shield-halved"></i> Admin</div>
-      <div class="tab" data-target="profile" onclick="nav(this)"><i class="fas fa-user"></i> Profile</div>
-    </div>
-    <div class="grow"></div>
-    <button class="signout" onclick="signOut()"><i class="fas fa-arrow-right-from-bracket"></i> Sign Out</button>
-  </div>
-
-  <div class="wrap">
-    <!-- HOME -->
-    <section id="home" class="section active">
-      <div class="card animate__animated animate__fadeIn">
-        <h1 style="margin:0 0 6px 0">SophosWRLD — <span class="muted">Developer Communication Hub</span></h1>
-        <p class="muted">A place for developers to connect, share ideas, and collaborate on projects. Join discussions, post threads, create tickets, and chat in real-time — all in one dashboard.</p>
-        <div class="row" style="margin-top:8px;">
-          <span class="pill"><i class="fas fa-bolt"></i> Realtime Chat</span>
-          <span class="pill"><i class="fas fa-comments"></i> Forums</span>
-          <span class="pill"><i class="fas fa-user-gear"></i> Profiles</span>
-          <span class="pill"><i class="fas fa-shield-halved"></i> Admin Tools</span>
-          <span class="pill"><i class="fab fa-google"></i> Google Login</span>
-        </div>
-      </div>
-      <div class="grid" style="margin-top:16px;">
-        <div class="card" style="grid-column: span 4;">
-          <h3><i class="fas fa-comments"></i> Chat</h3>
-          <p class="muted">Discuss ideas quickly with other devs. Lightweight, real-time.</p>
-          <img src="./images/chat.svg" alt="Chat preview" style="width:100%"/>
-        </div>
-        <div class="card" style="grid-column: span 4;">
-          <h3><i class="fas fa-layer-group"></i> Forums</h3>
-          <p class="muted">Long-form topics, announcements, and knowledge sharing.</p>
-          <img src="./images/forum.svg" alt="Forum preview" style="width:100%"/>
-        </div>
-        <div class="card" style="grid-column: span 4;">
-          <h3><i class="fas fa-user"></i> Profile</h3>
-          <p class="muted">Customize your presence with name, bio, and avatar.</p>
-          <img src="./images/profile.svg" alt="Profile preview" style="width:100%"/>
-        </div>
-      </div>
-    </section>
-
-    <!-- CHAT: roomsPublic/general -->
-    <section id="chat" class="section">
-      <div class="card">
-        <h3><i class="fas fa-comments"></i> General Chat</h3>
-        <div id="chatbox" class="chatbox"></div>
-        <div class="row">
-          <input id="chatText" type="text" placeholder="Write a message and press Enter"/>
-          <button class="btn" onclick="sendChat()"><i class="fas fa-paper-plane"></i> Send</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- FORUMS -->
-    <section id="forums" class="section">
-      <div class="card">
-        <div class="row" style="justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;"><i class="fas fa-layer-group"></i> Forums</h3>
-          <button class="btn" onclick="toggleNewThread(true)"><i class="fas fa-plus"></i> New Thread</button>
-        </div>
-        <div id="newThread" class="hidden" style="margin:10px 0;">
-          <div class="field"><label>Title</label><input id="threadTitle" type="text" placeholder="Thread title"/></div>
-          <div class="field"><label>Body</label><textarea id="threadBody" placeholder="What's on your mind?"></textarea></div>
-          <div class="row">
-            <button class="btn" onclick="createThread()"><i class="fas fa-paper-plane"></i> Post Thread</button>
-            <button class="btn secondary" onclick="toggleNewThread(false)">Cancel</button>
-          </div>
-          <p id="threadError" class="muted"></p>
-        </div>
-        <div id="threads"></div>
-      </div>
-    </section>
-
-    <!-- TICKETS -->
-    <section id="tickets" class="section">
-      <div class="card">
-        <div class="row" style="justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;"><i class="fas fa-ticket"></i> My Tickets</h3>
-          <button class="btn" onclick="openTicketComposer(true)"><i class="fas fa-plus"></i> New Ticket</button>
-        </div>
-        <div id="ticketCompose" class="hidden" style="margin:10px 0;">
-          <div class="field"><label>Type</label>
-            <select id="ticketType">
-              <option value="support">Support</option>
-              <option value="appeal">Appeal</option>
-              <option value="suggestion">Suggestion</option>
-            </select>
-          </div>
-          <div class="field"><label>Message</label><textarea id="ticketMessage" placeholder="Describe your request..."></textarea></div>
-          <div class="row">
-            <button class="btn" onclick="createTicket()"><i class="fas fa-paper-plane"></i> Submit Ticket</button>
-            <button class="btn secondary" onclick="openTicketComposer(false)">Cancel</button>
-          </div>
-          <p id="ticketError" class="muted"></p>
-        </div>
-        <div id="ticketList"></div>
-      </div>
-    </section>
-
-    <!-- ADMIN -->
-    <section id="admin" class="section">
-      <div class="grid">
-        <div class="card" style="grid-column: span 7;">
-          <h3><i class="fas fa-users"></i> Users</h3>
-          <div class="row">
-            <input id="userSearch" type="text" placeholder="Search by name or email"/>
-            <button class="btn secondary" onclick="loadUsers()"><i class="fas fa-rotate"></i> Refresh</button>
-          </div>
-          <div id="userList"></div>
-        </div>
-        <div class="card" style="grid-column: span 5;">
-          <h3><i class="fas fa-ticket"></i> Tickets</h3>
-          <div id="adminTickets"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- PROFILE -->
-    <section id="profile" class="section">
-      <div class="card">
-        <h3><i class="fas fa-user-gear"></i> Profile</h3>
-        <div class="grid">
-          <div class="card" style="grid-column: span 6;">
-            <h4>My Info</h4>
-            <p><b>Name:</b> <span id="pName"></span></p>
-            <p><b>Email:</b> <span id="pEmail"></span></p>
-            <p><b>Role:</b> <span id="pRole"></span></p>
-            <p><b>UID:</b> <span id="pUid"></span></p>
-          </div>
-          <div class="card" style="grid-column: span 6;">
-            <h4>Edit Profile</h4>
-            <div class="field"><label>Display Name</label><input id="editName" type="text" maxlength="40"/></div>
-            <div class="field"><label>Bio</label><textarea id="editBio"></textarea></div>
-            <div class="field"><label>Avatar URL</label><input id="editAvatar" type="url"/></div>
-            <div class="field"><label>Accent Color</label><input id="editAccent" type="color" value="#e53935"/></div>
-            <div class="row">
-              <button class="btn" onclick="saveProfile()"><i class="fas fa-save"></i> Save</button>
-            </div>
-            <p id="profileMsg" class="muted"></p>
-          </div>
-        </div>
-      </div>
-    </section>
-  </div>
-</div>
-
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-functions-compat.js"></script>
-<script>
-// === CONFIG ===
-const firebaseConfig = {
-  apiKey: "AIzaSyCbdfLVFXpRg-wTev7QfPhyJ-LFPpyI3mU",
-  authDomain: "sophoswrld.firebaseapp.com",
-  databaseURL: "https://sophoswrld-default-rtdb.firebaseio.com",
-  projectId: "sophoswrld",
-  storageBucket: "sophoswrld.firebasestorage.app",
-  messagingSenderId: "26686142400",
-  appId: "1:26686142400:web:48f8d3ae0b097731317a25",
-  measurementId: "G-6XETC98C22"
-};
-const APP_ID = "sophoswrld"; // <-- change to your appId used in Firestore paths
-
-// === INIT ===
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db   = firebase.firestore();
-const fns  = firebase.functions();
-
-// === UTIL ===
-function escapeHTML(s = '') {
-  return s.replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
-}
-function el(tag, attrs={}, inner=''){
-  const e = document.createElement(tag);
-  for (const [k,v] of Object.entries(attrs)){ if (v != null) e.setAttribute(k,v); }
-  if (typeof inner === 'string') e.innerHTML = inner;
-  else if (inner instanceof Node) e.appendChild(inner);
-  else if (Array.isArray(inner)) inner.forEach(n => e.appendChild(n));
-  return e;
-}
-function fmtDate(ts){
-  if (!ts) return '';
-  const d = ts?.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleString();
-}
-function notify(elmId, msg){ const n = document.getElementById(elmId); if (n) n.textContent = msg; }
-
-// === AUTH UI TOGGLE ===
-function toggleAuthMode(signup){
-  document.getElementById('auth').classList.toggle('hidden', signup);
-  document.getElementById('signup').classList.toggle('hidden', !signup);
-}
-function showApp(show){
-  document.getElementById('auth').classList.add('hidden');
-  document.getElementById('signup').classList.add('hidden');
-  document.getElementById('suspended').classList.add('hidden');
-  document.getElementById('app').classList.toggle('hidden', !show);
-  if (show) { setActive('home'); }
-}
-function showSuspended(){
-  document.getElementById('auth').classList.add('hidden');
-  document.getElementById('signup').classList.add('hidden');
-  document.getElementById('app').classList.add('hidden');
-  document.getElementById('suspended').classList.remove('hidden');
-}
-
-// === NAV ===
-function setActive(id){
-  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  const active = document.querySelector(`.tab[data-target="${id}"]`);
-  if (active) active.classList.add('active');
-}
-function nav(btn){ setActive(btn.dataset.target); }
-
-// === AUTH ACTIONS ===
-function signIn(){
-  const email = document.getElementById('signInEmail').value.trim();
-  const pass  = document.getElementById('signInPassword').value;
-  auth.signInWithEmailAndPassword(email, pass).catch(e => notify('authError', e.message));
-}
-function sendResetFromLogin(){
-  const email = document.getElementById('signInEmail').value.trim();
-  if (!email) return notify('authError','Enter your email then click Forgot password.');
-  auth.sendPasswordResetEmail(email).then(()=> notify('authError','Password reset email sent.')).catch(e=>notify('authError',e.message));
-}
-async function signUp() { // Removed parameters
-  const email = document.getElementById('signUpEmail').value.trim();
-  const pass  = document.getElementById('signUpPassword').value;
-  const displayName = document.getElementById('signUpName').value.trim();
-  firebase.auth().createUserWithEmailAndPassword(email, pass)
-    .then(cred => {
-      // create Firestore profile document for this user
-      return db.collection(`artifacts/${APP_ID}/public/data/users`)
-        .doc(cred.user.uid)
-        .set({
-          uid: cred.user.uid,
-          name: displayName,
-          bio: "",
-          avatar: "",
-          role: "member",
-          isBanned: false,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-    })
-    .catch(err => {
-      alert("Sign up failed: " + err.message);
-    });
-}
-function googleSignIn(){
-  const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).then(async result => {
-    await ensureUserDoc(result.user.uid, {name: result.user.displayName || 'User'});
-  }).catch(e => notify('authError', e.message));
-}
-function signOut(){ auth.signOut(); }
-
-async function ensureUserDoc(uid, {name}){
-  const ref = db.doc(`artifacts/${APP_ID}/public/data/users/${uid}`);
-  const snap = await ref.get();
-  if (!snap.exists){
-    await ref.set({
-      uid, name: name || 'User', bio: '', avatar: '', accentColor: '#e53935',
-      role: 'member', currency: 0, isBanned: false,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-  }
-}
-
-// Auth state
-let unsubThreads = null, unsubChat = null, unsubTickets = null, unsubAdminTickets = null;
-auth.onAuthStateChanged(async user => {
-  if (user) {
-    console.log("User logged in:", user.uid);
-    // Load their profile data
-    const doc = await db.collection(`artifacts/${APP_ID}/public/data/users`).doc(user.uid).get();
-    if (!doc.exists) {
-      // If profile doesn’t exist (e.g. Google login), create a default one
-      await db.collection(`artifacts/${APP_ID}/public/data/users`).doc(user.uid).set({
-        uid: user.uid,
-        name: user.displayName || "Anonymous",
-        bio: "",
-        avatar: user.photoURL || "",
-        role: "member",
-        isBanned: false,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    }
-
-    // This is the corrected code.
-    const userData = doc.data() || {};
-    if (userData.isBanned) {
-      showSuspended();
-      return;
-    }
-    showApp(true);
-    loadProfile(user);
-    watchThreads();
-    watchChat();
-    watchTickets();
-    checkAdmin(userData);
-
-  } else {
-    console.log("User logged out");
-    if (unsubThreads){ unsubThreads(); unsubThreads=null; }
-    if (unsubChat){ unsubChat(); unsubChat=null; }
-    if (unsubTickets){ unsubTickets(); unsubTickets=null; }
-    if (unsubAdminTickets){ unsubAdminTickets(); unsubAdminTickets=null; }
-    document.getElementById('app').classList.add('hidden');
-    document.getElementById('suspended').classList.add('hidden');
-    document.getElementById('auth').classList.remove('hidden');
-  }
-});
-
-// Suspended - submit appeal
-async function submitAppeal(){
-  const user = auth.currentUser; if (!user) return;
-  const message = document.getElementById('appealText').value.trim();
-  if (!message) return notify('appealMsg','Please write a message.');
-  await db.collection(`artifacts/${APP_ID}/public/data/tickets`).add({
-    createdBy: user.uid, type: 'appeal', status: 'pending', message,
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
-  notify('appealMsg','Appeal submitted. We will review it soon.');
-}
-
-async function submitSuggestion() {
-  const user = auth.currentUser; if (!user) return;
-  const message = document.getElementById('suggestionText').value.trim();
-  if (!message) return notify('suggestionMsg', 'Please write your suggestion.');
-  await db.collection(`artifacts/${APP_ID}/public/data/ticket`).add({
-    createdBy: user.uid, type: 'suggestion', status: 'pending', message,
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
-  notify('appealMsg', 'Suggestion submitted. Staff will reveal it shortly')
-}
-
-// === PROFILE ===
-async function loadProfile(user){
-  document.getElementById('pEmail').textContent = user.email || '';
-  document.getElementById('pUid').textContent = user.uid;
-  const ref = db.doc(`artifacts/${APP_ID}/public/data/users/${user.uid}`);
-  const doc = await ref.get();
-  const data = doc.data() || {};
-  document.getElementById('pName').textContent = data.name || '';
-  document.getElementById('pRole').textContent = data.role || 'member';
-  document.getElementById('editName').value = data.name || '';
-  document.getElementById('editBio').value = data.bio || '';
-  document.getElementById('editAvatar').value = data.avatar || '';
-  document.getElementById('editAccent').value = data.accentColor || '#e53935';
-}
-async function saveProfile(){
-  const user = auth.currentUser;
-  // This check is the fix. If user is null, the function stops.
-  if (!user) {
-    notify('profileMsg', 'You must be logged in to save your profile.');
-    return;
-  }
-  const ref = db.doc(`artifacts/${APP_ID}/public/data/users/${user.uid}`);
-  const payload = {
-    name: document.getElementById('editName').value.trim(),
-    bio: document.getElementById('editBio').value,
-    avatar: document.getElementById('editAvatar').value,
-    accentColor: document.getElementById('editAccent').value,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
-  try { await ref.update(payload); notify('profileMsg','Profile saved.'); }
-  catch(e){ notify('profileMsg', e.message); }
-}
-
-// === CHAT (public room general) ===
-function watchChat(){
-  const list = document.getElementById('chatbox');
-  if (unsubChat) unsubChat();
-  unsubChat = db.collection(`artifacts/${APP_ID}/public/data/roomsPublic/general/messages`)
-    .orderBy('createdAt','asc')
-    .onSnapshot(async snap => {
-      list.innerHTML='';
-      for (const doc of snap.docs){
-        const d = doc.data();
-        const userDoc = await db.doc(`artifacts/${APP_ID}/public/data/users/${d.senderId}`).get();
-        const name = userDoc.exists ? userDoc.data().name || 'User' : d.senderId;
-        const div = el('div',{class:'msg'},
-          `<div class="who">${escapeHTML(name)} <span class="muted" style="font-weight:400">• ${fmtDate(d.createdAt)}</span></div>
-           <div>${escapeHTML(d.text||'')}</div>`);
-        list.appendChild(div);
-      }
-      list.scrollTop = list.scrollHeight;
-    });
-}
-async function sendChat(){
-  const user = auth.currentUser; if (!user) return;
-  const text = document.getElementById('chatText').value.trim();
-  if (!text) return;
-  await db.collection(`artifacts/${APP_ID}/public/data/roomsPublic/general/messages`).add({
-    senderId: user.uid, text, createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
-  document.getElementById('chatText').value='';
-}
-
-// === FORUMS ===
-function toggleNewThread(show){
-  document.getElementById('newThread').classList.toggle('hidden', !show);
-  if (show) document.getElementById('threadTitle').focus();
-}
-function renderThread(threadId, data){
-  const t = el('div',{class:'thread'});
-  const title = escapeHTML(data.title||'');
-  const body  = escapeHTML(data.body||'');
-  const meta  = `by ${escapeHTML(data.authorName||'unknown')} • ${fmtDate(data.createdAt)}`;
-  t.appendChild(el('div',{class:'title'}, title));
-  t.appendChild(el('div',{class:'meta'}, meta));
-  t.appendChild(el('div',{style:'margin-top:6px;'}, `${body}<br/><br/>~ Sincerely, ${escapeHTML(data.authorName||'User')}`));
-  const postsWrap = el('div',{id:`posts-${threadId}`, style:'margin-top:8px;'});
-  t.appendChild(postsWrap);
-  const comp = el('div',{class:'composer', style:'margin-top:8px;'},`
-    <textarea id="reply-${threadId}" placeholder="Write a reply..."></textarea>
-    <div class="row" style="margin-top:6px;">
-      <button class="btn" onclick="createReply('${threadId}')"><i class="fas fa-reply"></i> Reply</button>
-    </div>`);
-  t.appendChild(comp);
-  loadPosts(threadId, postsWrap);
-  return t;
-}
-async function createThread(){
-  const user = auth.currentUser; if (!user) return;
-  const title = document.getElementById('threadTitle').value.trim();
-  const body  = document.getElementById('threadBody').value.trim();
-  const errEl = document.getElementById('threadError'); errEl.textContent='';
-  if (!title || !body){ errEl.textContent='Title and body are required.'; return; }
-  const userDoc = await db.doc(`artifacts/${APP_ID}/public/data/users/${user.uid}`).get();
-  const name = userDoc.exists ? userDoc.data().name || 'User' : 'User';
-  try{
-    await db.collection(`artifacts/${APP_ID}/public/data/forumThreads`).add({
-      authorId: user.uid, authorName: name, title, body,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    document.getElementById('threadTitle').value='';
-    document.getElementById('threadBody').value='';
-    toggleNewThread(false);
-  }catch(e){ errEl.textContent = e.message; }
-}
-function loadPosts(threadId, wrap){
-  db.collection(`artifacts/${APP_ID}/public/data/forumThreads/${threadId}/posts`)
-    .orderBy('createdAt','asc')
-    .onSnapshot(snap => {
-      wrap.innerHTML='';
-      snap.forEach(doc => {
-        const d = doc.data();
-        const p = el('div',{class:'post'},
-          `<div class="muted" style="font-size:12px;">${escapeHTML(d.authorName||'')} • ${fmtDate(d.createdAt)}</div>
-           <div>${escapeHTML(d.body||'')}</div>`);
-        wrap.appendChild(p);
-      });
-    });
-}
-async function createReply(threadId){
-  const user = auth.currentUser; if (!user) return;
-  const ta = document.getElementById(`reply-${threadId}`);
-  const text = ta.value.trim(); if (!text) return;
-  const userDoc = await db.doc(`artifacts/${APP_ID}/public/data/users/${user.uid}`).get();
-  const name = userDoc.exists ? userDoc.data().name || 'User' : 'User';
-  try{
-    await db.collection(`artifacts/${APP_ID}/public/data/forumThreads/${threadId}/posts`).add({
-      authorId: user.uid, authorName: name, body: text,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    ta.value='';
-  }catch(e){ alert(e.message); }
-}
-function watchThreads(){
-  const list = document.getElementById('threads');
-  if (unsubThreads) unsubThreads();
-  unsubThreads = db.collection(`artifacts/${APP_ID}/public/data/forumThreads`)
-    .orderBy('createdAt','desc')
-    .onSnapshot(snap => {
-      list.innerHTML='';
-      if (snap.empty){ list.appendChild(el('div',{class:'muted'},'No threads yet. Start the first one!')); }
-      snap.forEach(doc => list.appendChild(renderThread(doc.id, doc.data())));
-    });
-}
-
-// === TICKETS (user) ===
-function openTicketComposer(show){ document.getElementById('ticketCompose').classList.toggle('hidden', !show); }
-function watchTickets(){
-  const wrap = document.getElementById('ticketList');
-  if (unsubTickets) unsubTickets();
-  const uid = auth.currentUser.uid;
-  unsubTickets = db.collection(`artifacts/${APP_ID}/public/data/tickets`).where('createdBy','==',uid)
-    .orderBy('createdAt','desc').onSnapshot(snap => {
-      wrap.innerHTML='';
-      snap.forEach(doc => {
-        const d = doc.data();
-        wrap.appendChild(el('div',{class:'thread'},
-          `<div class="title"><i class="fas fa-ticket"></i> ${escapeHTML(d.type)} — <span class="pill">${escapeHTML(d.status)}</span></div>
-           <div class="meta">${fmtDate(d.createdAt)}</div>
-           <div style="margin-top:6px;">${escapeHTML(d.message||'')}</div>`));
-      });
-    });
-}
-async function createTicket(){
-  const user = auth.currentUser; if (!user) return;
-  const type = document.getElementById('ticketType').value;
-  const msg  = document.getElementById('ticketMessage').value.trim();
-  if (!msg) return notify('ticketError','Please write a message.');
-  await db.collection(`artifacts/${APP_ID}/public/data/tickets`).add({
-    createdBy: user.uid, type, status: 'pending', message: msg,
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
-  document.getElementById('ticketMessage').value='';
-  openTicketComposer(false);
-}
-
-// === ADMIN ===
-function checkAdmin(userData){
-  const isAdmin = userData && (userData.role === 'admin' || userData.role === 'founder');
-  const tab = document.querySelector('.tab[data-target="admin"]');
-  if (tab){ tab.classList.toggle('hidden', !isAdmin); if (isAdmin) loadUsers(), watchAdminTickets(); }
-}
-async function loadUsers(){
-  const q = document.getElementById('userSearch').value.toLowerCase();
-  const wrap = document.getElementById('userList');
-  wrap.innerHTML='';
-  const snap = await db.collection(`artifacts/${APP_ID}/public/data/users`).limit(200).get();
-  snap.forEach(doc => {
-    const u = doc.data();
-    const hay = (u.name||'') + ' ' + (u.uid||'') + ' ' + (u.email||'');
-    if (q && !hay.toLowerCase().includes(q)) return;
-    const row = el('div',{class:'row', style:'justify-content:space-between; border:1px solid var(--border); padding:10px; border-radius:10px; margin:6px 0;'},
-      `<div><b>${escapeHTML(u.name||'User')}</b><br/>
-       <span class="muted">${escapeHTML(u.email||'no email')}</span><br/>
-       <span class="pill">${escapeHTML(u.role||'member')}</span> ${u.isBanned ? '<span class="pill" style="background:#331;">Suspended</span>':''}
-      </div>`);
-    const btns = el('div',{class:'row'});
-    const suspendBtn = el('button',{class:`btn ${u.isBanned?'ok':'warn'}`}, `<i class="fas fa-user-slash"></i> ${u.isBanned?'Unsuspend':'Suspend'}`);
-    suspendBtn.onclick = async ()=>{
-      await db.doc(`artifacts/${APP_ID}/public/data/users/${u.uid}`).update({
-        isBanned: !u.isBanned,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      loadUsers();
-    };
-    const resetBtn = el('button',{class:'btn secondary'}, `<i class="fas fa-key"></i> Send Reset`);
-    resetBtn.onclick = ()=>{
-      if (!u.email){ alert('No email on file.'); return; }
-      auth.sendPasswordResetEmail(u.email).then(()=>alert('Password reset email sent.')).catch(e=>alert(e.message));
-    };
-    const delBtn = el('button',{class:'btn', style:'background:#8b0000'}, `<i class="fas fa-user-xmark"></i> Delete`);
-    delBtn.onclick = async ()=>{
-      const ok = confirm(`Delete account for ${u.name||u.uid}? This cannot be undone.`);
-      if (!ok) return;
-      try{
-        const callable = firebase.functions().httpsCallable('deleteUserByUid');
-        await callable({ appId: APP_ID, uid: u.uid });
-        alert('Deleted.');
-        loadUsers();
-      }catch(e){ alert(e.message); }
-    };
-    btns.appendChild(suspendBtn);
-    btns.appendChild(resetBtn);
-    btns.appendChild(delBtn);
-    row.appendChild(btns);
-    wrap.appendChild(row);
-  });
-}
-function watchAdminTickets(){
-  const wrap = document.getElementById('adminTickets');
-  if (unsubAdminTickets) unsubAdminTickets();
-  unsubAdminTickets = db.collection(`artifacts/${APP_ID}/public/data/tickets`).orderBy('createdAt','desc')
-    .onSnapshot(snap => {
-      wrap.innerHTML='';
-      snap.forEach(doc => {
-        const t = doc.data();
-        const box = el('div',{class:'row', style:'justify-content:space-between; border:1px solid var(--border); padding:10px; border-radius:10px; margin:6px 0;'},
-          `<div><b>${escapeHTML(t.type)}</b> <span class="pill">${escapeHTML(t.status)}</span><br/>
-             <span class="muted">${escapeHTML(t.createdBy)}</span> • ${fmtDate(t.createdAt)}<br/>
-             ${escapeHTML(t.message||'')}</div>`);
-        const ctrl = el('div',{class:'row'});
-        ['open','pending','closed'].forEach(st => {
-          const b = el('button',{class:'btn secondary'}, st);
-          b.onclick = ()=> db.doc(`artifacts/${APP_ID}/public/data/tickets/${doc.id}`).update({status: st, updatedAt: firebase.firestore.FieldValue.serverTimestamp()});
-          ctrl.appendChild(b);
-        });
-        box.appendChild(ctrl);
-        wrap.appendChild(box);
-      });
-    });
-}
-</script>
+    <!-- Import all JavaScript modules -->
+    <script type="module" src="config.js"></script>
+    <script type="module" src="src/utils.js"></script>
+    <script type="module" src="src/firebase-service.js"></script>
+    <script type="module" src="src/modals.js"></script>
+    <script type="module" src="src/page-renderers.js"></script>
+    <script type="module" src="src/navigation.js"></script>
+    <script type="module" src="App.js"></script> <!-- Main entry point -->
 </body>
 </html>
