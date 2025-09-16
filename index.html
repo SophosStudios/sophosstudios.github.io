@@ -9,15 +9,25 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        /* Basic styling for the main content area to allow scrolling */
+        /* Reset and base styles for the entire page */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8fafc; /* Subtle light gray background for a clean look */
+            transition: background-color 0.3s ease-in-out;
+        }
+
+        /* Dark theme styles */
+        .dark body {
+            background: #111827; /* Dark gray for the body in dark mode */
+        }
+
+        /* Styles for the main content area */
         #content-area {
-            min-height: calc(100vh - 64px); /* Subtract navbar height */
+            min-height: calc(100vh - 64px); /* Correctly handles navbar height */
+            padding: 2rem 1rem; /* Generous padding on all sides */
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding-bottom: 2rem; /* Add some padding at the bottom */
+            align-items: center; /* Center content horizontally */
         }
 
         /* Styles for the side drawer menu */
@@ -26,17 +36,16 @@
             top: 0;
             left: 0;
             height: 100vh;
-            width: 280px; /* Adjust width as needed */
-            background-color: #1f2937; /* Gray-800 equivalent */
-            z-index: 50; /* Above content, below modal */
+            width: 280px;
+            background-color: #1f2937;
+            z-index: 50;
             transform: translateX(-100%);
             transition: transform 0.3s ease-in-out;
-            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.5); /* Shadow on open */
-            overflow-y: auto; /* Allow scrolling for many menu items */
-            padding-top: 4rem; /* Space for fixed navbar/status bar */
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.6);
+            overflow-y: auto;
+            padding-top: 4rem;
             display: flex;
             flex-direction: column;
-            align-items: flex-start;
         }
 
         #side-drawer-menu.open {
@@ -50,8 +59,8 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 40; /* Below drawer, above main content */
+            background-color: rgba(0, 0, 0, 0.6); /* Slightly darker overlay */
+            z-index: 40;
             opacity: 0;
             visibility: hidden;
             transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
@@ -62,12 +71,69 @@
             visibility: visible;
         }
 
-        /* Hide desktop nav links when mobile menu is open - no longer needed as side drawer handles all mobile nav */
-        /* @media (max-width: 767px) {
-            #nav-links.hidden-on-mobile-menu-open {
-                display: none;
-            }
-        } */
+        /* Additional class for a more visually appealing card */
+        .content-card {
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+            transform: translateY(0);
+            backdrop-filter: blur(8px);
+        }
+        .content-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Custom switch for dark mode toggle */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+        }
+
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        /* Rounded sliders */
+        .slider.round {
+            border-radius: 28px;
+        }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-r from-blue-400 to-purple-600 min-h-screen font-inter">
