@@ -8,26 +8,26 @@
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-        <style>
+    <style>
         /* Base styles */
         body { 
             font-family: 'Inter', sans-serif; 
-            background: #f8fafc; /* Subtle light gray background for a clean look */
+            background: #f8fafc;
             transition: background-color 0.3s ease-in-out;
         }
 
         /* Dark theme styles */
         .dark body {
-            background: #111827; /* Dark gray for the body in dark mode */
+            background: #111827;
         }
-
+        
         /* Main content area */
         #content-area {
-            min-height: calc(100vh - 64px); /* Correctly handles navbar height */
+            min-height: calc(100vh - 64px);
             padding: 2rem 1rem;
             display: flex;
             flex-direction: column;
-            align-items: center; /* Center content horizontally */
+            align-items: center;
         }
 
         /* Side drawer menu */
@@ -52,7 +52,7 @@
             transform: translateX(0);
         }
 
-        /* Overlay for when the side drawer is open */
+        /* Overlay for side drawer */
         #overlay-backdrop {
             position: fixed;
             top: 0;
@@ -106,7 +106,7 @@
             bottom: 0;
             background-color: #ccc;
             transition: .4s;
-            border-radius: 28px; /* Correct for rounded corners */
+            border-radius: 28px;
         }
 
         .slider:before {
@@ -118,7 +118,7 @@
             bottom: 4px;
             background-color: white;
             transition: .4s;
-            border-radius: 50%; /* Correct for a circular handle */
+            border-radius: 50%;
         }
 
         input:checked + .slider {
@@ -128,6 +128,46 @@
         input:checked + .slider:before {
             transform: translateX(22px);
         }
+
+        /* Navbar-specific styles */
+        .nav-link {
+            transition: color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+            position: relative;
+            text-decoration: none;
+            overflow: hidden;
+        }
+        
+        .nav-link:hover {
+            background-color: #374151; /* Deeper gray for hover */
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: #3b82f6; /* Blue underline */
+            transition: width 0.3s ease-in-out;
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+
+        /* Mobile menu icon transition */
+        .hamburger-icon, .close-icon {
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .hamburger-icon {
+            transform: rotate(0deg);
+        }
+
+        .close-icon {
+            transform: rotate(90deg);
+        }
     </style>
 </head>
 <body class="bg-gradient-to-r from-blue-400 to-purple-600 min-h-screen font-inter">
@@ -135,23 +175,20 @@
     <!-- The overlay backdrop -->
     <div id="overlay-backdrop"></div>
 
-    <nav class="bg-gray-800 p-4 text-white shadow-lg sticky top-0 z-40">
+        <nav class="bg-gray-800 p-4 text-white shadow-lg sticky top-0 z-40">
         <div class="container mx-auto flex justify-between items-center">
-            <!-- Mobile Menu Toggle Button (Hamburger/X icon) -->
             <button id="mobile-menu-toggle" class="text-white focus:outline-none p-2 rounded-md hover:bg-gray-700 md:hidden">
-                <i id="mobile-menu-icon-open" class="fas fa-bars text-xl"></i>
-                <i id="mobile-menu-icon-close" class="fas fa-times text-xl hidden"></i>
+                <i id="mobile-menu-icon-open" class="fas fa-bars text-xl hamburger-icon"></i>
+                <i id="mobile-menu-icon-close" class="fas fa-times text-xl close-icon hidden"></i>
             </button>
 
             <button id="nav-home" class="text-2xl font-bold hover:text-gray-300 transition duration-200">
                 SophosWRLD
             </button>
             
-            <!-- Desktop Nav Links -->
-            <div class="hidden md:flex space-x-4" id="nav-links">
-                <button id="nav-about" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200">About</button>
-                <!-- Dynamic links (Forum, Admin, Profile, Sign Out/In) will be loaded here by App.js -->
-            </div>
+            <div class="hidden md:flex space-x-2" id="nav-links">
+                <button id="nav-about" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-white transition duration-200 nav-link">About</button>
+                </div>
             
         </div>
     </nav>
