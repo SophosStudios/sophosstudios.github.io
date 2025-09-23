@@ -1430,7 +1430,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     colorClass = 'text-red-600'; // Admin color
                     break;
                 case 'founder':
-                    emoji = '✨'; // Sparkles emoji
+                    emoji = '👑'; // Sparkles emoji
                     colorClass = 'text-purple-600'; // Founder color
                     break;
                 case 'co-founder': // New co-founder role
@@ -1442,7 +1442,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     colorClass = 'text-indigo-600'; // Partner color
                     break;
                 default:
-                    emoji = '';
+                    emoji = '❌';
                     colorClass = 'text-gray-800';
             }
             // Apply a subtle animation for all roles, or only privileged ones
@@ -1703,6 +1703,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             { name: 'Green-Cyan Gradient', class: 'bg-gradient-to-r from-green-400 to-cyan-600' },
             { name: 'Red-Black Gradient', class: 'bg-gradient-to-r from-red-800 to-black' },
             { name: 'Orange-Red Gradient', class: 'bg-gradient-to-r from-orange-600 to-red-600' },
+            { name: 'JuiceWRLD (999 Edition)', url: 'https://4kwallpapers.com/images/wallpapers/juice-wrld-fighting-1920x1080-9496.jpeg' },
         ];
 
         const isPartnerOrAdmin = userData.role === 'partner' || userData.role === 'admin' || userData.role === 'founder' || userData.role === 'co-founder';
@@ -4192,3 +4193,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         mobileDrawerAboutButton.addEventListener('click', () => navigateTo('about'));
     }
 });
+
